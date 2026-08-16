@@ -11,9 +11,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "strict": true,
+    "strictPropertyInitialization": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src", "src/env.d.ts"]
 }

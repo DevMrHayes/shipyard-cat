@@ -48,6 +48,7 @@ export class GameEngine {
   private isWhiskersMode: boolean = false;
   private pounceTarget: THREE.Vector3 | null = null;
   private isPouncing: boolean = false;
+  private pounceTimer: number = 0;
   private catHeading: number = 0;
   private turnVelocity: number = 0;
   private isDraggingMouse: boolean = false;
@@ -808,8 +809,8 @@ export class GameEngine {
               rat.state = 'CAUGHT';
               soundEngine.playSuccess();
               this.vitals.feed(100);
-              this.vitals.stamina = this.vitals.maxStamina;
-              this.vitals.health = this.vitals.maxHealth;
+              this.vitals.currentStamina = this.vitals.maxStamina;
+              this.vitals.currentHealth = this.vitals.maxHealth;
               this.progression.skillPoints += 1;
               this.progression.addXP(150);
 
@@ -823,7 +824,7 @@ export class GameEngine {
             rat.state = 'CAUGHT';
             soundEngine.playRatCatch();
             this.vitals.feed(rat.nutritionValue);
-            this.vitals.stamina = Math.min(this.vitals.maxStamina, this.vitals.stamina + 35);
+            this.vitals.currentStamina = Math.min(this.vitals.maxStamina, this.vitals.currentStamina + 35);
 
             const xpEarned = rat.nutritionValue * 3;
             const leveledUp = this.progression.addXP(xpEarned);

@@ -143,30 +143,6 @@ export class SoundEngine {
     } catch {}
   }
 
-  // Whiskers Sonar Ping
-  public playWhiskersPing() {
-    if (this.isMuted || !this.ctx) return;
-    this.init();
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1400, now);
-      osc.frequency.exponentialRampToValueAtTime(320, now + 0.35);
-
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.36);
-    } catch {}
-  }
-
   // Combat: Paw Swipe
   public playPawSwipe() {
     if (this.isMuted || !this.ctx) return;

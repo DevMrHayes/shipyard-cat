@@ -306,9 +306,11 @@ export class RatEntity {
 
     // Run animation wobble & thermal pulse
     this.runCycle += deltaTime * 12;
-    this.bodyMesh.position.y = (this.isKingpin ? 0.22 : 0.12) + Math.abs(Math.sin(this.runCycle)) * 0.03;
+    if (this.bodyMesh) {
+      this.bodyMesh.position.y = (this.isKingpin ? 0.22 : 0.12) + Math.abs(Math.sin(this.runCycle)) * 0.03;
+    }
 
-    if (this.thermalAura.visible) {
+    if (this.thermalAura && this.thermalAura.visible) {
       const scale = 1.0 + Math.sin(Date.now() * 0.008) * 0.15;
       this.thermalAura.scale.set(scale, scale, scale);
     }

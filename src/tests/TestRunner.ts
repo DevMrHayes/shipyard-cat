@@ -140,16 +140,16 @@ export class TestRunner {
 
   private static testProgressionSystem() {
     const prog = new ProgressionSystem();
-    if (prog.level !== 1 || prog.rankTitle !== 'Yard Kitten') {
+    if ((prog.level as number) !== 1 || prog.rankTitle !== 'Yard Kitten') {
       throw new Error(`Expected Level 1 Yard Kitten, got Level ${prog.level} ${prog.rankTitle}`);
     }
 
     // Award 450 XP -> reaches Level 3 (200 XP/level), unlocks 2 Skill Points
     const leveledUp = prog.addXP(450);
-    if (!leveledUp || prog.level !== 3) {
+    if (!leveledUp || (prog.level as number) !== 3) {
       throw new Error(`Expected Level 3 after 450 XP, got Level ${prog.level}`);
     }
-    if (prog.skillPoints !== 2) {
+    if ((prog.skillPoints as number) !== 2) {
       throw new Error(`Expected 2 Skill Points, got ${prog.skillPoints}`);
     }
 
@@ -161,7 +161,7 @@ export class TestRunner {
     if (prog.jumpMultiplier < 1.4) {
       throw new Error(`Jump multiplier did not increase: ${prog.jumpMultiplier}`);
     }
-    if (prog.skillPoints !== 1) {
+    if ((prog.skillPoints as number) !== 1) {
       throw new Error(`SP did not decrement to 1: ${prog.skillPoints}`);
     }
   }
@@ -194,19 +194,19 @@ export class TestRunner {
 
     // Set Level 1
     prog.setLevel(1);
-    if (prog.level !== 1 || prog.rankTitle !== 'Yard Kitten' || prog.jumpMultiplier !== 1.0 || prog.maxComboHits !== 1) {
+    if ((prog.level as number) !== 1 || prog.rankTitle !== 'Yard Kitten' || prog.jumpMultiplier !== 1.0 || prog.maxComboHits !== 1) {
       throw new Error('Level 1 sandbox override failed default constraints');
     }
 
     // Override to Level 4 (Senior Rigger Mouser)
     prog.setLevel(4);
-    if (prog.level !== 4 || prog.jumpMultiplier <= 1.2 || prog.maxComboHits !== 3 || prog.whiskersTier < 2) {
+    if ((prog.level as number) !== 4 || prog.jumpMultiplier <= 1.2 || (prog.maxComboHits as number) !== 3 || prog.whiskersTier < 2) {
       throw new Error(`Level 4 sandbox override did not unlock expected stats (jump: ${prog.jumpMultiplier}, combo: ${prog.maxComboHits}, whiskers: ${prog.whiskersTier})`);
     }
 
     // Toggle All Perks (Max Sandbox)
     prog.toggleAllPerks(true);
-    if (prog.level !== 6 || prog.whiskersTier !== 3 || !prog.hasAlwaysLandOnFeet) {
+    if ((prog.level as number) !== 6 || (prog.whiskersTier as number) !== 3 || !prog.hasAlwaysLandOnFeet) {
       throw new Error('Max Sandbox toggle did not grant full Tier 3 perks');
     }
   }

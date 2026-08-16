@@ -23,8 +23,8 @@ export class ShipyardEnvironment {
   private waterTime: number = 0;
 
   // Whiskers Sonar Objective Beacons
-  public objectiveBeacon: THREE.Mesh;
-  public beaconLight: THREE.PointLight;
+  public objectiveBeacon: THREE.Mesh | null = null;
+  public beaconLight: THREE.PointLight | null = null;
 
   constructor() {
     this.group = new THREE.Group();
@@ -127,8 +127,8 @@ export class ShipyardEnvironment {
   }
 
   public setWhiskersMode(active: boolean) {
-    this.objectiveBeacon.visible = active;
-    this.beaconLight.intensity = active ? 2.5 : 0;
+    if (this.objectiveBeacon) this.objectiveBeacon.visible = active;
+    if (this.beaconLight) this.beaconLight.intensity = active ? 2.5 : 0;
   }
 
   private buildGroundAndWater() {

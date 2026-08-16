@@ -13,7 +13,7 @@ export interface FelinePerk {
 export class ProgressionSystem {
   public skillPoints: number = 0;
   public totalXPEarned: number = 0;
-  public level: number = 1;
+  public level: number = 1 as number;
   public rankTitle: string = "Yard Kitten";
 
   public perks: Map<string, FelinePerk> = new Map();
