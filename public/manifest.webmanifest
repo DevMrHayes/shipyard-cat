@@ -1,0 +1,16 @@
+{
+  "name": "Shipyard Cat",
+  "short_name": "ShipyardCat",
+  "description": "Narrative third-person action/stealth/sim video game set in Newport News Shipbuilding",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c0f13",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/assets/alba_portrait.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

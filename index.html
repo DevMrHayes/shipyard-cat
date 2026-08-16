@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shipyard Cat | Newport News Shipbuilding</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/src/style.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐱</text></svg>">
+
+  <!-- CRITICAL PRE-FLIGHT ERROR SHIELD & STALE SERVICE WORKER UNREGISTRATION -->
+  <script>
+    // 1. Immediately purge old / stale Service Workers and caches from previous projects on this port
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          console.warn('[ShipyardCat Shield] Purging stale ServiceWorker registration:', registration);
+          registration.unregister();
+        }
+      }).catch(function(err) {
+        console.warn('[ShipyardCat Shield] SW cleanup error:', err);
+      });
+    }
+
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) {
+          console.warn('[ShipyardCat Shield] Clearing stale cache:', name);
+          caches.delete(name);
+        }
+      });
+    }
+
+    // 2. Global Error Shield: Catch any uncaught runtime errors or failed script loads
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error('[ShipyardCat Error Shield]', message, source, lineno, error);
+      showErrorFallback(message + (source ? ' (' + source + ':' + lineno + ')' : ''));
+      return false;
+    };
+
+    window.onunhandledrejection = function(event) {
+      console.error('[ShipyardCat Promise Rejection]', event.reason);
+      showErrorFallback(event.reason ? (event.reason.message || event.reason) : 'Unhandled promise rejection');
+    };
+
+    function showErrorFallback(errorMsg) {
+      const banner = document.getElementById('engine-error-fallback');
+      if (banner) {
+        banner.style.display = 'flex';
+        const msgEl = document.getElementById('engine-error-msg');
+        if (msgEl) msgEl.textContent = errorMsg;
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- Pre-Flight Error Diagnostics Overlay (Hidden unless an error occurs) -->
+  <div id="engine-error-fallback" style="display: none; position: fixed; inset: 0; background: #0b0f14; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; color: #f8fafc; font-family: sans-serif; text-align: center;">
+    <div style="background: #1e293b; border: 1px solid #ef4444; border-radius: 12px; padding: 2rem; max-width: 550px; box-shadow: 0 20px 40px rgba(0,0,0,0.8);">
+      <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚠️</div>
+      <h2 style="color: #f87171; font-size: 1.3rem; margin-bottom: 0.75rem;">Engine Startup Diagnostic Notice</h2>
+      <p style="color: #cbd5e1; font-size: 0.9rem; margin-bottom: 1rem; line-height: 1.5;">
+        A previous cached service worker or resource conflict was detected on this port.
+      </p>
+      <div id="engine-error-msg" style="background: rgba(0,0,0,0.5); padding: 0.75rem; border-radius: 6px; font-family: monospace; font-size: 0.8rem; color: #fca5a5; margin-bottom: 1.5rem; word-break: break-all;">
+        Initializing...
+      </div>
+      <div style="display: flex; gap: 1rem; justify-content: center;">
+        <button onclick="localStorage.clear(); sessionStorage.clear(); if('caches' in window) caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => location.reload(true)); else location.reload(true);" style="background: #f97316; color: #000; border: none; font-weight: 700; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">
+          🧹 Force Hard Reload & Clear Cache
+        </button>
+        <button onclick="document.getElementById('engine-error-fallback').style.display='none'" style="background: #334155; color: #fff; border: none; padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer;">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Atmospheric Loading Screen -->
+  <div id="loading-screen" style="position: fixed; inset: 0; background: radial-gradient(circle at center, #1e293b 0%, #090d14 100%); z-index: 9000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; transition: opacity 0.8s ease, visibility 0.8s ease;">
+    <div style="max-width: 600px; width: 90%; text-align: center; background: rgba(15, 23, 42, 0.95); border: 2px solid #b45309; border-radius: 16px; padding: 2.5rem; box-shadow: 0 25px 60px rgba(0,0,0,0.9), inset 0 0 30px rgba(245, 158, 11, 0.15);">
+      <div style="position: relative; width: 140px; height: 140px; margin: 0 auto 1.5rem auto; border-radius: 50%; overflow: hidden; border: 3px solid #f59e0b; box-shadow: 0 0 25px rgba(245, 158, 11, 0.5);">
+        <img src="/assets/alba_portrait.jpg" alt="Alba Portrait" style="width: 100%; height: 100%; object-fit: cover;">
+      </div>
+      <div style="font-size: 0.85rem; font-weight: 700; color: #f59e0b; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 0.25rem;">NEWPORT NEWS SHIPBUILDING</div>
+      <h1 style="font-size: 2.2rem; font-weight: 900; margin: 0 0 0.5rem 0; letter-spacing: 1px; color: #f8fafc; font-family: 'Courier New', monospace;">SHIPYARD CAT</h1>
+      <p style="color: #94a3b8; font-size: 0.95rem; margin-bottom: 1.8rem; line-height: 1.5;">
+        Step into the paws of Alba, the resident mouser and unsung guardian of the historic shipyard.
+      </p>
+
+      <!-- Progress Bar -->
+      <div style="background: rgba(0,0,0,0.6); border: 1px solid #475569; height: 10px; border-radius: 6px; overflow: hidden; margin-bottom: 1.2rem; position: relative;">
+        <div id="loading-progress-bar" style="width: 15%; height: 100%; background: linear-gradient(90deg, #f59e0b, #eab308); transition: width 0.3s ease; box-shadow: 0 0 12px #f59e0b;"></div>
+      </div>
+      <div id="loading-status-text" style="font-size: 0.85rem; color: #cbd5e1; font-family: 'Courier New', monospace; margin-bottom: 1.5rem;">
+        Loading 3D Cat & Vermin Models...
+      </div>
+
+      <button id="btn-enter-game" style="display: none; background: linear-gradient(135deg, #f59e0b, #d97706); color: #0f172a; font-weight: 800; font-size: 1.05rem; padding: 0.85rem 2.5rem; border: none; border-radius: 8px; cursor: pointer; letter-spacing: 1px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4); text-transform: uppercase;">
+        🐾 Enter Yard
+      </button>
+    </div>
+  </div>
+
+  <div id="game-container"></div>
+
+  <!-- Diegetic In-Game HUD -->
+  <div id="hud-overlay">
+    <!-- Top Bar: Vitals & Geiger Counter -->
+    <div class="hud-top">
+      <div class="vitals-card interactive">
+        <div class="cat-header">
+          <img src="/assets/alba_portrait.jpg" alt="Alba" class="cat-avatar">
+          <div class="cat-info">
+            <h2>ALBA</h2>
+            <span>NNS Rigger Division • Master Mouser</span>
+          </div>
+        </div>
+        <div class="stat-bar-group">
+          <div class="stat-row">
+            <span>STAMINA</span>
+            <div class="bar-container">
+              <div id="stamina-fill" class="bar-fill bar-stamina" style="width: 100%;"></div>
+            </div>
+          </div>
+          <div class="stat-row">
+            <span>HUNGER</span>
+            <div class="bar-container">
+              <div id="hunger-fill" class="bar-fill bar-hunger" style="width: 100%;"></div>
+            </div>
+          </div>
+          <div class="stat-row">
+            <span>HEALTH</span>
+            <div class="bar-container">
+              <div id="health-fill" class="bar-fill bar-health" style="width: 100%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Right: System & Progression Tools -->
+      <div class="hud-top-right interactive">
+        <!-- Geiger Dosimeter Collar Gauge -->
+        <div class="dosimeter-card">
+          <div class="geiger-icon">☢</div>
+          <div class="rad-reading">
+            <span class="rad-label">COLLAR DOSIMETER</span>
+            <div>
+              <span id="rad-val" class="rad-value">0.05</span>
+              <span class="rad-unit">mSv/hr</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick System Toolbar -->
+        <div class="system-toolbar">
+          <button id="btn-abilities" class="hud-btn-mini" title="Abilities & Perks">
+            <span>⭐ Abilities</span> <span id="sp-badge" class="badge-mini">0 SP</span>
+          </button>
+          <button id="btn-logbook" class="hud-btn-mini" title="Shipyard Logbook & Comms">
+            <span>📜 Logbook</span>
+          </button>
+          <button id="btn-sandbox" class="hud-btn-mini" title="Level Sandbox Debugger">
+            <span>🎮 Sandbox</span>
+          </button>
+          <button id="btn-gallery" class="hud-btn-mini" title="Lore & Gallery">
+            <span>🖼 Lore</span>
+          </button>
+          <button id="btn-tests" class="hud-btn-mini" title="Test Diagnostics">
+            <span>🧪 Tests</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast Stream -->
+    <div id="toast-container"></div>
+
+    <!-- Bottom Bar: Mission Tracker & Feline Action Controls -->
+    <div class="hud-bottom">
+      <div class="mission-card interactive">
+        <div class="mission-badge" id="mission-subtitle">MISSION 1: SOUTH YARD & HISTORIC DOROTHY</div>
+        <div class="mission-title" id="mission-title">The Rigger's Whistle</div>
+        <div class="objective-list" id="objective-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Core Feline Actions Controls -->
+      <div class="action-controls interactive">
+        <button id="btn-swipe" class="hud-btn btn-action-combat">
+          <span class="key-badge">J / Click</span> Paw Swipe
+        </button>
+        <button id="btn-tailsweep" class="hud-btn btn-action-special">
+          <span class="key-badge">K</span> Tail Sweep
+        </button>
+        <button id="btn-pounce" class="hud-btn btn-action-pounce">
+          <span class="key-badge">F</span> Pounce
+        </button>
+        <button id="btn-whiskers" class="hud-btn btn-action-senses">
+          <span class="key-badge">Q</span> Whiskers
+        </button>
+        <button id="btn-meow" class="hud-btn btn-action-talk">
+          <span class="key-badge">E</span> Talk / Meow
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Level Testing Sandbox Modal -->
+  <div id="modal-sandbox" class="modal-overlay">
+    <div class="modal-container" style="max-width: 800px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">🎮 Level Testing Sandbox & Capability Debugger</h2>
+          <span style="font-size: 0.8rem; color: #94a3b8;">Instantly override Alba's Level & test limits across all progression stages</span>
+        </div>
+        <button class="modal-close" data-close="modal-sandbox">&times;</button>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--panel-border); margin-bottom: 1.25rem;">
+        <h4 style="font-family: var(--font-tech); font-size: 0.85rem; color: #f472b6; margin-bottom: 0.75rem;">SET FELINE PROGRESSION LEVEL:</h4>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button class="hud-btn sandbox-level-btn" data-level="1">Level 1: Yard Kitten</button>
+          <button class="hud-btn sandbox-level-btn" data-level="2">Level 2: Apprentice Cat</button>
+          <button class="hud-btn sandbox-level-btn" data-level="3">Level 3: Master Mouser</button>
+          <button class="hud-btn sandbox-level-btn" data-level="4">Level 4: Senior Rigger</button>
+          <button class="hud-btn sandbox-level-btn" data-level="5">Level 5: Shadow Stalker</button>
+          <button class="hud-btn sandbox-level-btn" data-level="6">Level 6: Legend of Dry Dock 12</button>
+        </div>
+        <div style="margin-top: 1rem; display: flex; gap: 0.75rem;">
+          <button id="btn-sandbox-unlock-all" class="hud-btn" style="background: #ec4899; color: #fff; font-weight: 700;">⚡ Unlock All Perks & Max Senses</button>
+          <button id="btn-sandbox-reset" class="hud-btn" style="background: #334155; color: #cbd5e1;">🔄 Reset to Level 1 Kitten</button>
+        </div>
+      </div>
+
+      <h4 style="font-family: var(--font-tech); font-size: 0.85rem; color: #38bdf8; margin-bottom: 0.5rem;">ACTIVE FELINE CAPABILITY METRICS:</h4>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;" id="sandbox-metrics-grid">
+        <div class="stat-card">
+          <span style="font-size: 0.7rem; color: #94a3b8;">JUMP MULTIPLIER</span>
+          <div id="stat-jump" style="font-family: var(--font-tech); font-size: 1.2rem; font-weight: 700; color: #4ade80;">1.0x (6.2 m/s)</div>
+        </div>
+        <div class="stat-card">
+          <span style="font-size: 0.7rem; color: #94a3b8;">SPRINT SPEED</span>
+          <div id="stat-sprint" style="font-family: var(--font-tech); font-size: 1.2rem; font-weight: 700; color: #38bdf8;">8.8 m/s</div>
+        </div>
+        <div class="stat-card">
+          <span style="font-size: 0.7rem; color: #94a3b8;">SNEAK DETECTION</span>
+          <div id="stat-detection" style="font-family: var(--font-tech); font-size: 1.2rem; font-weight: 700; color: #facc15;">1.8 m (Silent)</div>
+        </div>
+        <div class="stat-card">
+          <span style="font-size: 0.7rem; color: #94a3b8;">COMBAT COMBO</span>
+          <div id="stat-combo" style="font-family: var(--font-tech); font-size: 1.2rem; font-weight: 700; color: #ef4444;">1-Hit Swipe</div>
+        </div>
+        <div class="stat-card">
+          <span style="font-size: 0.7rem; color: #94a3b8;">WHISKERS TIER</span>
+          <div id="stat-whiskers" style="font-family: var(--font-tech); font-size: 1.2rem; font-weight: 700; color: #c084fc;">Tier 0 (Prey)</div>
+        </div>
+        <div class="stat-card">
+          <span style="font-size: 0.7rem; color: #94a3b8;">FALL RIGHTING</span>
+          <div id="stat-righting" style="font-family: var(--font-tech); font-size: 1.2rem; font-weight: 700; color: #f472b6;">Normal</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shipyard Logbook & Comms Archive Modal -->
+  <div id="modal-logbook" class="modal-overlay">
+    <div class="modal-container" style="max-width: 820px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">📜 Shipyard Logbook & Comms Archive</h2>
+          <span style="font-size: 0.8rem; color: #94a3b8;">Active Mission Intel, NPC Conversations & Progress Guide</span>
+        </div>
+        <button class="modal-close" data-close="modal-logbook">&times;</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div>
+          <h4 style="font-family: var(--font-tech); font-size: 0.85rem; color: #38bdf8; margin-bottom: 0.5rem;">HOW TO PROGRESS & LEVEL UP:</h4>
+          <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5;">
+            <p>🐾 <strong>1. Hunt Shipyard Rodents:</strong> Catch mice & rats in alleyways (+15 to +65 XP, refills hunger).</p>
+            <p style="margin-top: 0.4rem;">🛠️ <strong>2. Assist Shipbuilders:</strong> Clear cables, unjam mooring winches, thread sonar conduit lines (+50 to +250 XP).</p>
+            <p style="margin-top: 0.4rem;">⚔️ <strong>3. Fight Mutant Scouts:</strong> Defeat Gantry's radioactive 6-toed cats using Paw Swipe combos (+80 XP).</p>
+            <p style="margin-top: 0.4rem;">⭐ <strong>4. Spend Skill Points:</strong> Every level grants +1 SP to unlock perks in the Abilities menu.</p>
+          </div>
+
+          <h4 style="font-family: var(--font-tech); font-size: 0.85rem; color: #f59e0b; margin: 1rem 0 0.5rem 0;">CHAPTER STORY MISSIONS:</h4>
+          <div id="logbook-chapters-list" style="background: rgba(30, 41, 59, 0.6); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 0.8rem;">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <div>
+          <h4 style="font-family: var(--font-tech); font-size: 0.85rem; color: #4ade80; margin-bottom: 0.5rem;">SHIPYARD DIALOGUE & COMMS LOG:</h4>
+          <div id="comms-log-list" style="background: rgba(15, 23, 42, 0.8); padding: 1rem; border-radius: 8px; border: 1px solid var(--panel-border); max-height: 380px; overflow-y: auto; font-size: 0.8rem; line-height: 1.4;">
+            <div style="color: #94a3b8; font-style: italic;">Talk with colony cats (Calico Belle, Tripod Toby, Dr. Vance) or shipbuilders (Mo Kelly, Frank Miller, Dave O'Connor) to record entries...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feline Character Ability Progression Modal -->
+  <div id="modal-abilities" class="modal-overlay">
+    <div class="modal-container" style="max-width: 860px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">⭐ Character Ability Progression</h2>
+          <span style="font-size: 0.8rem; color: #94a3b8;">Young Yard Kitten to Master Mouser of Newport News</span>
+        </div>
+        <button class="modal-close" data-close="modal-abilities">&times;</button>
+      </div>
+
+      <div style="background: rgba(30, 41, 59, 0.6); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--panel-border); margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <div style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-tech);">CURRENT RANK & LEVEL</div>
+          <div id="rank-title" style="font-family: var(--font-tech); font-size: 1.3rem; font-weight: 700; color: #f59e0b;">Yard Kitten (Level 1)</div>
+          <div id="xp-text" style="font-size: 0.8rem; color: #cbd5e1; margin-top: 0.2rem;">0 / 200 XP to next level</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-tech);">AVAILABLE SKILL POINTS</div>
+          <div id="sp-count" style="font-family: var(--font-tech); font-size: 1.6rem; font-weight: 700; color: #4ade80;">0 SP</div>
+        </div>
+      </div>
+
+      <h3 style="font-family: var(--font-tech); font-size: 1rem; color: #f8fafc; margin-bottom: 0.75rem; letter-spacing: 0.05em;">FELINE PERKS & ABILITIES</h3>
+      <div class="perks-grid" id="perks-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+        <!-- Dynamically rendered -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Test Suite Diagnostics Modal -->
+  <div id="modal-tests" class="modal-overlay">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h2 class="modal-title">🧪 Unit & Integration Test Suite</h2>
+        <button class="modal-close" data-close="modal-tests">&times;</button>
+      </div>
+      <div class="test-suite-header">
+        <p style="color: #94a3b8; font-size: 0.9rem;">
+          Validating Core Physics, Radiation Inverse-Square Mathematics, Cat Vitals Decays, and Accidental Shipbuilding Assistance Event Pipelines.
+        </p>
+        <button id="btn-rerun-tests" class="hud-btn" style="background: #16a34a; color: #fff;">
+          ▶ Execute All Tests
+        </button>
+      </div>
+      <div class="test-list" id="test-results-list">
+        <!-- Dynamically rendered -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Gallery & Concept Art Modal -->
+  <div id="modal-gallery" class="modal-overlay">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h2 class="modal-title">🎨 Shipyard Cat Art & World Lore</h2>
+        <button class="modal-close" data-close="modal-gallery">&times;</button>
+      </div>
+      <p style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.25rem;">
+        Authentic recreations of Newport News Shipbuilding (NNS)—from the 1891 restored tugboat Dorothy to the 1,050-ton "Big Blue" Goliath crane towering over Dry Dock 12.
+      </p>
+      <div class="gallery-grid">
+        <div class="gallery-card">
+          <img src="/assets/shipyard_cat_cover.jpg" alt="Shipyard Cat Key Art">
+          <div class="gallery-caption">
+            <strong>Key Art: Big Blue & Dry Dock 12</strong>
+            <p>Alba on high scaffolding overlooking the CVN supercarrier modular assembly at sunset.</p>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <img src="/assets/alba_portrait.jpg" alt="Alba Portrait">
+          <div class="gallery-caption">
+            <strong>Alba (Master Mouser)</strong>
+            <p>Wearing her orange safety collar and brass dosimeter medal (Tag: NNS-1014).</p>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <img src="/assets/gantry_mutant_boss.jpg" alt="Gantry the Mutant Boss">
+          <div class="gallery-caption">
+            <strong>Gantry (Insurgency Leader)</strong>
+            <p>7-toed polydactyl mutant Maine Coon residing in the RCOH scrap fields.</p>
+          </div>
+        </div>
+        <div class="gallery-card">
+          <img src="/assets/dorothy_tugboat_scene.jpg" alt="Tugboat Dorothy">
+          <div class="gallery-caption">
+            <strong>Tugboat Dorothy (1891)</strong>
+            <p>NNS Hull No. 1 dry-mounted near Washington Ave and Red-Brick Machine Shop No. 1.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

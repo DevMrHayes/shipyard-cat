@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.firebase/
+*.log
+.DS_Store
+.system_generated/
+scratch/
