@@ -60,10 +60,11 @@ export class CatCharacter {
         CatCharacter.diagnosticFlags.gltfChildCount = gltf.scene.children.length;
         CatCharacter.diagnosticFlags.activeMeshMode = 'GLTF';
 
-        // Cat model bounding box is ~30 units tall, 0.018 scale normalizes it to ~0.55m height
-        this.gltfModel.scale.set(0.018, 0.018, 0.018);
+        // The cat.glb model is exported in real-world metric units (~0.55m height at scale 1.0)
+        this.gltfModel.scale.set(1.0, 1.0, 1.0);
         this.gltfModel.position.set(0, 0, 0);
         this.gltfModel.rotation.y = 0; // Face forward (+Z direction)
+        CatCharacter.diagnosticFlags.currentScale = 1.0;
 
         // Traverse to enable shadows & disable frustum culling on animated bones
         let meshCnt = 0;

@@ -447,10 +447,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btn-scale-reset')?.addEventListener('click', () => {
     if (game.cat.gltfModel) {
-      game.cat.gltfModel.scale.set(0.018, 0.018, 0.018);
-      CatCharacter.diagnosticFlags.currentScale = 0.018;
+      game.cat.gltfModel.scale.set(1.0, 1.0, 1.0);
+      CatCharacter.diagnosticFlags.currentScale = 1.0;
       soundEngine.playSuccess();
-      showToast('Normal Scale Restored', 'Scale reset to 0.018 (0.55m height)', 'info');
+      showToast('Normal Scale Restored', 'Scale reset to 1.0 (0.55m real-world feline height)', 'info');
       renderDiagnostics();
     }
   });
