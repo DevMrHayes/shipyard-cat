@@ -48,7 +48,7 @@ export class GameEngine {
   private cameraOffset: THREE.Vector3 = new THREE.Vector3(0, 1.8, -4.5);
   private currentCameraPos: THREE.Vector3 = new THREE.Vector3();
   private catVelocity: THREE.Vector3 = new THREE.Vector3();
-  private isGrounded: boolean = true;
+  public isGrounded: boolean = true;
   private isWhiskersMode: boolean = false;
   private hdrSkyTexture: THREE.DataTexture | null = null;
   private pounceTarget: THREE.Vector3 | null = null;

@@ -613,6 +613,14 @@ export class ShipyardEnvironment {
     dd1Ramp.receiveShadow = true;
     this.group.add(dd1Ramp);
 
+    // Dry Dock 1 Solid Basin Stone Floor Slab (Eliminates transparency and grounds the basin)
+    const dd1FloorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85, metalness: 0.2 });
+    const dd1Floor = new THREE.Mesh(new THREE.PlaneGeometry(27, 30), dd1FloorMat);
+    dd1Floor.rotateX(-Math.PI / 2);
+    dd1Floor.position.set(18.5, 0.02, -30);
+    dd1Floor.receiveShadow = true;
+    this.group.add(dd1Floor);
+
     // Stepped timber keel blocks on the floor of Dry Dock 1
     const keelMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
     for (let k = -40; k <= -22; k += 4) {
@@ -827,7 +835,7 @@ export class ShipyardEnvironment {
 
   public platforms: { minX: number; maxX: number; minZ: number; maxZ: number; height: number; isRamp?: boolean; rampStart?: number; rampEnd?: number }[] = [];
 
-  public getPlatformFloor(x: number, z: number, _currentY: number): number {
+  public getPlatformFloor(x: number, z: number, currentY: number): number {
     let maxFloor = 0; // Default ground level
 
     // 1. Dynamic Sloped Gangway Ramps (X: 38 to 45 -> Y: 0.0 to 1.4)
@@ -840,10 +848,14 @@ export class ShipyardEnvironment {
     }
 
     // 2. Solid Elevated Platforms (Pier, Dorothy Deck, I-Beams, Pallets)
+    // Only snap or land on top of platform if Alba is currently at or above the platform height
     for (const p of this.platforms) {
       if (x >= p.minX && x <= p.maxX && z >= p.minZ && z <= p.maxZ) {
-        if (p.height > maxFloor) {
-          maxFloor = p.height;
+        // Prevent snapping to high I-beams (Y=4.7) when walking underneath on the floor (currentY < 3.5)
+        if (currentY >= (p.height - 0.45)) {
+          if (p.height > maxFloor) {
+            maxFloor = p.height;
+          }
         }
       }
     }

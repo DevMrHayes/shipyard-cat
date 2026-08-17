@@ -326,6 +326,24 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentFps = 60;
   let currentFrameTime = 16.6;
 
+  // 30-Second Rolling Telemetry Buffer (Sampled twice per second)
+  interface TelemetryRecord {
+    timestamp: string;
+    fps: number;
+    frameRenderTimeMs: number;
+    drawCalls: number;
+    triangles: number;
+    texturesInVRAM: number;
+    heapMemoryMB: number | string;
+    catPosition: string;
+    isMoving: boolean;
+    isPouncing: boolean;
+    isAirborne: boolean;
+    activeMissionId: number;
+  }
+  const telemetryHistory: TelemetryRecord[] = [];
+  const maxTelemetryRecords = 60; // 60 samples @ 500ms = 30 seconds
+
   function updatePerformanceProfiler() {
     const now = performance.now();
     frameCount++;
@@ -359,16 +377,70 @@ document.addEventListener('DOMContentLoaded', () => {
       if (texElem && game.renderer.info) {
         texElem.textContent = `${game.renderer.info.memory.textures} Textures in VRAM`;
       }
+      let memoryUsage: number | string = 'N/A';
       if (memElem) {
         if ((performance as any).memory) {
           const usedMB = Math.round((performance as any).memory.usedJSHeapSize / (1024 * 1024));
+          memoryUsage = usedMB;
           memElem.textContent = `${usedMB} MB / Heap`;
         } else {
           memElem.textContent = `Optimized (WebGL 2.0)`;
         }
       }
+
+      // Record telemetry snapshot
+      const catPos = game.cat ? game.cat.mesh.position : new THREE.Vector3();
+      telemetryHistory.push({
+        timestamp: new Date().toISOString().substring(11, 23),
+        fps: currentFps,
+        frameRenderTimeMs: parseFloat(currentFrameTime.toFixed(1)),
+        drawCalls: game.renderer.info ? game.renderer.info.render.calls : 0,
+        triangles: game.renderer.info ? game.renderer.info.render.triangles : 0,
+        texturesInVRAM: game.renderer.info ? game.renderer.info.memory.textures : 0,
+        heapMemoryMB: memoryUsage,
+        catPosition: `X:${catPos.x.toFixed(1)} Y:${catPos.y.toFixed(1)} Z:${catPos.z.toFixed(1)}`,
+        isMoving: game.cat ? game.cat.isCrouching : false,
+        isPouncing: game.cat ? game.cat.isPouncing : false,
+        isAirborne: !game.isGrounded,
+        activeMissionId: game.missionManager ? game.missionManager.getCurrentMission().id : 1
+      });
+
+      if (telemetryHistory.length > maxTelemetryRecords) {
+        telemetryHistory.shift();
+      }
     }
   }
+
+  // Telemetry Log Download Handler
+  document.getElementById('btn-download-telemetry')?.addEventListener('click', () => {
+    let logContent = `=========================================================================\n`;
+    logContent += `SHIPYARD CAT: 30-SECOND LIVE GPU & ENGINE PERFORMANCE TELEMETRY LOG\n`;
+    logContent += `Generated: ${new Date().toLocaleString()} | User Agent: ${navigator.userAgent}\n`;
+    logContent += `=========================================================================\n\n`;
+    logContent += `INDEX | TIME (UTC) | FPS | FRAME TIME (ms) | CALLS | TRIANGLES | VRAM TEX | HEAP (MB) | CAT POSITION | MOVING | AIRBORNE | POUNCING | MISSION\n`;
+    logContent += `--------------------------------------------------------------------------------------------------------------------------------------------\n`;
+
+    telemetryHistory.forEach((r, idx) => {
+      const pad = (s: any, len: number) => String(s).padEnd(len, ' ');
+      logContent += `${pad(idx + 1, 5)} | ${pad(r.timestamp, 12)} | ${pad(r.fps, 3)} | ${pad(r.frameRenderTimeMs, 15)} | ${pad(r.drawCalls, 5)} | ${pad(r.triangles, 9)} | ${pad(r.texturesInVRAM, 8)} | ${pad(r.heapMemoryMB, 9)} | ${pad(r.catPosition, 18)} | ${pad(r.isMoving, 6)} | ${pad(r.isAirborne, 8)} | ${pad(r.isPouncing, 8)} | Mission ${r.activeMissionId}\n`;
+    });
+
+    logContent += `\n=========================================================================\n`;
+    logContent += `END OF TELEMETRY LOG\n`;
+
+    const blob = new Blob([logContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shipyard_cat_telemetry_${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    soundEngine.playSuccess();
+    showToast('Telemetry Downloaded', 'Saved 30-second rolling engine performance log to your device.', 'success');
+  });
 
   // Graphics Quality Preset Buttons
   document.getElementById('btn-perf-high')?.addEventListener('click', () => {
