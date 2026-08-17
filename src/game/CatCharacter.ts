@@ -66,6 +66,25 @@ export class CatCharacter {
               mesh.geometry.computeBoundingBox();
               mesh.geometry.computeBoundingSphere();
             }
+
+            // CRITICAL FIX: Ensure materials are fully opaque, double-sided, and not culled or alpha-masked out
+            if (mesh.material) {
+              if (Array.isArray(mesh.material)) {
+                mesh.material.forEach(mat => {
+                  mat.transparent = false;
+                  mat.opacity = 1.0;
+                  mat.depthWrite = true;
+                  mat.side = THREE.DoubleSide;
+                  mat.needsUpdate = true;
+                });
+              } else {
+                mesh.material.transparent = false;
+                mesh.material.opacity = 1.0;
+                mesh.material.depthWrite = true;
+                mesh.material.side = THREE.DoubleSide;
+                mesh.material.needsUpdate = true;
+              }
+            }
           }
         });
 
