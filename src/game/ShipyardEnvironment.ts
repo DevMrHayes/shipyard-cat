@@ -592,61 +592,77 @@ export class ShipyardEnvironment {
   private buildDryDock12AndBigBlue() {
     const dockWallMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.95 });
     const brickMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
-    // === 1. HISTORIC DRY DOCK 1 (True Sunken Basin Trough Leading to River Caisson Gate) ===
-    // Excavated sunken trough at Y = -2.5m (X: 5 to 32, Z: -50 to -15)
-    const basinFloorGeo = new THREE.PlaneGeometry(27, 35);
+    // === 1. HISTORIC DRY DOCK 1 (Perpendicular Trough Running from Yard X=15 to Boardwalk X=45) ===
+    // Excavated sunken stone trough at Y = -2.0m (X: 15 to 45, Z: -35 to -20, Width = 15m, Length = 30m)
+    const basinFloorGeo = new THREE.PlaneGeometry(30, 15);
     basinFloorGeo.rotateX(-Math.PI / 2);
     const dd1BasinFloor = new THREE.Mesh(basinFloorGeo, new THREE.MeshStandardMaterial({
       color: 0x1e293b,
       roughness: 0.9,
       metalness: 0.2
     }));
-    dd1BasinFloor.position.set(18.5, -2.5, -32.5);
+    dd1BasinFloor.position.set(30, -2.0, -27.5);
     dd1BasinFloor.receiveShadow = true;
     this.group.add(dd1BasinFloor);
 
-    // Deep Basin Walls (Y = -2.5m to +1.0m, height 3.5m)
-    const dd1WallWest = new THREE.Mesh(new THREE.BoxGeometry(2, 4.0, 35), brickMat);
-    dd1WallWest.position.set(5, -0.5, -32.5);
-    const dd1WallEast = new THREE.Mesh(new THREE.BoxGeometry(2, 4.0, 35), brickMat);
-    dd1WallEast.position.set(32, -0.5, -32.5);
-    const dd1WallNorth = new THREE.Mesh(new THREE.BoxGeometry(29, 4.0, 2), brickMat);
-    dd1WallNorth.position.set(18.5, -0.5, -50);
-    this.group.add(dd1WallWest, dd1WallEast, dd1WallNorth);
+    // Deep Basin Walls (Y = -2.0m to 0.2m, height 2.2m)
+    // North Wall (Z = -35.5)
+    const dd1WallNorth = new THREE.Mesh(new THREE.BoxGeometry(30, 2.2, 1.2), brickMat);
+    dd1WallNorth.position.set(30, -0.9, -35.5);
+    // South Wall (Z = -19.5)
+    const dd1WallSouth = new THREE.Mesh(new THREE.BoxGeometry(30, 2.2, 1.2), brickMat);
+    dd1WallSouth.position.set(30, -0.9, -19.5);
+    // West Headwall (X = 14.5)
+    const dd1WallWest = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 16.5), brickMat);
+    dd1WallWest.position.set(14.5, -0.9, -27.5);
+    this.group.add(dd1WallNorth, dd1WallSouth, dd1WallWest);
 
-    // Watertight River Caisson Gate (South seawall barrier blocking the river water)
+    // Watertight Steel River Caisson Gate (At East end X = 45 connecting to the boardwalk, holding back the James River)
     const caissonMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7, roughness: 0.3 });
-    const caissonGate = new THREE.Mesh(new THREE.BoxGeometry(27, 5.0, 3), caissonMat);
-    caissonGate.position.set(18.5, 0.0, -15);
+    const caissonGate = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3.8, 16), caissonMat);
+    caissonGate.position.set(45.2, -0.1, -27.5);
     caissonGate.castShadow = true;
     caissonGate.receiveShadow = true;
     this.group.add(caissonGate);
 
-    // Concrete Step-Down Entrance Ramp descending from ground (Y=0) down to basin floor (Y=-2.5) at Z: -48 to -36
-    const rampMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 });
-    const dd1DownRampGeo = new THREE.BoxGeometry(6, 0.3, 14);
-    dd1DownRampGeo.rotateX(-0.18);
-    const dd1DownRamp = new THREE.Mesh(dd1DownRampGeo, rampMat);
-    dd1DownRamp.position.set(10, -1.25, -42);
-    dd1DownRamp.castShadow = true;
-    dd1DownRamp.receiveShadow = true;
-    this.group.add(dd1DownRamp);
-
-    // Stepped timber keel blocks resting directly on sunken basin floor (Y = -2.5m)
+    // Stepped Timber Keel Blocks along trough floor (Y = -2.0m)
     const keelMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
-    for (let k = -42; k <= -20; k += 4) {
-      const block = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.6, 1.4), keelMat);
-      block.position.set(18.5, -2.2, k);
+    for (let kx = 18; kx <= 40; kx += 4) {
+      const block = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 4.0), keelMat);
+      block.position.set(kx, -1.75, -27.5);
       block.castShadow = true;
       this.group.add(block);
-      this.platforms.push({ minX: 16.0, maxX: 21.0, minZ: k - 0.8, maxZ: k + 0.8, height: -1.9 });
+      this.platforms.push({ minX: kx - 0.7, maxX: kx + 0.7, minZ: -29.8, maxZ: -25.2, height: -1.5 });
     }
 
-    // Register Dry Dock 1 Sunken Colliders
-    this.registerObstacle(new THREE.Vector3(4, -3, -51), new THREE.Vector3(6, 2, -14), 'Dry Dock 1 West Wall');
-    this.registerObstacle(new THREE.Vector3(31, -3, -51), new THREE.Vector3(33, 2, -14), 'Dry Dock 1 East Wall');
-    this.registerObstacle(new THREE.Vector3(4, -3, -51), new THREE.Vector3(33, 2, -49), 'Dry Dock 1 North Wall');
-    this.registerObstacle(new THREE.Vector3(5, -3, -16.5), new THREE.Vector3(32, 2, -13.5), 'River Caisson Gate');
+    // Stepped Wooden Crates descending from Boardwalk (X: 43 to 45, Y = 1.4m) down into Drydock Basin (Y = -2.0m)
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85 });
+    // Crate 1 (Top Step beside Boardwalk at Y = 0.8m)
+    const cr1 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 1.6), crateMat);
+    cr1.position.set(43.5, 0.4, -22.5);
+    cr1.castShadow = true;
+    this.group.add(cr1);
+    this.platforms.push({ minX: 42.5, maxX: 44.5, minZ: -23.5, maxZ: -21.5, height: 0.8 });
+
+    // Crate 2 (Middle Step at Y = 0.0m ground grade)
+    const cr2 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.0, 1.8), crateMat);
+    cr2.position.set(41.2, -0.5, -22.5);
+    cr2.castShadow = true;
+    this.group.add(cr2);
+    this.platforms.push({ minX: 40.2, maxX: 42.2, minZ: -23.5, maxZ: -21.5, height: 0.0 });
+
+    // Crate 3 (Lower Step in Basin at Y = -1.2m)
+    const cr3 = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.8, 2.0), crateMat);
+    cr3.position.set(38.8, -1.6, -22.5);
+    cr3.castShadow = true;
+    this.group.add(cr3);
+    this.platforms.push({ minX: 37.8, maxX: 39.8, minZ: -23.5, maxZ: -21.5, height: -1.2 });
+
+    // Register Dry Dock 1 Sunken Colliders (Prevents walking through perimeter walls)
+    this.registerObstacle(new THREE.Vector3(14, -3, -36.5), new THREE.Vector3(46, 2, -34.5), 'Dry Dock 1 North Wall');
+    this.registerObstacle(new THREE.Vector3(14, -3, -20.5), new THREE.Vector3(46, 2, -18.5), 'Dry Dock 1 South Wall');
+    this.registerObstacle(new THREE.Vector3(13.5, -3, -36), new THREE.Vector3(15.5, 2, -19), 'Dry Dock 1 West Wall');
+    this.registerObstacle(new THREE.Vector3(44.5, -3, -36), new THREE.Vector3(46.5, 2, -19), 'River Caisson Gate');
 
     // === 2. ACTIVE CVN CARRIER YARD & BIG BLUE CRANE (North Sector Z: 20 to 80) ===
     const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 55), dockWallMat);
@@ -850,15 +866,9 @@ export class ShipyardEnvironment {
   public getPlatformFloor(x: number, z: number, currentY: number): number {
     let maxFloor = 0; // Default ground level
 
-    // 0. Historic Dry Dock 1 Sunken Basin Floor (Y = -2.5m) and Down-Ramp (X: 6 to 31, Z: -48 to -17)
-    if (x >= 6.0 && x <= 31.0 && z >= -48.0 && z <= -17.0) {
-      // Downward concrete entrance ramp at (X: 7 to 13, Z: -48 to -36)
-      if (x >= 7.0 && x <= 13.0 && z >= -48.0 && z <= -36.0) {
-        const rampProgress = (z - (-48.0)) / (-36.0 - (-48.0)); // 0.0 at top (Y=0), 1.0 at bottom (Y=-2.5)
-        const rampH = 0.0 - rampProgress * 2.5;
-        return rampH;
-      }
-      maxFloor = -2.5;
+    // 0. Historic Dry Dock 1 Sunken Basin Floor (Y = -2.0m for X: 15 to 44, Z: -35 to -20)
+    if (x >= 15.0 && x <= 44.0 && z >= -35.0 && z <= -20.0) {
+      maxFloor = -2.0;
     }
 
     // 1. Dynamic Sloped Gangway Ramps (X: 38 to 45 -> Y: 0.0 to 1.4)

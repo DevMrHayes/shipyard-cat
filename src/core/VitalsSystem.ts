@@ -94,6 +94,10 @@ export class CatVitals {
     this.currentHealth = Math.max(0, this.currentHealth - amount);
   }
 
+  public takeDamage(amount: number) {
+    this.currentHealth = Math.max(0, this.currentHealth - amount);
+  }
+
   public healAtSanctuary() {
     this.currentHealth = this.maxHealth;
     this.currentStamina = this.maxStamina;

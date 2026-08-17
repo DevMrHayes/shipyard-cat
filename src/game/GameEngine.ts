@@ -223,8 +223,8 @@ export class GameEngine {
       this.scene.add(rat.scentTrailParticles);
     });
 
-    // Dockyard Kingpin resides inside dedicated sunken Historic Dry Dock 1 (X: 18.5, Y: -2.5, Z: -32)
-    const kingpin = new RatEntity(new THREE.Vector3(18.5, -2.5, -32), true);
+    // Dockyard Kingpin resides inside dedicated perpendicular sunken Historic Dry Dock 1 (X: 28, Y: -2.0, Z: -27.5)
+    const kingpin = new RatEntity(new THREE.Vector3(28, -2.0, -27.5), true);
     this.rats.push(kingpin);
     this.scene.add(kingpin.mesh);
     this.scene.add(kingpin.scentTrailParticles);
@@ -745,19 +745,29 @@ export class GameEngine {
 
       // Check landing on platform top surface or ground
       if (this.cat.mesh.position.y <= currentFloor) {
+        const fallSpeed = Math.abs(this.catVelocity.y);
         this.cat.mesh.position.y = currentFloor;
         this.catVelocity.set(0, 0, 0);
         this.isGrounded = true;
         this.isPouncing = false;
         this.cat.isPouncing = false;
 
-        // Check if entered Historic Dry Dock 1 basin (X: 7 to 30, Z: -42 to -18)
-        if (this.cat.mesh.position.x >= 7.0 && this.cat.mesh.position.x <= 30.0 &&
-            this.cat.mesh.position.z >= -42.0 && this.cat.mesh.position.z <= -18.0) {
+        // Fall Impact Damage (Jumping from high boardwalk / walls without using crates)
+        if (fallSpeed > 10.5 && !this.progression.hasAlwaysLandOnFeet) {
+          const fallDmg = Math.round((fallSpeed - 10.0) * 8);
+          this.vitals.takeDamage(fallDmg);
+          soundEngine.playMeow();
+          this.onNotification?.('Ouch! Fall Damage', `Fell too far (-${fallDmg} HP)! Climb down using the wooden crates.`, 'warn');
+        }
+
+        // Check if entered Historic Dry Dock 1 basin (X: 16 to 43, Z: -34 to -21)
+        if (this.cat.mesh.position.x >= 16.0 && this.cat.mesh.position.x <= 43.0 &&
+            this.cat.mesh.position.z >= -34.0 && this.cat.mesh.position.z <= -21.0 &&
+            currentFloor <= -1.0) {
           if (!this.missionManager.getCurrentMission().objectives[1].isCompleted) {
             this.missionManager.completeObjective('climb_dorothy');
             soundEngine.playSuccess();
-            this.onNotification?.('OBJECTIVE COMPLETE!', "You entered Historic Dry Dock 1! Track down the Dockyard Kingpin.", 'success');
+            this.onNotification?.('OBJECTIVE COMPLETE!', "You climbed down into Historic Dry Dock 1! Track down the Dockyard Kingpin.", 'success');
             this.onMissionObjectiveUpdated?.();
           }
         }

@@ -25,18 +25,18 @@ export class MissionManager {
     {
       id: 1,
       title: "The Rigger's Whistle",
-      subtitle: "South Yard & Dry Dock Basin",
-      location: "Washington Ave & Dry Dock 12 Rim",
-      briefing: "A giant wharf rat named the 'Dockyard Kingpin' has taken refuge down in the empty Dry Dock 12 basin. Hunt mice near the staging spurs for stamina, climb down into the dry dock, and track down the Kingpin to secure the yard.",
+      subtitle: "South Yard & Historic Dry Dock 1",
+      location: "River Boardwalk & Dry Dock 1 Trough",
+      briefing: "A giant wharf rat named the 'Dockyard Kingpin' has taken refuge down inside Historic Dry Dock 1. Hunt 2 mice for stamina, jump up to the timber boardwalk, carefully climb down the stacked wooden crates into the drydock trough, and defeat the Kingpin.",
       dialogueSpeaker: "Mo Kelly (Welder, Dept. 11)",
-      dialogueText: "Morning, Alba! Eat up that tuna. Riggers spotted the Dockyard Kingpin down in the empty Dry Dock 12 basin. Climb down the access ramps and take him down!",
+      dialogueText: "Morning, Alba! Riggers spotted the Dockyard Kingpin down in the Historic Dry Dock 1 trough. Head along the river boardwalk and climb down the wooden crates into the basin!",
       isUnlocked: true,
       isCompleted: false,
       assistIdReward: "DOROTHY_CAPSTAN_UNJAM",
       objectives: [
         { id: "hunt_mice", description: "Hunt 2 shipyard mice near the rail spurs for stamina", isCompleted: false, requiredCount: 2, currentCount: 0 },
-        { id: "climb_dorothy", description: "Climb down into the empty Dry Dock 12 basin", isCompleted: false },
-        { id: "hunt_kingpin", description: "Pounce and defeat the 'Dockyard Kingpin' in Dry Dock 12", isCompleted: false }
+        { id: "climb_dorothy", description: "Go onto the river boardwalk and climb down crates into Dry Dock 1", isCompleted: false },
+        { id: "hunt_kingpin", description: "Pounce and defeat the 'Dockyard Kingpin' in Dry Dock 1", isCompleted: false }
       ]
     },
     {
