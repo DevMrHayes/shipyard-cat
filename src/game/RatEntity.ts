@@ -63,8 +63,9 @@ export class RatEntity {
         this.gltfModel.position.set(0, 0, 0);
 
         const ratFurMat = new THREE.MeshStandardMaterial({
-          color: isKingpin ? 0x271e16 : 0x475569, // Dark scarred fur for Kingpin, Slate brown for mice
-          roughness: 0.85,
+          color: isKingpin ? 0x221308 : 0x785338, // Kingpin: Dark charred brown; Shipyard mice: Warm chestnut brown
+          roughness: 0.75,
+          metalness: 0.1,
           side: THREE.DoubleSide
         });
 

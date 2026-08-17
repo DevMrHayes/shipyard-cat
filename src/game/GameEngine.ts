@@ -50,6 +50,7 @@ export class GameEngine {
   private catVelocity: THREE.Vector3 = new THREE.Vector3();
   private isGrounded: boolean = true;
   private isWhiskersMode: boolean = false;
+  private hdrSkyTexture: THREE.DataTexture | null = null;
   private pounceTarget: THREE.Vector3 | null = null;
   private isPouncing: boolean = false;
   private pounceTimer: number = 0;
@@ -109,8 +110,11 @@ export class GameEngine {
     const hdrLoader = new HDRLoader();
     hdrLoader.load('/environment/evening_sky_1k.hdr', (texture) => {
       texture.mapping = THREE.EquirectangularReflectionMapping;
+      this.hdrSkyTexture = texture;
       this.scene.environment = texture;
-      this.scene.background = texture;
+      if (!this.isWhiskersMode) {
+        this.scene.background = texture;
+      }
     }, undefined, (err) => {
       console.warn('HDRI load note:', err);
     });
@@ -619,8 +623,12 @@ export class GameEngine {
 
       this.onNotification?.('Whiskers Vision Active', modeDesc, 'info');
     } else {
-      this.scene.background = new THREE.Color(0x2b3748);
-      this.scene.fog = new THREE.Fog(0x2b3748, 80, 500);
+      if (this.hdrSkyTexture) {
+        this.scene.background = this.hdrSkyTexture;
+      } else {
+        this.scene.background = new THREE.Color(0x1e293b);
+      }
+      this.scene.fog = new THREE.FogExp2(0x1e293b, 0.0075);
     }
 
     // Toggle rats & mutant cats
