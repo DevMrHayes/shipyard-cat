@@ -592,49 +592,61 @@ export class ShipyardEnvironment {
   private buildDryDock12AndBigBlue() {
     const dockWallMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.95 });
     const brickMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
-    const concreteMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 });
+    // === 1. HISTORIC DRY DOCK 1 (True Sunken Basin Trough Leading to River Caisson Gate) ===
+    // Excavated sunken trough at Y = -2.5m (X: 5 to 32, Z: -50 to -15)
+    const basinFloorGeo = new THREE.PlaneGeometry(27, 35);
+    basinFloorGeo.rotateX(-Math.PI / 2);
+    const dd1BasinFloor = new THREE.Mesh(basinFloorGeo, new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.9,
+      metalness: 0.2
+    }));
+    dd1BasinFloor.position.set(18.5, -2.5, -32.5);
+    dd1BasinFloor.receiveShadow = true;
+    this.group.add(dd1BasinFloor);
 
-    // === 1. HISTORIC DRY DOCK 1 (Dedicated Empty Brick-Lined Basin for Kingpin Lair) ===
-    // Located in South-East staging quadrant (X: 5 to 32, Z: -45 to -15), completely clear of crane obstructions
-    const dd1WallWest = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 30), brickMat);
-    dd1WallWest.position.set(5, 2, -30);
-    const dd1WallEast = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 30), brickMat);
-    dd1WallEast.position.set(32, 2, -30);
-    const dd1WallNorth = new THREE.Mesh(new THREE.BoxGeometry(29, 4, 2), brickMat);
-    dd1WallNorth.position.set(18.5, 2, -45);
+    // Deep Basin Walls (Y = -2.5m to +1.0m, height 3.5m)
+    const dd1WallWest = new THREE.Mesh(new THREE.BoxGeometry(2, 4.0, 35), brickMat);
+    dd1WallWest.position.set(5, -0.5, -32.5);
+    const dd1WallEast = new THREE.Mesh(new THREE.BoxGeometry(2, 4.0, 35), brickMat);
+    dd1WallEast.position.set(32, -0.5, -32.5);
+    const dd1WallNorth = new THREE.Mesh(new THREE.BoxGeometry(29, 4.0, 2), brickMat);
+    dd1WallNorth.position.set(18.5, -0.5, -50);
     this.group.add(dd1WallWest, dd1WallEast, dd1WallNorth);
 
-    // Wide, gentle concrete access ramp descending from South Yard into Dry Dock 1 (Z: -20 to -15)
-    const dd1RampGeo = new THREE.BoxGeometry(10, 0.3, 12);
-    dd1RampGeo.rotateX(0.15);
-    const dd1Ramp = new THREE.Mesh(dd1RampGeo, concreteMat);
-    dd1Ramp.position.set(18.5, 0.15, -17);
-    dd1Ramp.castShadow = true;
-    dd1Ramp.receiveShadow = true;
-    this.group.add(dd1Ramp);
+    // Watertight River Caisson Gate (South seawall barrier blocking the river water)
+    const caissonMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7, roughness: 0.3 });
+    const caissonGate = new THREE.Mesh(new THREE.BoxGeometry(27, 5.0, 3), caissonMat);
+    caissonGate.position.set(18.5, 0.0, -15);
+    caissonGate.castShadow = true;
+    caissonGate.receiveShadow = true;
+    this.group.add(caissonGate);
 
-    // Dry Dock 1 Solid Basin Stone Floor Slab (Eliminates transparency and grounds the basin)
-    const dd1FloorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85, metalness: 0.2 });
-    const dd1Floor = new THREE.Mesh(new THREE.PlaneGeometry(27, 30), dd1FloorMat);
-    dd1Floor.rotateX(-Math.PI / 2);
-    dd1Floor.position.set(18.5, 0.02, -30);
-    dd1Floor.receiveShadow = true;
-    this.group.add(dd1Floor);
+    // Concrete Step-Down Entrance Ramp descending from ground (Y=0) down to basin floor (Y=-2.5) at Z: -48 to -36
+    const rampMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 });
+    const dd1DownRampGeo = new THREE.BoxGeometry(6, 0.3, 14);
+    dd1DownRampGeo.rotateX(-0.18);
+    const dd1DownRamp = new THREE.Mesh(dd1DownRampGeo, rampMat);
+    dd1DownRamp.position.set(10, -1.25, -42);
+    dd1DownRamp.castShadow = true;
+    dd1DownRamp.receiveShadow = true;
+    this.group.add(dd1DownRamp);
 
-    // Stepped timber keel blocks on the floor of Dry Dock 1
+    // Stepped timber keel blocks resting directly on sunken basin floor (Y = -2.5m)
     const keelMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
-    for (let k = -40; k <= -22; k += 4) {
-      const block = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.6, 1.2), keelMat);
-      block.position.set(18.5, 0.3, k);
+    for (let k = -42; k <= -20; k += 4) {
+      const block = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.6, 1.4), keelMat);
+      block.position.set(18.5, -2.2, k);
       block.castShadow = true;
       this.group.add(block);
-      this.platforms.push({ minX: 16.5, maxX: 20.5, minZ: k - 0.7, maxZ: k + 0.7, height: 0.6 });
+      this.platforms.push({ minX: 16.0, maxX: 21.0, minZ: k - 0.8, maxZ: k + 0.8, height: -1.9 });
     }
 
-    // Register Dry Dock 1 Colliders
-    this.registerObstacle(new THREE.Vector3(4, 0, -46), new THREE.Vector3(6, 4, -15), 'Dry Dock 1 West Wall');
-    this.registerObstacle(new THREE.Vector3(31, 0, -46), new THREE.Vector3(33, 4, -15), 'Dry Dock 1 East Wall');
-    this.registerObstacle(new THREE.Vector3(4, 0, -46), new THREE.Vector3(33, 4, -44), 'Dry Dock 1 North Wall');
+    // Register Dry Dock 1 Sunken Colliders
+    this.registerObstacle(new THREE.Vector3(4, -3, -51), new THREE.Vector3(6, 2, -14), 'Dry Dock 1 West Wall');
+    this.registerObstacle(new THREE.Vector3(31, -3, -51), new THREE.Vector3(33, 2, -14), 'Dry Dock 1 East Wall');
+    this.registerObstacle(new THREE.Vector3(4, -3, -51), new THREE.Vector3(33, 2, -49), 'Dry Dock 1 North Wall');
+    this.registerObstacle(new THREE.Vector3(5, -3, -16.5), new THREE.Vector3(32, 2, -13.5), 'River Caisson Gate');
 
     // === 2. ACTIVE CVN CARRIER YARD & BIG BLUE CRANE (North Sector Z: 20 to 80) ===
     const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 55), dockWallMat);
@@ -837,6 +849,17 @@ export class ShipyardEnvironment {
 
   public getPlatformFloor(x: number, z: number, currentY: number): number {
     let maxFloor = 0; // Default ground level
+
+    // 0. Historic Dry Dock 1 Sunken Basin Floor (Y = -2.5m) and Down-Ramp (X: 6 to 31, Z: -48 to -17)
+    if (x >= 6.0 && x <= 31.0 && z >= -48.0 && z <= -17.0) {
+      // Downward concrete entrance ramp at (X: 7 to 13, Z: -48 to -36)
+      if (x >= 7.0 && x <= 13.0 && z >= -48.0 && z <= -36.0) {
+        const rampProgress = (z - (-48.0)) / (-36.0 - (-48.0)); // 0.0 at top (Y=0), 1.0 at bottom (Y=-2.5)
+        const rampH = 0.0 - rampProgress * 2.5;
+        return rampH;
+      }
+      maxFloor = -2.5;
+    }
 
     // 1. Dynamic Sloped Gangway Ramps (X: 38 to 45 -> Y: 0.0 to 1.4)
     for (let rz = -100; rz <= 100; rz += 40) {

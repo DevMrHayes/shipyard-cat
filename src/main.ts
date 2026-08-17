@@ -88,14 +88,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalTests = document.getElementById('modal-tests') as HTMLElement;
   const modalGallery = document.getElementById('modal-gallery') as HTMLElement;
   const testResultsList = document.getElementById('test-results-list') as HTMLElement;
+  const commsLogList = document.getElementById('comms-log-list') as HTMLElement;
 
-  // 1. Toast Notification System
+  const dialogueArchive: { speaker: string; text: string; time: string }[] = [];
+
+  // 1. Toast Notification System with Stacking Queue (No Overlaps)
+  interface QueuedToast {
+    title: string;
+    message: string;
+    type: 'info' | 'success' | 'warn';
+  }
+  const toastQueue: QueuedToast[] = [];
+  let isToastDisplaying = false;
+
   function showToast(title: string, message: string, type: 'info' | 'success' | 'warn' = 'info') {
+    // Record all notifications in dialogueArchive so user can review full history in Logbook modal
+    dialogueArchive.unshift({
+      speaker: title,
+      text: message,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+    if (dialogueArchive.length > 50) dialogueArchive.pop();
+    renderCommsLog();
+
+    toastQueue.push({ title, message, type });
+    processToastQueue();
+  }
+
+  function processToastQueue() {
+    if (isToastDisplaying || toastQueue.length === 0) return;
+    isToastDisplaying = true;
+
+    const next = toastQueue.shift()!;
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
+    toast.className = `toast ${next.type}`;
     toast.innerHTML = `
-      <div class="toast-title">${title}</div>
-      <div class="toast-message">${message}</div>
+      <div class="toast-title">${next.title}</div>
+      <div class="toast-message">${next.message}</div>
     `;
     toastContainer.appendChild(toast);
 
@@ -103,8 +132,12 @@ document.addEventListener('DOMContentLoaded', () => {
       toast.style.opacity = '0';
       toast.style.transform = 'translateY(-10px)';
       toast.style.transition = 'all 0.3s ease';
-      setTimeout(() => toast.remove(), 300);
-    }, 4500);
+      setTimeout(() => {
+        toast.remove();
+        isToastDisplaying = false;
+        processToastQueue();
+      }, 300);
+    }, 3800);
   }
 
   game.onNotification = showToast;
@@ -264,7 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalSandbox = document.getElementById('modal-sandbox') as HTMLElement;
   const btnLogbook = document.getElementById('btn-logbook') as HTMLButtonElement;
   const modalLogbook = document.getElementById('modal-logbook') as HTMLElement;
-  const commsLogList = document.getElementById('comms-log-list') as HTMLElement;
   const logbookChaptersList = document.getElementById('logbook-chapters-list') as HTMLElement;
 
   const statJump = document.getElementById('stat-jump') as HTMLElement;
@@ -273,23 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const statCombo = document.getElementById('stat-combo') as HTMLElement;
   const statWhiskers = document.getElementById('stat-whiskers') as HTMLElement;
   const statRighting = document.getElementById('stat-righting') as HTMLElement;
-
-  const dialogueArchive: { speaker: string; text: string; time: string }[] = [];
-
-  // Intercept notifications to log conversations
-  const originalNotification = game.onNotification;
-  game.onNotification = (title: string, message: string, type: 'info' | 'success' | 'warn') => {
-    originalNotification?.(title, message, type);
-
-    if (title.startsWith('💬') || title.startsWith('🛠️')) {
-      dialogueArchive.unshift({
-        speaker: title,
-        text: message,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      });
-      renderCommsLog();
-    }
-  };
 
   function renderCommsLog() {
     if (!commsLogList) return;

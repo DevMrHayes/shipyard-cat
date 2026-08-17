@@ -223,8 +223,8 @@ export class GameEngine {
       this.scene.add(rat.scentTrailParticles);
     });
 
-    // Dockyard Kingpin resides inside dedicated Historic Dry Dock 1 (X: 18.5, Y: 0, Z: -32)
-    const kingpin = new RatEntity(new THREE.Vector3(18.5, 0, -32), true);
+    // Dockyard Kingpin resides inside dedicated sunken Historic Dry Dock 1 (X: 18.5, Y: -2.5, Z: -32)
+    const kingpin = new RatEntity(new THREE.Vector3(18.5, -2.5, -32), true);
     this.rats.push(kingpin);
     this.scene.add(kingpin.mesh);
     this.scene.add(kingpin.scentTrailParticles);
