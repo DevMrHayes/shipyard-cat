@@ -1,4 +1,5 @@
 import './style.css';
+import * as THREE from 'three';
 import { GameEngine } from './game/GameEngine';
 import { CatCharacter } from './game/CatCharacter';
 import { TestRunner, TestResult } from './tests/TestRunner';
@@ -403,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (game.cat.gltfModel) {
       game.cat.gltfModel.visible = true;
       game.cat.proceduralGroup.visible = false;
-      const debugMat = new (window as any).THREE.MeshBasicMaterial({ color: 0xff00ff, side: 2 });
+      const debugMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, side: THREE.DoubleSide });
       game.cat.gltfModel.traverse((child: any) => {
         if (child.isMesh) {
           child.material = debugMat;

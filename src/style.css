@@ -766,26 +766,145 @@ canvas {
     display: none; /* Hide desktop keyboard badges on mobile */
   }
 
-  .hud-top-left {
-    max-width: 220px;
+  /* Compact Top Bar on Mobile */
+  .hud-top {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .vitals-card {
+    min-width: unset;
+    width: auto;
+    padding: 0.5rem 0.75rem;
+    gap: 0.35rem;
+  }
+
+  .cat-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .cat-info h2 {
+    font-size: 0.95rem;
+  }
+
+  .cat-info span {
+    font-size: 0.65rem;
+    display: none; /* Hide secondary title on small screens */
+  }
+
+  .bar-container {
+    width: 90px;
+    height: 6px;
+  }
+
+  .stat-row {
+    font-size: 0.65rem;
+  }
+
+  .dosimeter-card {
+    padding: 0.35rem 0.6rem;
+    gap: 0.4rem;
+  }
+
+  .rad-value {
+    font-size: 0.95rem;
+  }
+
+  .hud-top-right {
+    align-items: flex-end;
+    gap: 0.35rem;
+  }
+
+  .system-toolbar {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.2rem;
+    max-width: 170px;
+  }
+
+  .hud-btn-mini {
+    padding: 0.2rem 0.35rem;
+    font-size: 0.65rem;
   }
 
   .minimap-card {
+    display: none; /* Hide top corner radar on mobile since touch buttons have map */
+  }
+
+  /* Position Mission Tracker at the Top-Center or Collapse cleanly */
+  .hud-bottom {
+    flex-direction: column;
+    align-items: center;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    pointer-events: none;
+  }
+
+  .mission-card {
+    position: absolute;
+    top: -85vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 1.5rem);
+    max-width: 340px;
+    padding: 0.5rem 0.75rem;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    pointer-events: auto;
+    font-size: 0.75rem;
+  }
+
+  .mission-title {
+    font-size: 0.9rem;
+  }
+
+  .objective-item {
+    font-size: 0.7rem;
+    margin-bottom: 0.2rem;
+  }
+
+  /* Mobile Joystick (Bottom Left) */
+  .joystick-zone {
+    bottom: 1.25rem;
+    left: 1.25rem;
+    width: 110px;
+    height: 110px;
+  }
+
+  .joystick-base {
     width: 95px;
     height: 95px;
   }
 
-  .mission-card {
-    max-width: 280px;
+  .joystick-thumb {
+    width: 40px;
+    height: 40px;
   }
 
-  .system-toolbar {
-    gap: 0.25rem;
+  /* Mobile Action Cluster (Bottom Right) */
+  .touch-actions-cluster {
+    bottom: 1.25rem;
+    right: 1rem;
+    gap: 0.45rem;
   }
 
-  .hud-btn-mini {
-    padding: 0.25rem 0.4rem;
-    font-size: 0.7rem;
+  .touch-action-btn {
+    width: 48px;
+    height: 48px;
+  }
+
+  .touch-action-btn span {
+    font-size: 1.1rem;
+  }
+
+  .touch-btn-primary {
+    width: 58px;
+    height: 58px;
   }
 }
 
