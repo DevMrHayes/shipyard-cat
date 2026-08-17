@@ -74,11 +74,14 @@ export class RatEntity {
         RatEntity.diagnosticFlags.childCount = gltf.scene.children.length;
         RatEntity.diagnosticFlags.activeMode = 'GLTF';
 
-        // Center and scale 3D rat model (0.014 scale normalizes Blender 50-unit space to 0.35m)
+        // Center and scale 3D rat model (compute bounding box to zero root offset)
+        const box = new THREE.Box3().setFromObject(this.gltfModel);
+        const center = box.getCenter(new THREE.Vector3());
+        this.gltfModel.position.set(-center.x * 0.014, -box.min.y * 0.014, -center.z * 0.014);
+
         const baseScale = isKingpin ? 0.024 : 0.014;
         const finalScale = baseScale * RatEntity.diagnosticFlags.scaleMultiplier;
         this.gltfModel.scale.set(finalScale, finalScale, finalScale);
-        this.gltfModel.position.set(0, 0, 0);
 
         const ratFurMat = new THREE.MeshStandardMaterial({
           color: RatEntity.diagnosticFlags.forcedMagenta ? 0xff00ff : (isKingpin ? 0x221308 : 0x785338),

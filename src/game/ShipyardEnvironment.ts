@@ -329,25 +329,6 @@ export class ShipyardEnvironment {
     wallSouth.receiveShadow = true;
     shopGroup.add(wallSouth);
 
-    // 3D Historic Industrial Green Shipyard Door (Doorway Entry at X = -34, Z = -20)
-    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-      const doorLoader = new GLTFLoader();
-      doorLoader.load('/models/gdansk_shipyard_green_door.glb', (gltf) => {
-        const door = gltf.scene;
-        door.scale.set(0.015, 0.015, 0.015);
-        door.position.set(-34.0, 0, -20);
-        door.rotation.y = Math.PI / 2;
-
-        door.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-          }
-        });
-        shopGroup.add(door);
-      });
-    }
-
     // 4. Back Bulkhead Wall (X = -56)
     const wallBack = new THREE.Mesh(new THREE.BoxGeometry(0.8, 8, 36), brickMat);
     wallBack.position.set(-56, 4, -20);
