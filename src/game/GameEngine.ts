@@ -739,7 +739,12 @@ export class GameEngine {
       this.cat.mesh.position.y
     );
 
-    if (!this.isGrounded || this.cat.mesh.position.y > currentFloor) {
+    // If standing on the ground/platform and the floor difference is within a small step (<= 0.35m), smoothly step up
+    const heightDiff = currentFloor - this.cat.mesh.position.y;
+    if (this.isGrounded && heightDiff > 0 && heightDiff <= 0.35) {
+      this.cat.mesh.position.y = currentFloor;
+    } else if (!this.isGrounded || this.cat.mesh.position.y > currentFloor + 0.05) {
+      this.isGrounded = false;
       this.catVelocity.y -= 18.0 * deltaTime;
       const newAirPos = this.cat.mesh.position.clone().addScaledVector(this.catVelocity, deltaTime);
       const resolvedAirPos = this.environment.resolveCollision(newAirPos, 0.35, previousPos);
@@ -791,6 +796,7 @@ export class GameEngine {
       }
     } else {
       this.cat.mesh.position.y = currentFloor;
+      this.isGrounded = true;
     }
 
     if (this.isPouncing) {
