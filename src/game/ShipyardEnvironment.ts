@@ -591,50 +591,75 @@ export class ShipyardEnvironment {
 
   private buildDryDock12AndBigBlue() {
     const dockWallMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.95 });
+    const brickMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+    const concreteMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 });
 
-    // Dry Dock 12 Basin Walls (Open at South Entrance Z = -10 for easy cat access)
-    const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 70), dockWallMat);
-    wallLeft.position.set(5, 4, 35);
-    const wallRight = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 70), dockWallMat);
-    wallRight.position.set(35, 4, 35);
+    // === 1. HISTORIC DRY DOCK 1 (Dedicated Empty Brick-Lined Basin for Kingpin Lair) ===
+    // Located in South-East staging quadrant (X: 5 to 32, Z: -45 to -15), completely clear of crane obstructions
+    const dd1WallWest = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 30), brickMat);
+    dd1WallWest.position.set(5, 2, -30);
+    const dd1WallEast = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 30), brickMat);
+    dd1WallEast.position.set(32, 2, -30);
+    const dd1WallNorth = new THREE.Mesh(new THREE.BoxGeometry(29, 4, 2), brickMat);
+    dd1WallNorth.position.set(18.5, 2, -45);
+    this.group.add(dd1WallWest, dd1WallEast, dd1WallNorth);
+
+    // Wide, gentle concrete access ramp descending from South Yard into Dry Dock 1 (Z: -20 to -15)
+    const dd1RampGeo = new THREE.BoxGeometry(10, 0.3, 12);
+    dd1RampGeo.rotateX(0.15);
+    const dd1Ramp = new THREE.Mesh(dd1RampGeo, concreteMat);
+    dd1Ramp.position.set(18.5, 0.15, -17);
+    dd1Ramp.castShadow = true;
+    dd1Ramp.receiveShadow = true;
+    this.group.add(dd1Ramp);
+
+    // Stepped timber keel blocks on the floor of Dry Dock 1
+    const keelMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
+    for (let k = -40; k <= -22; k += 4) {
+      const block = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.6, 1.2), keelMat);
+      block.position.set(18.5, 0.3, k);
+      block.castShadow = true;
+      this.group.add(block);
+      this.platforms.push({ minX: 16.5, maxX: 20.5, minZ: k - 0.7, maxZ: k + 0.7, height: 0.6 });
+    }
+
+    // Register Dry Dock 1 Colliders
+    this.registerObstacle(new THREE.Vector3(4, 0, -46), new THREE.Vector3(6, 4, -15), 'Dry Dock 1 West Wall');
+    this.registerObstacle(new THREE.Vector3(31, 0, -46), new THREE.Vector3(33, 4, -15), 'Dry Dock 1 East Wall');
+    this.registerObstacle(new THREE.Vector3(4, 0, -46), new THREE.Vector3(33, 4, -44), 'Dry Dock 1 North Wall');
+
+    // === 2. ACTIVE CVN CARRIER YARD & BIG BLUE CRANE (North Sector Z: 20 to 80) ===
+    const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 55), dockWallMat);
+    wallLeft.position.set(5, 4, 52.5);
+    const wallRight = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 55), dockWallMat);
+    wallRight.position.set(35, 4, 52.5);
     this.group.add(wallLeft, wallRight);
 
-    // Concrete Access Ramp entering Dry Dock 12 basin from South Yard (X: 20, Z: -5 to 10)
-    const rampMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 });
-    const dockRampGeo = new THREE.BoxGeometry(8, 0.4, 18);
-    dockRampGeo.rotateX(0.12);
-    const dockRamp = new THREE.Mesh(dockRampGeo, rampMat);
-    dockRamp.position.set(20, 0.2, 0);
-    dockRamp.castShadow = true;
-    dockRamp.receiveShadow = true;
-    this.group.add(dockRamp);
+    this.registerObstacle(new THREE.Vector3(3.5, 0, 25), new THREE.Vector3(6.5, 8, 80), 'CVN Basin West Wall');
+    this.registerObstacle(new THREE.Vector3(33.5, 0, 25), new THREE.Vector3(36.5, 8, 80), 'CVN Basin East Wall');
 
-    // Register Dry Dock Basin Wall Colliders
-    this.registerObstacle(new THREE.Vector3(3.5, 0, 0), new THREE.Vector3(6.5, 8, 70), 'Dry Dock 12 West Wall');
-    this.registerObstacle(new THREE.Vector3(33.5, 0, 0), new THREE.Vector3(36.5, 8, 70), 'Dry Dock 12 East Wall');
-
-    // 3D CVN Modular Superstructure (Optimized Lightweight Geometry - Saves 25MB RAM)
+    // 3D CVN Modular Superstructure (Optimized Lightweight Geometry)
     const steelPlateTex = TextureGenerator.createSteelPlateTexture();
     const carrierMat = new THREE.MeshStandardMaterial({
       map: steelPlateTex,
       metalness: 0.65,
       roughness: 0.35
     });
-    const carrierGeo = new THREE.BoxGeometry(22, 10, 55);
+    const carrierGeo = new THREE.BoxGeometry(20, 10, 45);
     const carrierHull = new THREE.Mesh(carrierGeo, carrierMat);
-    carrierHull.position.set(20, 5, 30);
+    carrierHull.position.set(20, 5, 52.5);
     carrierHull.castShadow = true;
     carrierHull.receiveShadow = true;
     this.group.add(carrierHull);
 
-    // Flight deck / island box
+    // Flight deck island box
     const islandMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.4 });
     const island = new THREE.Mesh(new THREE.BoxGeometry(4, 7, 12), islandMat);
-    island.position.set(28, 13.5, 30);
+    island.position.set(28, 13.5, 52.5);
     island.castShadow = true;
     this.group.add(island);
 
-    this.registerObstacle(new THREE.Vector3(9, 0, 2.5), new THREE.Vector3(31, 12, 57.5), 'CVN-80 Carrier Hull Module');
+    this.registerObstacle(new THREE.Vector3(9, 0, 30), new THREE.Vector3(31, 12, 75), 'CVN-80 Carrier Hull Module');
 
     // "BIG BLUE" Crane
     const bigBlueMat = new THREE.MeshStandardMaterial({
@@ -644,7 +669,7 @@ export class ShipyardEnvironment {
     });
 
     const gantryGroup = new THREE.Group();
-    gantryGroup.position.set(20, 0, 25);
+    gantryGroup.position.set(20, 0, 52.5);
 
     const legGeo = new THREE.BoxGeometry(3.2, 38, 4.0);
     const leftLeg = new THREE.Mesh(legGeo, bigBlueMat);

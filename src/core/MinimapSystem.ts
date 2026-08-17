@@ -31,7 +31,9 @@ export class MinimapSystem {
 
   public update(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[]) {
     this.renderCornerRadar(albaPos, albaHeading, entities);
-    this.renderFullTacticalMap(albaPos, albaHeading, entities);
+    if (this.fullMapCanvas && this.fullMapCanvas.offsetParent !== null) {
+      this.renderFullTacticalMap(albaPos, albaHeading, entities);
+    }
   }
 
   private renderCornerRadar(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[]) {

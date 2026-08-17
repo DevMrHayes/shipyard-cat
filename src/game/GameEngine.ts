@@ -223,8 +223,8 @@ export class GameEngine {
       this.scene.add(rat.scentTrailParticles);
     });
 
-    // Dockyard Kingpin resides inside Dry Dock 12 basin (X: 20, Y: 0, Z: 35)
-    const kingpin = new RatEntity(new THREE.Vector3(20, 0, 35), true);
+    // Dockyard Kingpin resides inside dedicated Historic Dry Dock 1 (X: 18.5, Y: 0, Z: -32)
+    const kingpin = new RatEntity(new THREE.Vector3(18.5, 0, -32), true);
     this.rats.push(kingpin);
     this.scene.add(kingpin.mesh);
     this.scene.add(kingpin.scentTrailParticles);
@@ -751,13 +751,13 @@ export class GameEngine {
         this.isPouncing = false;
         this.cat.isPouncing = false;
 
-        // Check if entered Dry Dock 12 basin (X: 8 to 32, Z: 5 to 65)
-        if (this.cat.mesh.position.x >= 8.0 && this.cat.mesh.position.x <= 32.0 &&
-            this.cat.mesh.position.z >= 5.0 && this.cat.mesh.position.z <= 65.0) {
+        // Check if entered Historic Dry Dock 1 basin (X: 7 to 30, Z: -42 to -18)
+        if (this.cat.mesh.position.x >= 7.0 && this.cat.mesh.position.x <= 30.0 &&
+            this.cat.mesh.position.z >= -42.0 && this.cat.mesh.position.z <= -18.0) {
           if (!this.missionManager.getCurrentMission().objectives[1].isCompleted) {
             this.missionManager.completeObjective('climb_dorothy');
             soundEngine.playSuccess();
-            this.onNotification?.('OBJECTIVE COMPLETE!', "You entered Dry Dock 12 basin! Track down the Dockyard Kingpin.", 'success');
+            this.onNotification?.('OBJECTIVE COMPLETE!', "You entered Historic Dry Dock 1! Track down the Dockyard Kingpin.", 'success');
             this.onMissionObjectiveUpdated?.();
           }
         }
@@ -1019,8 +1019,10 @@ export class GameEngine {
     // Distance-Based Dynamic Occlusion & LOD Culling (Performance Optimization)
     this.performDistanceLOD();
 
-    // Update Real-Time Tactical Minimap & Radar
-    this.updateMinimap();
+    // Update Real-Time Tactical Minimap & Radar (Throttled to 10 FPS to save main-thread 2D Canvas rendering time)
+    if (this.frameTick % 6 === 0) {
+      this.updateMinimap();
+    }
 
     this.renderer.render(this.scene, this.camera);
     this.onFrameUpdate?.();
