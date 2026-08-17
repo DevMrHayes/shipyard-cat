@@ -43,8 +43,11 @@ export class ShipyardEnvironment {
     this.solidObstacles.push({ min, max, name });
   }
 
+  // Preallocated scratch vector to eliminate Garbage Collection allocations at 60 FPS
+  private static readonly scratchResolved = new THREE.Vector3();
+
   public resolveCollision(pos: THREE.Vector3, radius: number = 0.3, previousPos?: THREE.Vector3): THREE.Vector3 {
-    const resolved = pos.clone();
+    const resolved = ShipyardEnvironment.scratchResolved.copy(pos);
 
     // 1. James River waterfront pier outer edge (prevent falling off pier into deep river)
     if (resolved.x > 56.5) {
@@ -55,39 +58,26 @@ export class ShipyardEnvironment {
     resolved.x = Math.max(-110, Math.min(110, resolved.x));
     resolved.z = Math.max(-110, Math.min(110, resolved.z));
 
-    // 3. Resolve against solid building and wall bounding boxes
-    for (const obs of this.solidObstacles) {
+    // 3. Fast AABB Collision Solver
+    const count = this.solidObstacles.length;
+    for (let i = 0; i < count; i++) {
+      const obs = this.solidObstacles[i];
+      if (resolved.y < obs.min.y || resolved.y > obs.max.y) continue;
+
       const minX = obs.min.x - radius;
       const maxX = obs.max.x + radius;
       const minZ = obs.min.z - radius;
       const maxZ = obs.max.z + radius;
-      const minY = obs.min.y;
-      const maxY = obs.max.y;
 
-      // Only collide if entity is within vertical height range of obstacle
-      if (resolved.y >= minY && resolved.y <= maxY) {
-        if (resolved.x >= minX && resolved.x <= maxX && resolved.z >= minZ && resolved.z <= maxZ) {
-          // If we have previous position, push back to previous position's valid side
-          if (previousPos) {
-            const prevSafeX = previousPos.x < minX || previousPos.x > maxX;
-            const prevSafeZ = previousPos.z < minZ || previousPos.z > maxZ;
+      if (resolved.x >= minX && resolved.x <= maxX && resolved.z >= minZ && resolved.z <= maxZ) {
+        if (previousPos) {
+          const prevSafeX = previousPos.x < minX || previousPos.x > maxX;
+          const prevSafeZ = previousPos.z < minZ || previousPos.z > maxZ;
 
-            if (prevSafeX && !prevSafeZ) {
-              resolved.x = previousPos.x < minX ? minX : maxX;
-            } else if (prevSafeZ && !prevSafeX) {
-              resolved.z = previousPos.z < minZ ? minZ : maxZ;
-            } else {
-              const dLeft = Math.abs(resolved.x - minX);
-              const dRight = Math.abs(maxX - resolved.x);
-              const dTop = Math.abs(resolved.z - minZ);
-              const dBottom = Math.abs(maxZ - resolved.z);
-              const minPen = Math.min(dLeft, dRight, dTop, dBottom);
-
-              if (minPen === dLeft) resolved.x = minX;
-              else if (minPen === dRight) resolved.x = maxX;
-              else if (minPen === dTop) resolved.z = minZ;
-              else resolved.z = maxZ;
-            }
+          if (prevSafeX && !prevSafeZ) {
+            resolved.x = previousPos.x < minX ? minX : maxX;
+          } else if (prevSafeZ && !prevSafeX) {
+            resolved.z = previousPos.z < minZ ? minZ : maxZ;
           } else {
             const dLeft = Math.abs(resolved.x - minX);
             const dRight = Math.abs(maxX - resolved.x);
@@ -100,11 +90,22 @@ export class ShipyardEnvironment {
             else if (minPen === dTop) resolved.z = minZ;
             else resolved.z = maxZ;
           }
+        } else {
+          const dLeft = Math.abs(resolved.x - minX);
+          const dRight = Math.abs(maxX - resolved.x);
+          const dTop = Math.abs(resolved.z - minZ);
+          const dBottom = Math.abs(maxZ - resolved.z);
+          const minPen = Math.min(dLeft, dRight, dTop, dBottom);
+
+          if (minPen === dLeft) resolved.x = minX;
+          else if (minPen === dRight) resolved.x = maxX;
+          else if (minPen === dTop) resolved.z = minZ;
+          else resolved.z = maxZ;
         }
       }
     }
 
-    return resolved;
+    return pos.copy(resolved);
   }
 
   private buildWhiskersBeacons() {

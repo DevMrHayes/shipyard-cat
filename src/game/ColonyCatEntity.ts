@@ -39,18 +39,21 @@ export class ColonyCatEntity {
         const gltfLoader = new GLTFLoader();
         gltfLoader.load('/models/cat.glb', (gltf) => {
           this.gltfModel = gltf.scene;
-          this.gltfModel.scale.set(0.016, 0.016, 0.016);
+          this.gltfModel.scale.set(1.8, 1.8, 1.8);
           this.gltfModel.position.set(0, 0, 0);
+
+          const colonyFurMat = new THREE.MeshStandardMaterial({
+            color: color,
+            roughness: 0.7,
+            side: THREE.DoubleSide
+          });
 
           this.gltfModel.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               child.castShadow = true;
               child.receiveShadow = true;
               child.frustumCulled = false;
-              (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                color: color,
-                roughness: 0.7
-              });
+              (child as THREE.Mesh).material = colonyFurMat;
             }
           });
 

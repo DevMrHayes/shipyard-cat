@@ -31,19 +31,23 @@ export class MutantCatEntity {
       const gltfLoader = new GLTFLoader();
       gltfLoader.load('/models/cat.glb', (gltf) => {
         this.gltfModel = gltf.scene;
-        this.gltfModel.scale.set(0.022, 0.022, 0.022); // Larger, imposing mutant scale
+        // Imposing mutant scale (2.1x)
+        this.gltfModel.scale.set(2.1, 2.1, 2.1);
         this.gltfModel.position.set(0, 0, 0);
+
+        const mutantFurMat = new THREE.MeshStandardMaterial({
+          color: 0x2e1065, // Dark radioactive bruised purple/black fur
+          roughness: 0.8,
+          metalness: 0.25,
+          side: THREE.DoubleSide
+        });
 
         this.gltfModel.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
             child.frustumCulled = false;
-            (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-              color: 0x18181b,
-              roughness: 0.9,
-              metalness: 0.2
-            });
+            (child as THREE.Mesh).material = mutantFurMat;
           }
         });
 

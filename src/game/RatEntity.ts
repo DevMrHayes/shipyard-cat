@@ -57,23 +57,23 @@ export class RatEntity {
       const gltfLoader = new GLTFLoader();
       gltfLoader.load('/models/rat.glb', (gltf) => {
         this.gltfModel = gltf.scene;
-        // Authentic rodent proportions (small shipyard mice/rats compared to Alba)
-        const modelScale = (isKingpin ? 0.28 : 0.14);
+        // Authentic rodent proportions (0.35m length)
+        const modelScale = isKingpin ? 0.45 : 0.26;
         this.gltfModel.scale.set(modelScale, modelScale, modelScale);
         this.gltfModel.position.set(0, 0, 0);
+
+        const ratFurMat = new THREE.MeshStandardMaterial({
+          color: isKingpin ? 0x271e16 : 0x475569, // Dark scarred fur for Kingpin, Slate brown for mice
+          roughness: 0.85,
+          side: THREE.DoubleSide
+        });
 
         this.gltfModel.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
             child.frustumCulled = false;
-            if (isKingpin) {
-              // Darker scarred fur for Kingpin
-              (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                color: 0x271e16,
-                roughness: 0.8
-              });
-            }
+            (child as THREE.Mesh).material = ratFurMat;
           }
         });
 
@@ -89,7 +89,7 @@ export class RatEntity {
             if (name.includes('eat')) this.animations['eat'] = action;
           });
 
-          const initialAction = this.animations['idle'] || Object.values(this.animations)[0];
+          const initialAction = this.animations['run'] || this.animations['idle'] || Object.values(this.animations)[0];
           if (initialAction) {
             initialAction.play();
             this.currentAction = initialAction;
@@ -99,7 +99,7 @@ export class RatEntity {
         this.mesh.add(this.gltfModel);
         proceduralGroup.visible = false;
       }, undefined, () => {
-        // Fallback
+        proceduralGroup.visible = true;
       });
     }
 

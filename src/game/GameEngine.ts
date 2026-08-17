@@ -19,7 +19,7 @@ export class GameEngine {
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
-  private renderer: THREE.WebGLRenderer;
+  public renderer: THREE.WebGLRenderer;
   
   public cat: CatCharacter;
   public environment: ShipyardEnvironment;
@@ -154,51 +154,49 @@ export class GameEngine {
 
   private setupLighting() {
     // 1. Warm Industrial Twilight Sky & Ground Bounce
-    const hemiLight = new THREE.HemisphereLight(0xffedd5, 0x1e293b, 1.6);
+    const hemiLight = new THREE.HemisphereLight(0xffedd5, 0x1e293b, 1.8);
     this.scene.add(hemiLight);
 
-    // 2. Low Golden Hour Sun (Dramatic long industrial shadows)
-    const sunLight = new THREE.DirectionalLight(0xfef08a, 2.6);
-    sunLight.position.set(70, 75, 45);
+    // 2. Optimized Golden Hour Sun (Single Efficient Shadow Map Pass)
+    const sunLight = new THREE.DirectionalLight(0xfef08a, 2.8);
+    sunLight.position.set(60, 65, 40);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.mapSize.width = 1024; // Optimized for 60 FPS performance
+    sunLight.shadow.mapSize.height = 1024;
+    sunLight.shadow.bias = -0.0008;
     sunLight.shadow.camera.near = 10;
-    sunLight.shadow.camera.far = 320;
-    sunLight.shadow.camera.left = -100;
-    sunLight.shadow.camera.right = 100;
-    sunLight.shadow.camera.top = 100;
-    sunLight.shadow.camera.bottom = -100;
+    sunLight.shadow.camera.far = 260;
+    sunLight.shadow.camera.left = -90;
+    sunLight.shadow.camera.right = 90;
+    sunLight.shadow.camera.top = 90;
+    sunLight.shadow.camera.bottom = -90;
     this.scene.add(sunLight);
 
     // 3. Cool River Horizon Fill Light
-    const fillLight = new THREE.DirectionalLight(0x38bdf8, 1.1);
+    const fillLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
     fillLight.position.set(-60, 45, -45);
     this.scene.add(fillLight);
 
-    // 4. High-Mast Sodium Floodlights (Warm Amber Industrial Staging Beams)
-    const southYardFlood = new THREE.SpotLight(0xfbbf24, 4.2, 85, Math.PI / 3, 0.4, 1.2);
+    // 4. High-Mast Sodium Floodlights (Direct illumination without expensive shadow map passes)
+    const southYardFlood = new THREE.SpotLight(0xfbbf24, 3.5, 80, Math.PI / 3, 0.4, 1.2);
     southYardFlood.position.set(-20, 18, -15);
-    southYardFlood.target.position.set(-20, 0, -25); // Aim at Tugboat Dorothy
-    southYardFlood.castShadow = true;
+    southYardFlood.target.position.set(-20, 0, -25);
     this.scene.add(southYardFlood, southYardFlood.target);
 
     // 5. Big Blue Gantry Dry Dock High-Mast Lights
-    const dryDockFlood = new THREE.SpotLight(0x60a5fa, 4.8, 120, Math.PI / 3.5, 0.3, 1.0);
+    const dryDockFlood = new THREE.SpotLight(0x60a5fa, 4.0, 110, Math.PI / 3.5, 0.3, 1.0);
     dryDockFlood.position.set(20, 36, 25);
-    dryDockFlood.target.position.set(20, 0, 30); // Aim at CVN-80 Supercarrier module
-    dryDockFlood.castShadow = true;
+    dryDockFlood.target.position.set(20, 0, 30);
     this.scene.add(dryDockFlood, dryDockFlood.target);
 
     // 6. Submarine MOF Fabrication Floodlight
-    const subShopFlood = new THREE.SpotLight(0xfde047, 3.8, 75, Math.PI / 3, 0.3, 1.1);
+    const subShopFlood = new THREE.SpotLight(0xfde047, 3.2, 70, Math.PI / 3, 0.3, 1.1);
     subShopFlood.position.set(-30, 18, 45);
     subShopFlood.target.position.set(-30, 0, 45);
     this.scene.add(subShopFlood, subShopFlood.target);
 
-    // 7. James River Waterfront Pier Illuminator (Casts bright reflections across water waves)
-    const riverFlood = new THREE.DirectionalLight(0xbae6fd, 1.8);
+    // 7. James River Waterfront Pier Illuminator
+    const riverFlood = new THREE.DirectionalLight(0xbae6fd, 1.6);
     riverFlood.position.set(50, 30, 0);
     riverFlood.target.position.set(120, 0, 0);
     this.scene.add(riverFlood, riverFlood.target);

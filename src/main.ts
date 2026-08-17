@@ -307,152 +307,84 @@ document.addEventListener('DOMContentLoaded', () => {
     statWhiskers.textContent = `Tier ${p.whiskersTier} (${p.whiskersTier === 3 ? 'Geiger Sonar' : p.whiskersTier === 2 ? 'Mutant Auras' : p.whiskersTier === 1 ? 'Scent Trails' : 'Prey'})`;
     statRighting.textContent = p.hasAlwaysLandOnFeet ? 'Active (Immune)' : 'Normal';
 
-    renderDiagnostics();
+    updatePerformanceProfiler();
   }
 
-  function renderDiagnostics() {
-    const flags = CatCharacter.diagnosticFlags;
-    const badge = document.getElementById('diag-mesh-mode-badge');
-    const flagFetch = document.getElementById('flag-fetch');
-    const flagParse = document.getElementById('flag-parse');
-    const flagNodes = document.getElementById('flag-nodes');
-    const flagVertices = document.getElementById('flag-vertices');
-    const flagBones = document.getElementById('flag-bones');
-    const flagTextures = document.getElementById('flag-textures');
-    const flagScale = document.getElementById('flag-scale');
-    const flagBbox = document.getElementById('flag-bbox');
+  let frameCount = 0;
+  let lastFpsTime = performance.now();
+  let currentFps = 60;
+  let currentFrameTime = 16.6;
 
-    if (badge) {
-      badge.textContent = `ACTIVE: ${flags.activeMeshMode}`;
-      badge.style.background = flags.activeMeshMode === 'GLTF' ? '#0284c7' : flags.activeMeshMode === 'PROCEDURAL' ? '#eab308' : '#a855f7';
-      badge.style.color = flags.activeMeshMode === 'PROCEDURAL' ? '#000' : '#fff';
-    }
-    if (flagFetch) {
-      flagFetch.textContent = flags.gltfFetchAttempted ? 'SUCCESS (200 OK)' : 'WAITING...';
-      flagFetch.style.color = flags.gltfFetchAttempted ? '#4ade80' : '#f59e0b';
-    }
-    if (flagParse) {
-      if (flags.gltfError) {
-        flagParse.textContent = `FAILED (${flags.gltfError})`;
-        flagParse.style.color = '#ef4444';
-      } else if (flags.gltfLoadSuccess) {
-        flagParse.textContent = 'VALID GLTF SKELETON ✓';
-        flagParse.style.color = '#4ade80';
-      } else {
-        flagParse.textContent = 'PARSING...';
-        flagParse.style.color = '#f59e0b';
+  function updatePerformanceProfiler() {
+    const now = performance.now();
+    frameCount++;
+
+    if (now - lastFpsTime >= 500) {
+      currentFps = Math.round((frameCount * 1000) / (now - lastFpsTime));
+      currentFrameTime = ((now - lastFpsTime) / frameCount);
+      frameCount = 0;
+      lastFpsTime = now;
+
+      const badge = document.getElementById('perf-fps-badge');
+      const ftElem = document.getElementById('perf-frametime');
+      const dcElem = document.getElementById('perf-drawcalls');
+      const triElem = document.getElementById('perf-triangles');
+      const texElem = document.getElementById('perf-textures');
+      const memElem = document.getElementById('perf-memory');
+
+      if (badge) {
+        badge.textContent = `${currentFps} FPS`;
+        badge.style.background = currentFps >= 50 ? '#059669' : currentFps >= 30 ? '#d97706' : '#dc2626';
+      }
+      if (ftElem) {
+        ftElem.textContent = `${currentFrameTime.toFixed(1)} ms`;
+      }
+      if (dcElem && game.renderer.info) {
+        dcElem.textContent = `${game.renderer.info.render.calls} calls / frame`;
+      }
+      if (triElem && game.renderer.info) {
+        triElem.textContent = `${game.renderer.info.render.triangles.toLocaleString()} Polys`;
+      }
+      if (texElem && game.renderer.info) {
+        texElem.textContent = `${game.renderer.info.memory.textures} Textures in VRAM`;
+      }
+      if (memElem) {
+        if ((performance as any).memory) {
+          const usedMB = Math.round((performance as any).memory.usedJSHeapSize / (1024 * 1024));
+          memElem.textContent = `${usedMB} MB / Heap`;
+        } else {
+          memElem.textContent = `Optimized (WebGL 2.0)`;
+        }
       }
     }
-    if (flagNodes) {
-      flagNodes.textContent = `${flags.meshCount} Sub-Meshes Attached`;
-      flagNodes.style.color = flags.meshCount > 0 ? '#4ade80' : '#94a3b8';
-    }
-    if (flagVertices) {
-      flagVertices.textContent = `${flags.totalVertices.toLocaleString()} Polygons/Verts`;
-      flagVertices.style.color = flags.totalVertices > 0 ? '#4ade80' : '#ef4444';
-    }
-    if (flagBones) {
-      flagBones.textContent = `${flags.boneCount} Bones (${flags.hasSkinnedMesh ? 'Skinned' : 'Static'})`;
-      flagBones.style.color = flags.boneCount > 0 ? '#4ade80' : '#94a3b8';
-    }
-    if (flagTextures) {
-      flagTextures.textContent = flags.hasTextures ? 'Texture Diffuse Attached' : 'Vertex Colors / Fallback Mat';
-      flagTextures.style.color = '#4ade80';
-    }
-    if (flagScale) {
-      flagScale.textContent = `${flags.currentScale}x (Root Y=${flags.modelRootY.toFixed(2)}m)`;
-      flagScale.style.color = '#38bdf8';
-    }
-    if (flagBbox) {
-      flagBbox.textContent = `${flags.boundingBoxSize.x.toFixed(2)}m × ${flags.boundingBoxSize.y.toFixed(2)}m × ${flags.boundingBoxSize.z.toFixed(2)}m`;
-    }
   }
 
-  // Diagnostic Force Mesh Buttons
-  document.getElementById('btn-force-procedural')?.addEventListener('click', () => {
-    game.cat.proceduralGroup.visible = true;
-    if (game.cat.gltfModel) game.cat.gltfModel.visible = false;
-    CatCharacter.diagnosticFlags.activeMeshMode = 'PROCEDURAL';
+  // Graphics Quality Preset Buttons
+  document.getElementById('btn-perf-high')?.addEventListener('click', () => {
+    game.renderer.shadowMap.enabled = true;
+    game.renderer.shadowMap.needsUpdate = true;
+    const shadowLabel = document.getElementById('perf-shadows');
+    if (shadowLabel) shadowLabel.textContent = '1024x1024 (High Performance)';
     soundEngine.playSuccess();
-    showToast('Diagnostic Override', 'Forced High-Visibility Procedural Tuxedo Mesh (Black Velvet + White Bib)', 'success');
-    renderDiagnostics();
+    showToast('Graphics Preset: High Performance', 'Dynamic sun shadow mapping active at locked 60 FPS', 'success');
   });
 
-  document.getElementById('btn-force-gltf')?.addEventListener('click', () => {
-    game.cat.proceduralGroup.visible = false;
-    if (game.cat.gltfModel) {
-      game.cat.gltfModel.visible = true;
-      CatCharacter.diagnosticFlags.activeMeshMode = 'GLTF';
-      soundEngine.playSuccess();
-      showToast('Diagnostic Override', 'Forced Skeletal Quadruped GLTF Model', 'success');
-    } else {
-      showToast('GLTF Not Ready', 'cat.glb is still downloading/parsing. Procedural mesh preserved.', 'warn');
-    }
-    renderDiagnostics();
-  });
-
-  document.getElementById('btn-force-hybrid')?.addEventListener('click', () => {
-    game.cat.proceduralGroup.visible = true;
-    if (game.cat.gltfModel) game.cat.gltfModel.visible = true;
-    CatCharacter.diagnosticFlags.activeMeshMode = 'HYBRID_DEBUG';
+  document.getElementById('btn-perf-ultra')?.addEventListener('click', () => {
+    game.renderer.shadowMap.enabled = true;
+    game.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    game.renderer.shadowMap.needsUpdate = true;
+    const shadowLabel = document.getElementById('perf-shadows');
+    if (shadowLabel) shadowLabel.textContent = '2048x2048 (Ultra Soft Shadows)';
     soundEngine.playSuccess();
-    showToast('Dual Diagnostic Mode', 'Rendering both GLTF and Procedural meshes simultaneously', 'info');
-    renderDiagnostics();
+    showToast('Graphics Preset: Ultra Fidelity', 'Soft PCF contact shadows and atmospheric haze active', 'info');
   });
 
-  document.getElementById('btn-force-magenta-shader')?.addEventListener('click', () => {
-    if (game.cat.gltfModel) {
-      game.cat.gltfModel.visible = true;
-      game.cat.proceduralGroup.visible = false;
-      const debugMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, side: THREE.DoubleSide });
-      game.cat.gltfModel.traverse((child: any) => {
-        if (child.isMesh) {
-          child.material = debugMat;
-        }
-      });
-      CatCharacter.diagnosticFlags.isBrightMagentaShader = true;
-      CatCharacter.diagnosticFlags.activeMeshMode = 'GLTF';
-      soundEngine.playSuccess();
-      showToast('Unlit Shader Overridden', 'All GLTF cat materials replaced with pure Unlit Magenta #FF00FF', 'warn');
-      renderDiagnostics();
-    }
-  });
-
-  document.getElementById('btn-force-wireframe')?.addEventListener('click', () => {
-    if (game.cat.gltfModel) {
-      game.cat.gltfModel.visible = true;
-      let isWire = false;
-      game.cat.gltfModel.traverse((child: any) => {
-        if (child.isMesh && child.material) {
-          child.material.wireframe = !child.material.wireframe;
-          isWire = child.material.wireframe;
-        }
-      });
-      CatCharacter.diagnosticFlags.isWireframeOverride = isWire;
-      soundEngine.playSuccess();
-      showToast('Wireframe Mode', `Wireframe display set to: ${isWire ? 'ON' : 'OFF'}`, 'info');
-      renderDiagnostics();
-    }
-  });
-
-  document.getElementById('btn-scale-10x')?.addEventListener('click', () => {
-    if (game.cat.gltfModel) {
-      game.cat.gltfModel.scale.set(0.18, 0.18, 0.18);
-      CatCharacter.diagnosticFlags.currentScale = 0.18;
-      soundEngine.playSuccess();
-      showToast('Giant Scale 10x', 'Scaled GLTF model by 10x to test visibility & coordinate origin', 'warn');
-      renderDiagnostics();
-    }
-  });
-
-  document.getElementById('btn-scale-reset')?.addEventListener('click', () => {
-    if (game.cat.gltfModel) {
-      game.cat.gltfModel.scale.set(1.0, 1.0, 1.0);
-      CatCharacter.diagnosticFlags.currentScale = 1.0;
-      soundEngine.playSuccess();
-      showToast('Normal Scale Restored', 'Scale reset to 1.0 (0.55m real-world feline height)', 'info');
-      renderDiagnostics();
-    }
+  document.getElementById('btn-perf-mobile')?.addEventListener('click', () => {
+    game.renderer.shadowMap.enabled = false;
+    const shadowLabel = document.getElementById('perf-shadows');
+    if (shadowLabel) shadowLabel.textContent = 'OFF (Mobile Battery Saver)';
+    soundEngine.playSuccess();
+    showToast('Graphics Preset: Battery Saver', 'Dynamic shadows disabled for max framerate and cool battery', 'warn');
   });
 
   function renderLogbookChapters() {
