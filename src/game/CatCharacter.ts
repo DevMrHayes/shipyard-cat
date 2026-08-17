@@ -30,53 +30,59 @@ export class CatCharacter {
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
       const gltfLoader = new GLTFLoader();
       gltfLoader.load('/models/cat.glb', (gltf) => {
-      this.gltfModel = gltf.scene;
-      // Cat model bounding box is ~30 units tall, so 0.018 scale normalizes it to ~0.55m
-      this.gltfModel.scale.set(0.018, 0.018, 0.018);
-      this.gltfModel.position.set(0, 0, 0);
-      this.gltfModel.rotation.y = 0; // Face forward (+Z direction)
+        this.gltfModel = gltf.scene;
+        // Cat model bounding box is ~30 units tall, 0.018 scale normalizes it to ~0.55m height
+        this.gltfModel.scale.set(0.018, 0.018, 0.018);
+        this.gltfModel.position.set(0, 0, 0);
+        this.gltfModel.rotation.y = 0; // Face forward (+Z direction)
 
-      // Traverse to enable shadows
-      this.gltfModel.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      });
-
-      // Bind Skeletal Animation Mixer
-      if (gltf.animations && gltf.animations.length > 0) {
-        this.mixer = new THREE.AnimationMixer(this.gltfModel);
-        gltf.animations.forEach((clip) => {
-          const action = this.mixer!.clipAction(clip);
-          const name = clip.name.toLowerCase();
-          this.animations[name] = action;
-          // Also alias common animation names
-          if (name.includes('idle')) this.animations['idle'] = action;
-          if (name.includes('walk')) this.animations['walk'] = action;
-          if (name.includes('run')) this.animations['run'] = action;
-          if (name.includes('jump')) this.animations['jump'] = action;
-          if (name.includes('attack')) this.animations['attack'] = action;
+        // Traverse to enable shadows & disable frustum culling on animated bones
+        this.gltfModel.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.frustumCulled = false; // CRITICAL: Prevents skinned mesh dropping out of camera frustum
+            if (mesh.geometry) {
+              mesh.geometry.computeBoundingBox();
+              mesh.geometry.computeBoundingSphere();
+            }
+          }
         });
 
-        // Set default idle animation
-        const idleAction = this.animations['idle'] || Object.values(this.animations)[0];
-        if (idleAction) {
-          idleAction.play();
-          this.currentAction = idleAction;
+        // Bind Skeletal Animation Mixer
+        if (gltf.animations && gltf.animations.length > 0) {
+          this.mixer = new THREE.AnimationMixer(this.gltfModel);
+          gltf.animations.forEach((clip) => {
+            const action = this.mixer!.clipAction(clip);
+            const name = clip.name.toLowerCase();
+            this.animations[name] = action;
+            // Also alias common animation names
+            if (name.includes('idle')) this.animations['idle'] = action;
+            if (name.includes('walk')) this.animations['walk'] = action;
+            if (name.includes('run')) this.animations['run'] = action;
+            if (name.includes('jump')) this.animations['jump'] = action;
+            if (name.includes('attack')) this.animations['attack'] = action;
+          });
+
+          // Set default idle animation
+          const idleAction = this.animations['idle'] || Object.values(this.animations)[0];
+          if (idleAction) {
+            idleAction.play();
+            this.currentAction = idleAction;
+          }
         }
-      }
 
-      this.mesh.add(this.gltfModel);
+        this.mesh.add(this.gltfModel);
 
-      // Hide procedural geometry once GLTF mesh is verified in scene graph
-      if (this.gltfModel && this.gltfModel.children.length > 0) {
-        proceduralGroup.visible = false;
-      }
-    }, undefined, (err) => {
-      console.warn('GLTF Cat load fallback note:', err);
-      proceduralGroup.visible = true;
-    });
+        // Hide procedural fallback geometry only after verifying GLTF is attached
+        if (this.gltfModel && this.gltfModel.children.length > 0) {
+          proceduralGroup.visible = false;
+        }
+      }, undefined, (err) => {
+        console.warn('GLTF Cat load fallback note:', err);
+        proceduralGroup.visible = true;
+      });
     }
 
     // Material definitions (Tuxedo Cat: Sleek velvety black fur with white bib and white paws)

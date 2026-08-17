@@ -38,6 +38,7 @@ export class MutantCatEntity {
           if ((child as THREE.Mesh).isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
+            child.frustumCulled = false;
             (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
               color: 0x18181b,
               roughness: 0.9,

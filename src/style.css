@@ -560,3 +560,232 @@ canvas {
   font-size: 0.8rem;
   color: #cbd5e1;
 }
+
+/* --- TACTICAL CORNER RADAR (Minimap) --- */
+.minimap-card {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(56, 189, 248, 0.4);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.minimap-card:hover {
+  transform: scale(1.05);
+  border-color: #38bdf8;
+}
+
+.minimap-label {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-family: var(--font-tech);
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+
+/* --- FULL TACTICAL BLUEPRINT MAP MODAL --- */
+.blueprint-map-wrapper {
+  width: 100%;
+  background: #09131e;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+#full-map-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.blueprint-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  background: rgba(15, 23, 42, 0.7);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  font-size: 0.75rem;
+  font-family: var(--font-tech);
+  color: #cbd5e1;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-alba { background: #38bdf8; box-shadow: 0 0 6px #38bdf8; }
+.dot-rat { background: #facc15; }
+.dot-kingpin { background: #f97316; box-shadow: 0 0 6px #f97316; }
+.dot-mutant { background: #c084fc; box-shadow: 0 0 6px #c084fc; }
+.dot-colony { background: #4ade80; }
+.dot-obj { background: #38bdf8; }
+
+/* --- MOBILE VIRTUAL JOYSTICK & TOUCH CONTROLS --- */
+.mobile-controls-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 15;
+  display: none; /* Auto-enabled on touch/mobile devices */
+}
+
+.joystick-zone {
+  position: absolute;
+  bottom: 2rem;
+  left: 2rem;
+  width: 130px;
+  height: 130px;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.joystick-base {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border: 2px solid rgba(56, 189, 248, 0.4);
+  backdrop-filter: blur(6px);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.joystick-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #38bdf8 0%, #0284c7 100%);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+  position: absolute;
+  pointer-events: none;
+  transition: transform 0.05s ease-out;
+}
+
+.touch-actions-cluster {
+  position: absolute;
+  bottom: 2rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: flex-end;
+  pointer-events: auto;
+}
+
+.touch-action-btn {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.85);
+  border: 2px solid var(--panel-border);
+  color: #fff;
+  font-family: var(--font-tech);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  touch-action: manipulation;
+  user-select: none;
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+
+.touch-action-btn span {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.touch-action-btn label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  margin-top: 2px;
+  pointer-events: none;
+}
+
+.touch-btn-primary {
+  width: 68px;
+  height: 68px;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.touch-btn-combat { border-color: #ef4444; }
+.touch-btn-senses { border-color: #38bdf8; }
+.touch-btn-social { border-color: #4ade80; }
+.touch-btn-map { border-color: #a855f7; }
+
+.touch-action-btn:active,
+.touch-action-btn.active {
+  transform: scale(0.92);
+  background: rgba(56, 189, 248, 0.4);
+}
+
+/* Media Queries for Mobile Responsive Layout */
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  .mobile-controls-overlay {
+    display: block;
+  }
+
+  .action-controls {
+    display: none; /* Hide desktop keyboard badges on mobile */
+  }
+
+  .hud-top-left {
+    max-width: 220px;
+  }
+
+  .minimap-card {
+    width: 95px;
+    height: 95px;
+  }
+
+  .mission-card {
+    max-width: 280px;
+  }
+
+  .system-toolbar {
+    gap: 0.25rem;
+  }
+
+  .hud-btn-mini {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.7rem;
+  }
+}
+

@@ -46,6 +46,7 @@ export class ColonyCatEntity {
             if ((child as THREE.Mesh).isMesh) {
               child.castShadow = true;
               child.receiveShadow = true;
+              child.frustumCulled = false;
               (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
                 color: color,
                 roughness: 0.7

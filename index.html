@@ -154,6 +154,9 @@
 
         <!-- Quick System Toolbar -->
         <div class="system-toolbar">
+          <button id="btn-map" class="hud-btn-mini" title="Shipyard Blueprint Map">
+            <span>🗺️ Map</span>
+          </button>
           <button id="btn-abilities" class="hud-btn-mini" title="Abilities & Perks">
             <span>⭐ Abilities</span> <span id="sp-badge" class="badge-mini">0 SP</span>
           </button>
@@ -170,6 +173,46 @@
             <span>🧪 Tests</span>
           </button>
         </div>
+
+        <!-- Real-Time Shipyard Tactical Corner Radar -->
+        <div class="minimap-card" id="minimap-container">
+          <canvas id="minimap-canvas" width="130" height="130"></canvas>
+          <div class="minimap-label">RADAR (45M)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Virtual On-Screen Controls (Touch Devices) -->
+    <div id="mobile-touch-controls" class="mobile-controls-overlay">
+      <!-- Floating Virtual Analog Thumbstick -->
+      <div id="virtual-joystick-zone" class="joystick-zone">
+        <div class="joystick-base">
+          <div id="virtual-joystick-thumb" class="joystick-thumb"></div>
+        </div>
+      </div>
+
+      <!-- Ergonomic Action Touch Cluster -->
+      <div class="touch-actions-cluster">
+        <button id="touch-btn-pounce" class="touch-action-btn touch-btn-primary" title="Pounce / Jump">
+          <span>🐾</span>
+          <label>LEAP</label>
+        </button>
+        <button id="touch-btn-attack" class="touch-action-btn touch-btn-combat" title="Claw Attack">
+          <span>⚡</span>
+          <label>SWIPE</label>
+        </button>
+        <button id="touch-btn-whiskers" class="touch-action-btn touch-btn-senses" title="Whiskers Vision">
+          <span>📡</span>
+          <label>SENSES</label>
+        </button>
+        <button id="touch-btn-meow" class="touch-action-btn touch-btn-social" title="Meow / Interact">
+          <span>💬</span>
+          <label>MEOW</label>
+        </button>
+        <button id="touch-btn-map" class="touch-action-btn touch-btn-map" title="Shipyard Map">
+          <span>🗺️</span>
+          <label>MAP</label>
+        </button>
       </div>
     </div>
 
@@ -391,6 +434,32 @@
             <p>NNS Hull No. 1 dry-mounted near Washington Ave and Red-Brick Machine Shop No. 1.</p>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full Tactical Shipyard Blueprint Map Modal -->
+  <div id="modal-map" class="modal-overlay">
+    <div class="modal-container" style="max-width: 860px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">🗺️ Newport News Shipbuilding Master Blueprint</h2>
+          <span style="font-size: 0.8rem; color: #94a3b8;">Real-Time GPS Tactical Radar & Facility Zoning Map</span>
+        </div>
+        <button class="modal-close" data-close="modal-map">&times;</button>
+      </div>
+      
+      <div class="blueprint-map-wrapper">
+        <canvas id="full-map-canvas" width="800" height="480"></canvas>
+      </div>
+
+      <div class="blueprint-legend">
+        <div class="legend-item"><span class="legend-dot dot-alba"></span> Alba (You)</div>
+        <div class="legend-item"><span class="legend-dot dot-rat"></span> Foraging Vermin</div>
+        <div class="legend-item"><span class="legend-dot dot-kingpin"></span> Dockyard Kingpin Boss</div>
+        <div class="legend-item"><span class="legend-dot dot-mutant"></span> Mutant Insurgents</div>
+        <div class="legend-item"><span class="legend-dot dot-colony"></span> Friendly Colony Cats</div>
+        <div class="legend-item"><span class="legend-dot dot-obj"></span> Mission Objective</div>
       </div>
     </div>
   </div>

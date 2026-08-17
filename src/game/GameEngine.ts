@@ -12,6 +12,8 @@ import { ColonyCatEntity } from './ColonyCatEntity';
 import { MutantCatEntity } from './MutantCatEntity';
 import { ShipbuilderEntity } from './ShipbuilderEntity';
 import { soundEngine } from '../core/SoundEngine';
+import { TouchController } from '../core/TouchController';
+import { MinimapSystem, MinimapEntity } from '../core/MinimapSystem';
 
 export class GameEngine {
   private container: HTMLElement;
@@ -30,6 +32,8 @@ export class GameEngine {
   public assistanceEngine: AssistanceEngine;
   public missionManager: MissionManager;
   public progression: ProgressionSystem;
+  public touchController: TouchController;
+  public minimapSystem: MinimapSystem;
 
   private keys: { [key: string]: boolean } = {};
   private lastForwardKeyDownTime: number = 0;
@@ -50,9 +54,13 @@ export class GameEngine {
   private isPouncing: boolean = false;
   private pounceTimer: number = 0;
   private catHeading: number = 0;
+  private cameraYaw: number = 0;
+  private cameraPitch: number = 0.15;
   private turnVelocity: number = 0;
   private isDraggingMouse: boolean = false;
   private lastMouseX: number = 0;
+  private lastMouseY: number = 0;
+  private lastLocationName: string = '';
 
   // Event callbacks for UI
   public onVitalsUpdate?: (vitals: CatVitals, radiation: number) => void;
@@ -70,6 +78,8 @@ export class GameEngine {
     this.assistanceEngine = new AssistanceEngine();
     this.missionManager = new MissionManager();
     this.progression = new ProgressionSystem();
+    this.touchController = new TouchController();
+    this.minimapSystem = new MinimapSystem();
 
     // 2. Initialize Three.js Scene & Renderer (Video Game AAA Grade Pipeline)
     this.scene = new THREE.Scene();
@@ -637,16 +647,20 @@ export class GameEngine {
   }
 
   private updateMovement(deltaTime: number) {
-    const isSprinting = (this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.isDoubleTapSprint) && this.vitals.canSprint();
+    const touchMove = this.touchController.moveVector;
+    const isSprinting = ((this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.isDoubleTapSprint || this.touchController.isSprinting) && this.vitals.canSprint());
     const isCrouching = this.isSneakToggle || this.keys['ControlLeft'] || this.keys['KeyC'];
     this.cat.isCrouching = isCrouching;
 
-    // 1. Forward / Reverse Propulsion
+    // 1. Forward / Reverse Propulsion (Keyboard + Touch Joystick)
     let driveInput = 0;
     if (this.keys['KeyW'] || this.keys['ArrowUp']) driveInput += 1;
     if (this.keys['KeyS'] || this.keys['ArrowDown']) driveInput -= 0.6;
+    if (this.touchController.isTouching) {
+      driveInput = touchMove.y; // Positive Y is forward
+    }
 
-    const isMoving = driveInput !== 0;
+    const isMoving = Math.abs(driveInput) > 0.05 || Math.abs(touchMove.x) > 0.05;
 
     // Auto-disable Whiskers Mode if exhausted
     if (this.isWhiskersMode && !this.vitals.canUseWhiskers()) {
@@ -654,15 +668,25 @@ export class GameEngine {
       this.onNotification?.('Whiskers Vision Faded', 'Alba is exhausted! Stamina recharging...', 'warn');
     }
 
-    // 2. Silky-Smooth Precision Steering (Micro-turning on tap, smooth arc while moving)
+    // 2. Silky-Smooth Precision Steering (Keyboard + Touch Joystick)
     let turnInput = 0;
     if (this.keys['KeyA'] || this.keys['ArrowLeft']) turnInput += 1;
     if (this.keys['KeyD'] || this.keys['ArrowRight']) turnInput -= 1;
+    if (this.touchController.isTouching) {
+      turnInput = -touchMove.x * 1.5; // Turn left / right with thumbstick
+    }
 
     if (turnInput !== 0) {
-      const baseTurnRate = isMoving ? 2.2 : 2.6;
+      const baseTurnRate = isMoving ? 2.4 : 2.8;
       this.catHeading += turnInput * baseTurnRate * deltaTime;
       this.cat.mesh.rotation.y = this.catHeading;
+    }
+
+    // Touch camera drag swipe delta
+    const camDelta = this.touchController.consumeCameraDelta();
+    if (camDelta.x !== 0 || camDelta.y !== 0) {
+      this.cameraYaw -= camDelta.x * 2.0;
+      this.cameraPitch = Math.max(-0.25, Math.min(0.85, this.cameraPitch + camDelta.y * 1.5));
     }
 
     // Update vitals with Whiskers drain & exhaustion lock
@@ -873,10 +897,6 @@ export class GameEngine {
     this.onVitalsUpdate?.(this.vitals, radData.totalDose);
   }
 
-  private lastLocationName: string = 'Shipyard Grounds';
-  public cameraYaw: number = 0;
-  public cameraPitch: number = 0.2;
-
   private updateCamera(deltaTime: number) {
     const targetPos = this.cat.mesh.position.clone();
     
@@ -945,7 +965,78 @@ export class GameEngine {
     this.environment.update(deltaTime);
     this.updateCamera(deltaTime);
 
+    // Distance-Based Dynamic Occlusion & LOD Culling (Performance Optimization)
+    this.performDistanceLOD();
+
+    // Update Real-Time Tactical Minimap & Radar
+    this.updateMinimap();
+
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private performDistanceLOD() {
+    const catPos = this.cat.mesh.position;
+    const maxActiveDistanceSq = 70 * 70; // 70-meter near-focus culling radius
+
+    // 1. Cull far vermin
+    this.rats.forEach(rat => {
+      const dSq = rat.mesh.position.distanceToSquared(catPos);
+      rat.mesh.visible = dSq < maxActiveDistanceSq;
+    });
+
+    // 2. Cull far mutant cats
+    this.mutantCats.forEach(mutant => {
+      const dSq = mutant.mesh.position.distanceToSquared(catPos);
+      mutant.mesh.visible = dSq < maxActiveDistanceSq;
+    });
+
+    // 3. Cull far shipbuilders
+    this.shipbuilders.forEach(builder => {
+      const dSq = builder.mesh.position.distanceToSquared(catPos);
+      builder.mesh.visible = dSq < maxActiveDistanceSq;
+    });
+  }
+
+  private updateMinimap() {
+    const entities: MinimapEntity[] = [];
+
+    // Add Rats
+    this.rats.forEach(rat => {
+      if (rat.state !== 'CAUGHT') {
+        entities.push({
+          pos: rat.mesh.position,
+          type: rat.isKingpin ? 'KINGPIN' : 'RAT'
+        });
+      }
+    });
+
+    // Add Mutants
+    this.mutantCats.forEach(m => {
+      if (!m.isDefeated) {
+        entities.push({
+          pos: m.mesh.position,
+          type: 'MUTANT'
+        });
+      }
+    });
+
+    // Add Colony Friendly Cats
+    this.colonyNPCs.forEach(c => {
+      entities.push({
+        pos: c.mesh.position,
+        type: 'COLONY'
+      });
+    });
+
+    // Add Objective Beacons
+    if (this.environment.objectiveBeacon && this.environment.objectiveBeacon.visible) {
+      entities.push({
+        pos: this.environment.objectiveBeacon.position,
+        type: 'OBJECTIVE'
+      });
+    }
+
+    this.minimapSystem.update(this.cat.mesh.position, this.catHeading, entities);
   }
 
   private onResize() {

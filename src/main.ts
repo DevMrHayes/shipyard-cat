@@ -360,6 +360,33 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCommsLog();
   });
 
+  // Map Modal Elements
+  const btnMap = document.getElementById('btn-map') as HTMLButtonElement;
+  const modalMap = document.getElementById('modal-map') as HTMLElement;
+  const minimapContainer = document.getElementById('minimap-container') as HTMLElement;
+
+  if (btnMap && modalMap) {
+    btnMap.addEventListener('click', () => modalMap.classList.add('open'));
+  }
+  if (minimapContainer && modalMap) {
+    minimapContainer.addEventListener('click', () => modalMap.classList.add('open'));
+  }
+
+  // Bind Touch Controller Action Hooks
+  game.touchController.onPounce = () => game.executePounce();
+  game.touchController.onAttack = () => game.executePawSwipe();
+  game.touchController.onWhiskers = () => game.toggleWhiskersMode();
+  game.touchController.onMeow = () => game.handleInteractOrMeow();
+  game.touchController.onToggleMap = () => {
+    if (modalMap) {
+      if (modalMap.classList.contains('open')) {
+        modalMap.classList.remove('open');
+      } else {
+        modalMap.classList.add('open');
+      }
+    }
+  };
+
   // Modal Handlers
   btnGallery.addEventListener('click', () => modalGallery.classList.add('open'));
   btnTests.addEventListener('click', () => {

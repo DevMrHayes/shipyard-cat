@@ -66,6 +66,7 @@ export class RatEntity {
           if ((child as THREE.Mesh).isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
+            child.frustumCulled = false;
             if (isKingpin) {
               // Darker scarred fur for Kingpin
               (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
