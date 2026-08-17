@@ -84,7 +84,7 @@ export class RatEntity {
         this.gltfModel.position.set(-center.x, -box.min.y, -center.z);
 
         const ratFurMat = new THREE.MeshStandardMaterial({
-          color: RatEntity.diagnosticFlags.forcedMagenta ? 0xff00ff : (isKingpin ? 0x221308 : 0x785338),
+          color: RatEntity.diagnosticFlags.forcedMagenta ? 0xff00ff : (isKingpin ? 0x1a0f0a : 0x3d2618), // Rich dark chocolate rodent brown
           roughness: 0.75,
           metalness: 0.1,
           side: THREE.DoubleSide

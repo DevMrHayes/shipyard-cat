@@ -223,7 +223,8 @@ export class GameEngine {
       this.scene.add(rat.scentTrailParticles);
     });
 
-    const kingpin = new RatEntity(new THREE.Vector3(-20, 3.2, -29.5), true);
+    // Dockyard Kingpin resides inside Dry Dock 12 basin (X: 20, Y: 0, Z: 35)
+    const kingpin = new RatEntity(new THREE.Vector3(20, 0, 35), true);
     this.rats.push(kingpin);
     this.scene.add(kingpin.mesh);
     this.scene.add(kingpin.scentTrailParticles);
@@ -639,6 +640,9 @@ export class GameEngine {
     return this.isWhiskersMode;
   }
 
+  private static readonly scratchForward = new THREE.Vector3();
+  private static readonly scratchPounce = new THREE.Vector3();
+
   public executePounce() {
     if (this.isPouncing || !this.isGrounded) return;
     if (!this.vitals.consumePounceStamina(22)) {
@@ -651,9 +655,9 @@ export class GameEngine {
     this.pounceTimer = 0.45;
     this.cat.isPouncing = true;
 
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.cat.mesh.quaternion);
-    this.catVelocity.copy(forward).multiplyScalar(11.0);
-    this.catVelocity.y = 5.5;
+    GameEngine.scratchForward.set(0, 0, 1).applyQuaternion(this.cat.mesh.quaternion);
+    this.catVelocity.copy(GameEngine.scratchForward).multiplyScalar(10.0);
+    this.catVelocity.y = 5.0;
     this.isGrounded = false;
   }
 
@@ -747,16 +751,22 @@ export class GameEngine {
         this.isPouncing = false;
         this.cat.isPouncing = false;
 
+        // Check if entered Dry Dock 12 basin (X: 8 to 32, Z: 5 to 65)
+        if (this.cat.mesh.position.x >= 8.0 && this.cat.mesh.position.x <= 32.0 &&
+            this.cat.mesh.position.z >= 5.0 && this.cat.mesh.position.z <= 65.0) {
+          if (!this.missionManager.getCurrentMission().objectives[1].isCompleted) {
+            this.missionManager.completeObjective('climb_dorothy');
+            soundEngine.playSuccess();
+            this.onNotification?.('OBJECTIVE COMPLETE!', "You entered Dry Dock 12 basin! Track down the Dockyard Kingpin.", 'success');
+            this.onMissionObjectiveUpdated?.();
+          }
+        }
+
         // Check if climbed onto Tugboat Dorothy's deck (X: -22 to -18, Z: -31 to -19, Y: 2.2)
         if (this.cat.mesh.position.x >= -23.0 && this.cat.mesh.position.x <= -17.0 &&
             this.cat.mesh.position.z >= -32.0 && this.cat.mesh.position.z <= -18.0 &&
             currentFloor >= 2.0) {
-          if (!this.missionManager.getCurrentMission().objectives[1].isCompleted) {
-            this.missionManager.completeObjective('climb_dorothy');
-            soundEngine.playSuccess();
-            this.onNotification?.('OBJECTIVE COMPLETE!', "You climbed onto Tugboat Dorothy's deck! Head to the capstan.", 'success');
-            this.onMissionObjectiveUpdated?.();
-          }
+          soundEngine.playPurr();
         }
 
         // Check if landed on a floating pallet in Dry Dock 12

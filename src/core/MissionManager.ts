@@ -25,18 +25,18 @@ export class MissionManager {
     {
       id: 1,
       title: "The Rigger's Whistle",
-      subtitle: "South Yard & Historic Dorothy Tugboat",
-      location: "Washington Ave & Pier 3 Staging Yard",
-      briefing: "A giant wharf rat named the 'Dockyard Kingpin' is gnawing on electrical harnesses inside the 1891 Tugboat Dorothy. Stalk through the brick machine shop alleys, practice climbing crates, and hunt it down to help the welders.",
+      subtitle: "South Yard & Dry Dock Basin",
+      location: "Washington Ave & Dry Dock 12 Rim",
+      briefing: "A giant wharf rat named the 'Dockyard Kingpin' has taken refuge down in the empty Dry Dock 12 basin. Hunt mice near the staging spurs for stamina, climb down into the dry dock, and track down the Kingpin to secure the yard.",
       dialogueSpeaker: "Mo Kelly (Welder, Dept. 11)",
-      dialogueText: "Morning, Alba! Eat up that tuna. Keep an eye on the old Dorothy for me—riggers say something big is chewing up the winch harnesses again.",
+      dialogueText: "Morning, Alba! Eat up that tuna. Riggers spotted the Dockyard Kingpin down in the empty Dry Dock 12 basin. Climb down the access ramps and take him down!",
       isUnlocked: true,
       isCompleted: false,
       assistIdReward: "DOROTHY_CAPSTAN_UNJAM",
       objectives: [
         { id: "hunt_mice", description: "Hunt 2 shipyard mice near the rail spurs for stamina", isCompleted: false, requiredCount: 2, currentCount: 0 },
-        { id: "climb_dorothy", description: "Jump and climb the wooden crates onto Tugboat Dorothy's deck", isCompleted: false },
-        { id: "hunt_kingpin", description: "Pounce and defeat the 'Dockyard Kingpin' inside the capstan housing", isCompleted: false }
+        { id: "climb_dorothy", description: "Climb down into the empty Dry Dock 12 basin", isCompleted: false },
+        { id: "hunt_kingpin", description: "Pounce and defeat the 'Dockyard Kingpin' in Dry Dock 12", isCompleted: false }
       ]
     },
     {

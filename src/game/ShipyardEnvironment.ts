@@ -591,17 +591,27 @@ export class ShipyardEnvironment {
 
   private buildDryDock12AndBigBlue() {
     const dockWallMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.95 });
-    
-    // Basin Walls
-    const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 80), dockWallMat);
-    wallLeft.position.set(5, 4, 30);
-    const wallRight = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 80), dockWallMat);
-    wallRight.position.set(35, 4, 30);
+
+    // Dry Dock 12 Basin Walls (Open at South Entrance Z = -10 for easy cat access)
+    const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 70), dockWallMat);
+    wallLeft.position.set(5, 4, 35);
+    const wallRight = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 70), dockWallMat);
+    wallRight.position.set(35, 4, 35);
     this.group.add(wallLeft, wallRight);
 
+    // Concrete Access Ramp entering Dry Dock 12 basin from South Yard (X: 20, Z: -5 to 10)
+    const rampMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 });
+    const dockRampGeo = new THREE.BoxGeometry(8, 0.4, 18);
+    dockRampGeo.rotateX(0.12);
+    const dockRamp = new THREE.Mesh(dockRampGeo, rampMat);
+    dockRamp.position.set(20, 0.2, 0);
+    dockRamp.castShadow = true;
+    dockRamp.receiveShadow = true;
+    this.group.add(dockRamp);
+
     // Register Dry Dock Basin Wall Colliders
-    this.registerObstacle(new THREE.Vector3(3.5, 0, -10), new THREE.Vector3(6.5, 8, 70), 'Dry Dock 12 West Wall');
-    this.registerObstacle(new THREE.Vector3(33.5, 0, -10), new THREE.Vector3(36.5, 8, 70), 'Dry Dock 12 East Wall');
+    this.registerObstacle(new THREE.Vector3(3.5, 0, 0), new THREE.Vector3(6.5, 8, 70), 'Dry Dock 12 West Wall');
+    this.registerObstacle(new THREE.Vector3(33.5, 0, 0), new THREE.Vector3(36.5, 8, 70), 'Dry Dock 12 East Wall');
 
     // 3D CVN Modular Superstructure (Optimized Lightweight Geometry - Saves 25MB RAM)
     const steelPlateTex = TextureGenerator.createSteelPlateTexture();
