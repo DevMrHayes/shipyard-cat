@@ -192,7 +192,7 @@ export class ShipyardEnvironment {
 
     // 3. James River Waterfront with realistic ocean wave normal texture & caustics (Visible directly from pier top)
     const waterNormalTex = TextureGenerator.createWaterNormalTexture();
-    const waterGeo = new THREE.PlaneGeometry(240, 280, 64, 64);
+    const waterGeo = new THREE.PlaneGeometry(240, 280, 16, 16);
     waterGeo.rotateX(-Math.PI / 2);
     const waterMat = new THREE.MeshStandardMaterial({
       map: waterNormalTex,

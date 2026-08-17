@@ -95,11 +95,13 @@ export class GameEngine {
       600
     );
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.autoUpdate = false; // Throttled to 30 FPS shadow updates to eliminate GPU vertex stalling
+    this.renderer.shadowMap.needsUpdate = true;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.25;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -162,19 +164,19 @@ export class GameEngine {
     const hemiLight = new THREE.HemisphereLight(0xffedd5, 0x1e293b, 1.8);
     this.scene.add(hemiLight);
 
-    // 2. Optimized Golden Hour Sun (Single Efficient Shadow Map Pass)
+    // 2. Optimized Golden Hour Sun (512x512 Fast PCF Shadow Map)
     const sunLight = new THREE.DirectionalLight(0xfef08a, 2.8);
     sunLight.position.set(60, 65, 40);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 1024; // Optimized for 60 FPS performance
-    sunLight.shadow.mapSize.height = 1024;
-    sunLight.shadow.bias = -0.0008;
+    sunLight.shadow.mapSize.width = 512; // 512x512 for fast rendering
+    sunLight.shadow.mapSize.height = 512;
+    sunLight.shadow.bias = -0.001;
     sunLight.shadow.camera.near = 10;
-    sunLight.shadow.camera.far = 260;
-    sunLight.shadow.camera.left = -90;
-    sunLight.shadow.camera.right = 90;
-    sunLight.shadow.camera.top = 90;
-    sunLight.shadow.camera.bottom = -90;
+    sunLight.shadow.camera.far = 240;
+    sunLight.shadow.camera.left = -80;
+    sunLight.shadow.camera.right = 80;
+    sunLight.shadow.camera.top = 80;
+    sunLight.shadow.camera.bottom = -80;
     this.scene.add(sunLight);
 
     // 3. Cool River Horizon Fill Light
@@ -1005,19 +1007,24 @@ export class GameEngine {
 
     this.frameTick++;
     this.timer.update();
-    const deltaTime = Math.min(this.timer.getDelta(), 0.1);
+    const deltaTime = Math.min(this.timer.getDelta(), 0.05);
 
-    // 1. Dynamic Resolution Scaling (DRS): Adjust pixel ratio smoothly to prevent frame drops
-    if (this.frameTick % 60 === 0) {
+    // 1. Dynamic Resolution Scaling (DRS)
+    if (this.frameTick % 45 === 0) {
       const targetFPS = 60;
       const actualFPS = deltaTime > 0 ? 1 / deltaTime : targetFPS;
-      if (actualFPS < 45 && this.currentDRSPixelRatio > 1.0) {
-        this.currentDRSPixelRatio = Math.max(1.0, this.currentDRSPixelRatio - 0.15);
+      if (actualFPS < 40 && this.currentDRSPixelRatio > 0.85) {
+        this.currentDRSPixelRatio = Math.max(0.85, this.currentDRSPixelRatio - 0.1);
         this.renderer.setPixelRatio(this.currentDRSPixelRatio);
-      } else if (actualFPS > 58 && this.currentDRSPixelRatio < Math.min(window.devicePixelRatio, 2.0)) {
-        this.currentDRSPixelRatio = Math.min(Math.min(window.devicePixelRatio, 2.0), this.currentDRSPixelRatio + 0.05);
+      } else if (actualFPS > 55 && this.currentDRSPixelRatio < 1.25) {
+        this.currentDRSPixelRatio = Math.min(1.25, this.currentDRSPixelRatio + 0.05);
         this.renderer.setPixelRatio(this.currentDRSPixelRatio);
       }
+    }
+
+    // 2. Throttled Shadow Map Updates (Every 2nd frame or when moving)
+    if (this.frameTick % 2 === 0) {
+      this.renderer.shadowMap.needsUpdate = true;
     }
 
     this.updateMovement(deltaTime);
