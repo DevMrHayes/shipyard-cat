@@ -46,6 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let game: GameEngine;
   try {
     game = new GameEngine(container);
+    game.onFrameUpdate = () => {
+      updatePerformanceProfiler();
+    };
   } catch (err: any) {
     console.error('[Shipyard Cat Fatal Init]', err);
     const fallback = document.getElementById('engine-error-fallback');

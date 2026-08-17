@@ -57,8 +57,8 @@ export class RatEntity {
       const gltfLoader = new GLTFLoader();
       gltfLoader.load('/models/rat.glb', (gltf) => {
         this.gltfModel = gltf.scene;
-        // Authentic rodent proportions (0.35m length)
-        const modelScale = isKingpin ? 0.45 : 0.26;
+        // Raw rat model coordinates are ~50 units in Blender; 0.015 scale normalizes to authentic 0.35m rodent length
+        const modelScale = isKingpin ? 0.024 : 0.014;
         this.gltfModel.scale.set(modelScale, modelScale, modelScale);
         this.gltfModel.position.set(0, 0, 0);
 

@@ -67,6 +67,7 @@ export class GameEngine {
   public onAssistanceTriggered?: (event: ShipbuildingAssistEvent) => void;
   public onMissionObjectiveUpdated?: () => void;
   public onNotification?: (title: string, message: string, type: 'info' | 'success' | 'warn') => void;
+  public onFrameUpdate?: () => void;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -982,6 +983,7 @@ export class GameEngine {
     this.updateMinimap();
 
     this.renderer.render(this.scene, this.camera);
+    this.onFrameUpdate?.();
   }
 
   private performDistanceLOD() {
