@@ -516,6 +516,10 @@ export class GameEngine {
         const dist = rat.mesh.position.distanceTo(catPos);
         if (dist < 1.8) {
           rat.state = 'CAUGHT';
+          rat.mesh.visible = false;
+          this.scene.remove(rat.mesh);
+          this.scene.remove(rat.scentTrailParticles);
+          this.cat.triggerEat();
           soundEngine.playRatCatch();
           this.vitals.feed(rat.nutritionValue);
           this.progression.addXP(rat.nutritionValue * 3);
@@ -766,7 +770,7 @@ export class GameEngine {
       }
     }
 
-    this.cat.animate(deltaTime, isMoving ? speed : 0, this.isGrounded);
+    this.cat.animate(deltaTime, isMoving ? speed : 0, this.isGrounded, turnInput);
 
     // Update Mutant Cats & Flooding
     this.updateMutantsAndColony(deltaTime);
@@ -829,6 +833,10 @@ export class GameEngine {
 
             if (rat.health <= 0) {
               rat.state = 'CAUGHT';
+              rat.mesh.visible = false;
+              this.scene.remove(rat.mesh); // Permanently remove caught rat from 3D scene
+              this.scene.remove(rat.scentTrailParticles);
+              this.cat.triggerEat(); // Trigger Alba eating chewing animation
               soundEngine.playSuccess();
               this.vitals.feed(100);
               this.vitals.currentStamina = this.vitals.maxStamina;
@@ -844,6 +852,10 @@ export class GameEngine {
             }
           } else {
             rat.state = 'CAUGHT';
+            rat.mesh.visible = false;
+            this.scene.remove(rat.mesh); // Permanently remove caught mouse from 3D scene
+            this.scene.remove(rat.scentTrailParticles);
+            this.cat.triggerEat(); // Trigger Alba eating chewing animation
             soundEngine.playRatCatch();
             this.vitals.feed(rat.nutritionValue);
             this.vitals.currentStamina = Math.min(this.vitals.maxStamina, this.vitals.currentStamina + 35);
@@ -976,10 +988,14 @@ export class GameEngine {
     const catPos = this.cat.mesh.position;
     const maxActiveDistanceSq = 60 * 60; // 60-meter near-focus culling radius
 
-    // 1. Cull far vermin
+    // 1. Cull far vermin (and ensure caught eaten rats stay hidden/removed)
     this.rats.forEach(rat => {
-      const dSq = rat.mesh.position.distanceToSquared(catPos);
-      rat.mesh.visible = dSq < maxActiveDistanceSq;
+      if (rat.state === 'CAUGHT') {
+        rat.mesh.visible = false;
+      } else {
+        const dSq = rat.mesh.position.distanceToSquared(catPos);
+        rat.mesh.visible = dSq < maxActiveDistanceSq;
+      }
     });
 
     // 2. Cull far mutant cats

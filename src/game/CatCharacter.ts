@@ -119,23 +119,51 @@ export class CatCharacter {
         // Bind Skeletal Animation Mixer
         if (gltf.animations && gltf.animations.length > 0) {
           this.mixer = new THREE.AnimationMixer(this.gltfModel);
+          console.log('Available Cat Animations in cat.glb:', gltf.animations.map(a => a.name));
           gltf.animations.forEach((clip) => {
             const action = this.mixer!.clipAction(clip);
-            const name = clip.name.toLowerCase();
+            const rawName = clip.name;
+            const name = rawName.toLowerCase();
             this.animations[name] = action;
-            // Also alias common animation names
-            if (name.includes('idle')) this.animations['idle'] = action;
-            if (name.includes('walk')) this.animations['walk'] = action;
-            if (name.includes('run')) this.animations['run'] = action;
-            if (name.includes('jump')) this.animations['jump'] = action;
-            if (name.includes('attack')) this.animations['attack'] = action;
+            this.animations[rawName] = action;
+
+            // Precision Aliases for Feline Locomotion & Postures
+            if (name.includes('sit') || name.includes('rest') || name.includes('sleep')) {
+              this.animations['sit'] = action;
+            }
+            if (name.includes('stand') || name.includes('survey') || name.includes('look') || (name.includes('idle') && !name.includes('sit'))) {
+              this.animations['stand'] = action;
+              this.animations['idle'] = action;
+            }
+            if (name.includes('walk') && !name.includes('left') && !name.includes('right')) {
+              this.animations['walk_straight'] = action;
+              this.animations['walk'] = action;
+            }
+            if (name.includes('left')) {
+              this.animations['turn_left'] = action;
+            }
+            if (name.includes('right')) {
+              this.animations['turn_right'] = action;
+            }
+            if (name.includes('run') || name.includes('sprint') || name.includes('trot') || name.includes('gallop')) {
+              this.animations['run'] = action;
+            }
+            if (name.includes('jump') || name.includes('leap')) {
+              this.animations['jump'] = action;
+            }
+            if (name.includes('attack') || name.includes('swipe') || name.includes('paw') || name.includes('scratch')) {
+              this.animations['attack'] = action;
+            }
+            if (name.includes('eat') || name.includes('chew') || name.includes('bite') || name.includes('feed')) {
+              this.animations['eat'] = action;
+            }
           });
 
-          // Set default idle animation
-          const idleAction = this.animations['idle'] || Object.values(this.animations)[0];
-          if (idleAction) {
-            idleAction.play();
-            this.currentAction = idleAction;
+          // Default state: Active standing alert posture (does not immediately sit down)
+          const initialAction = this.animations['stand'] || this.animations['walk'] || this.animations['idle'] || Object.values(this.animations)[0];
+          if (initialAction) {
+            initialAction.play();
+            this.currentAction = initialAction;
           }
         }
 
@@ -388,44 +416,75 @@ export class CatCharacter {
     this.mesh.scale.set(1.15, 1.15, 1.15);
   }
 
-  // Combat Animation Timers
+  // Locomotion & State Timers
+  public idleTimer: number = 0;
+  public eatTimer: number = 0;
   public attackTimer: number = 0;
   public attackType: 'SWIPE_L' | 'SWIPE_R' | 'TAIL_SWEEP' | null = null;
 
   public triggerSwipe(isRight: boolean = false) {
-    this.attackTimer = 0.25;
+    this.attackTimer = 0.4;
     this.attackType = isRight ? 'SWIPE_R' : 'SWIPE_L';
   }
 
   public triggerTailSweep() {
-    this.attackTimer = 0.35;
+    this.attackTimer = 0.45;
     this.attackType = 'TAIL_SWEEP';
   }
 
-  public animate(deltaTime: number, speed: number, isGrounded: boolean) {
+  public triggerEat() {
+    this.eatTimer = 1.2;
+  }
+
+  public animate(deltaTime: number, speed: number, isGrounded: boolean, turnInput: number = 0) {
+    // Locomotion & Idle State Machine
+    if (speed > 0.05) {
+      this.idleTimer = 0; // Reset idle timer whenever moving
+    } else {
+      this.idleTimer += deltaTime;
+    }
+
+    if (this.attackTimer > 0) this.attackTimer -= deltaTime;
+    if (this.eatTimer > 0) this.eatTimer -= deltaTime;
+
     // 1. Update GLTF Skeletal Animation Mixer
     if (this.mixer) {
       this.mixer.update(deltaTime);
 
-      // Determine appropriate animation clip based on locomotion state
-      let targetName = 'survey'; // Default idle
-      if (this.isPouncing || !isGrounded) {
-        if (this.animations['run']) targetName = 'run';
-        else if (this.animations['walk']) targetName = 'walk';
-      } else if (speed > 5.0 && this.animations['run']) {
-        targetName = 'run';
-      } else if (speed > 0.1 && this.animations['walk']) {
-        targetName = 'walk';
-      } else if (this.animations['idle']) {
-        targetName = 'idle';
+      let targetName = 'stand'; // Default: Alert standing posture
+
+      if (this.attackTimer > 0 && this.animations['attack']) {
+        targetName = 'attack';
+      } else if (this.eatTimer > 0 && this.animations['eat']) {
+        targetName = 'eat';
+      } else if (this.isPouncing || !isGrounded) {
+        targetName = this.animations['run'] ? 'run' : (this.animations['walk_straight'] ? 'walk_straight' : 'walk');
+      } else if (speed > 5.0) {
+        targetName = this.animations['run'] ? 'run' : (this.animations['walk_straight'] ? 'walk_straight' : 'walk');
+      } else if (speed > 0.1) {
+        // Dynamic Directional Walk: If actively turning, use turn left/right animations; otherwise walk straight
+        if (turnInput > 0.25 && this.animations['turn_left']) {
+          targetName = 'turn_left';
+        } else if (turnInput < -0.25 && this.animations['turn_right']) {
+          targetName = 'turn_right';
+        } else {
+          targetName = this.animations['walk_straight'] ? 'walk_straight' : (this.animations['walk'] ? 'walk' : 'stand');
+        }
+      } else {
+        // Idle Posture Logic: Stand alert for the first 12 seconds, then sit down to rest
+        if (this.idleTimer >= 12.0 && this.animations['sit']) {
+          targetName = 'sit';
+        } else {
+          targetName = this.animations['stand'] ? 'stand' : (this.animations['idle'] ? 'idle' : 'stand');
+        }
       }
 
-      const targetAction = this.animations[targetName] || Object.values(this.animations)[0];
+      const targetAction = this.animations[targetName] || this.animations['stand'] || this.animations['walk'] || Object.values(this.animations)[0];
       if (targetAction && targetAction !== this.currentAction) {
         if (this.currentAction) {
-          this.currentAction.fadeOut(0.15);
+          this.currentAction.fadeOut(0.2);
         }
-        targetAction.reset().fadeIn(0.15).play();
+        targetAction.reset().fadeIn(0.2).play();
         this.currentAction = targetAction;
       }
     }
