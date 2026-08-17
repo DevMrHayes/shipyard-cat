@@ -311,27 +311,41 @@
           <h4 style="font-family: var(--font-tech); font-size: 0.9rem; color: #38bdf8;">🔍 ALBA 3D MODEL DIAGNOSTICS & MESH FORCER</h4>
           <span id="diag-mesh-mode-badge" style="font-family: var(--font-tech); font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: #0284c7; color: #fff;">CHECKING...</span>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem; font-size: 0.78rem; font-family: monospace;" id="diag-flags-list">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; font-size: 0.75rem; font-family: monospace;" id="diag-flags-list">
           <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
-            <span>GLTF Fetch: </span><strong id="flag-fetch" style="color: #94a3b8;">PENDING</strong>
+            <span>1. GLTF Network Fetch: </span><strong id="flag-fetch" style="color: #94a3b8;">PENDING</strong>
           </div>
           <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
-            <span>GLTF Parse: </span><strong id="flag-parse" style="color: #94a3b8;">PENDING</strong>
+            <span>2. GLTF Skeleton Parse: </span><strong id="flag-parse" style="color: #94a3b8;">PENDING</strong>
           </div>
           <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
-            <span>Child Nodes: </span><strong id="flag-nodes" style="color: #94a3b8;">0</strong>
+            <span>3. Mesh Nodes Attached: </span><strong id="flag-nodes" style="color: #94a3b8;">0</strong>
           </div>
           <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
-            <span>Frustum Override: </span><strong id="flag-frustum" style="color: #4ade80;">ACTIVE (Culled=False)</strong>
+            <span>4. Geometry Vertices: </span><strong id="flag-vertices" style="color: #94a3b8;">0</strong>
           </div>
           <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
-            <span>Camera Target: </span><strong id="flag-cam" style="color: #4ade80;">Y=+0.4m (Offset)</strong>
+            <span>5. SkinnedMesh Rigging: </span><strong id="flag-bones" style="color: #94a3b8;">0 Bones</strong>
           </div>
           <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
-            <span>BBox Extents: </span><strong id="flag-bbox" style="color: #94a3b8;">Calculating...</strong>
+            <span>6. PBR Textures / Maps: </span><strong id="flag-textures" style="color: #94a3b8;">Checking...</strong>
+          </div>
+          <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
+            <span>7. Frustum Override: </span><strong id="flag-frustum" style="color: #4ade80;">ACTIVE (Culled=False)</strong>
+          </div>
+          <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
+            <span>8. Camera Focus Target: </span><strong id="flag-cam" style="color: #4ade80;">Y=+0.4m (Offset)</strong>
+          </div>
+          <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
+            <span>9. Model Scale & Root Y: </span><strong id="flag-scale" style="color: #94a3b8;">0.018x (Y=0.0m)</strong>
+          </div>
+          <div style="background: rgba(30, 41, 59, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--panel-border);">
+            <span>10. BBox Dimensions: </span><strong id="flag-bbox" style="color: #94a3b8;">Calculating...</strong>
           </div>
         </div>
-        <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap;">
+
+        <h5 style="font-family: var(--font-tech); font-size: 0.8rem; color: #f59e0b; margin: 0.85rem 0 0.4rem 0;">LIVE MESH & SHADER TROUBLESHOOTING ACTIONS:</h5>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
           <button id="btn-force-procedural" class="hud-btn" style="background: #eab308; color: #000; font-size: 0.75rem; padding: 0.4rem 0.8rem;">
             🐾 Force Procedural High-Visibility Mesh
           </button>
@@ -340,6 +354,18 @@
           </button>
           <button id="btn-force-hybrid" class="hud-btn" style="background: #a855f7; color: #fff; font-size: 0.75rem; padding: 0.4rem 0.8rem;">
             ✨ Force Both (Dual Diagnostic Layer)
+          </button>
+          <button id="btn-force-magenta-shader" class="hud-btn" style="background: #ec4899; color: #fff; font-size: 0.75rem; padding: 0.4rem 0.8rem;">
+            🔴 Force Bright Magenta Unlit Shader (Bypasses Textures)
+          </button>
+          <button id="btn-force-wireframe" class="hud-btn" style="background: #06b6d4; color: #000; font-size: 0.75rem; padding: 0.4rem 0.8rem;">
+            📐 Toggle Wireframe Mode
+          </button>
+          <button id="btn-scale-10x" class="hud-btn" style="background: #10b981; color: #000; font-size: 0.75rem; padding: 0.4rem 0.8rem;">
+            🔍 Force 10x Giant Scale (Check Visibility)
+          </button>
+          <button id="btn-scale-reset" class="hud-btn" style="background: #475569; color: #fff; font-size: 0.75rem; padding: 0.4rem 0.8rem;">
+            🔄 Reset Normal Scale (0.018x)
           </button>
         </div>
       </div>

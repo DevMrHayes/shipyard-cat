@@ -315,6 +315,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const flagFetch = document.getElementById('flag-fetch');
     const flagParse = document.getElementById('flag-parse');
     const flagNodes = document.getElementById('flag-nodes');
+    const flagVertices = document.getElementById('flag-vertices');
+    const flagBones = document.getElementById('flag-bones');
+    const flagTextures = document.getElementById('flag-textures');
+    const flagScale = document.getElementById('flag-scale');
     const flagBbox = document.getElementById('flag-bbox');
 
     if (badge) {
@@ -339,8 +343,24 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     if (flagNodes) {
-      flagNodes.textContent = `${flags.gltfChildCount} Mesh Root Groups`;
-      flagNodes.style.color = flags.gltfChildCount > 0 ? '#4ade80' : '#94a3b8';
+      flagNodes.textContent = `${flags.meshCount} Sub-Meshes Attached`;
+      flagNodes.style.color = flags.meshCount > 0 ? '#4ade80' : '#94a3b8';
+    }
+    if (flagVertices) {
+      flagVertices.textContent = `${flags.totalVertices.toLocaleString()} Polygons/Verts`;
+      flagVertices.style.color = flags.totalVertices > 0 ? '#4ade80' : '#ef4444';
+    }
+    if (flagBones) {
+      flagBones.textContent = `${flags.boneCount} Bones (${flags.hasSkinnedMesh ? 'Skinned' : 'Static'})`;
+      flagBones.style.color = flags.boneCount > 0 ? '#4ade80' : '#94a3b8';
+    }
+    if (flagTextures) {
+      flagTextures.textContent = flags.hasTextures ? 'Texture Diffuse Attached' : 'Vertex Colors / Fallback Mat';
+      flagTextures.style.color = '#4ade80';
+    }
+    if (flagScale) {
+      flagScale.textContent = `${flags.currentScale}x (Root Y=${flags.modelRootY.toFixed(2)}m)`;
+      flagScale.style.color = '#38bdf8';
     }
     if (flagBbox) {
       flagBbox.textContent = `${flags.boundingBoxSize.x.toFixed(2)}m × ${flags.boundingBoxSize.y.toFixed(2)}m × ${flags.boundingBoxSize.z.toFixed(2)}m`;
@@ -377,6 +397,61 @@ document.addEventListener('DOMContentLoaded', () => {
     soundEngine.playSuccess();
     showToast('Dual Diagnostic Mode', 'Rendering both GLTF and Procedural meshes simultaneously', 'info');
     renderDiagnostics();
+  });
+
+  document.getElementById('btn-force-magenta-shader')?.addEventListener('click', () => {
+    if (game.cat.gltfModel) {
+      game.cat.gltfModel.visible = true;
+      game.cat.proceduralGroup.visible = false;
+      const debugMat = new (window as any).THREE.MeshBasicMaterial({ color: 0xff00ff, side: 2 });
+      game.cat.gltfModel.traverse((child: any) => {
+        if (child.isMesh) {
+          child.material = debugMat;
+        }
+      });
+      CatCharacter.diagnosticFlags.isBrightMagentaShader = true;
+      CatCharacter.diagnosticFlags.activeMeshMode = 'GLTF';
+      soundEngine.playSuccess();
+      showToast('Unlit Shader Overridden', 'All GLTF cat materials replaced with pure Unlit Magenta #FF00FF', 'warn');
+      renderDiagnostics();
+    }
+  });
+
+  document.getElementById('btn-force-wireframe')?.addEventListener('click', () => {
+    if (game.cat.gltfModel) {
+      game.cat.gltfModel.visible = true;
+      let isWire = false;
+      game.cat.gltfModel.traverse((child: any) => {
+        if (child.isMesh && child.material) {
+          child.material.wireframe = !child.material.wireframe;
+          isWire = child.material.wireframe;
+        }
+      });
+      CatCharacter.diagnosticFlags.isWireframeOverride = isWire;
+      soundEngine.playSuccess();
+      showToast('Wireframe Mode', `Wireframe display set to: ${isWire ? 'ON' : 'OFF'}`, 'info');
+      renderDiagnostics();
+    }
+  });
+
+  document.getElementById('btn-scale-10x')?.addEventListener('click', () => {
+    if (game.cat.gltfModel) {
+      game.cat.gltfModel.scale.set(0.18, 0.18, 0.18);
+      CatCharacter.diagnosticFlags.currentScale = 0.18;
+      soundEngine.playSuccess();
+      showToast('Giant Scale 10x', 'Scaled GLTF model by 10x to test visibility & coordinate origin', 'warn');
+      renderDiagnostics();
+    }
+  });
+
+  document.getElementById('btn-scale-reset')?.addEventListener('click', () => {
+    if (game.cat.gltfModel) {
+      game.cat.gltfModel.scale.set(0.018, 0.018, 0.018);
+      CatCharacter.diagnosticFlags.currentScale = 0.018;
+      soundEngine.playSuccess();
+      showToast('Normal Scale Restored', 'Scale reset to 0.018 (0.55m height)', 'info');
+      renderDiagnostics();
+    }
   });
 
   function renderLogbookChapters() {

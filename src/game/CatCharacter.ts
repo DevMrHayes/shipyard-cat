@@ -27,9 +27,19 @@ export class CatCharacter {
     gltfLoadSuccess: false,
     gltfError: null as string | null,
     gltfChildCount: 0,
+    meshCount: 0,
+    totalVertices: 0,
+    boneCount: 0,
+    hasSkinnedMesh: false,
+    hasTextures: false,
     activeMeshMode: 'PROCEDURAL' as 'PROCEDURAL' | 'GLTF' | 'HYBRID_DEBUG',
     meshVisible: true,
-    boundingBoxSize: { x: 0, y: 0, z: 0 }
+    boundingBoxSize: { x: 0, y: 0, z: 0 },
+    modelRootY: 0,
+    computedWorldPos: { x: 0, y: 0, z: 0 },
+    currentScale: 0.018,
+    isWireframeOverride: false,
+    isBrightMagentaShader: false
   };
 
   public proceduralGroup: THREE.Group;
@@ -56,37 +66,61 @@ export class CatCharacter {
         this.gltfModel.rotation.y = 0; // Face forward (+Z direction)
 
         // Traverse to enable shadows & disable frustum culling on animated bones
+        let meshCnt = 0;
+        let vertCnt = 0;
+        let boneCnt = 0;
+        let hasSkinned = false;
+        let hasTex = false;
+
         this.gltfModel.traverse((child) => {
+          if ((child as THREE.Bone).isBone) {
+            boneCnt++;
+          }
+          if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
+            hasSkinned = true;
+          }
           if ((child as THREE.Mesh).isMesh) {
+            meshCnt++;
             const mesh = child as THREE.Mesh;
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             mesh.frustumCulled = false; // CRITICAL: Prevents skinned mesh dropping out of camera frustum
+            
             if (mesh.geometry) {
               mesh.geometry.computeBoundingBox();
               mesh.geometry.computeBoundingSphere();
+              if (mesh.geometry.attributes.position) {
+                vertCnt += mesh.geometry.attributes.position.count;
+              }
             }
 
             // CRITICAL FIX: Ensure materials are fully opaque, double-sided, and not culled or alpha-masked out
             if (mesh.material) {
+              const checkMat = (m: THREE.Material) => {
+                const stdMat = m as THREE.MeshStandardMaterial;
+                if (stdMat.map) hasTex = true;
+                stdMat.transparent = false;
+                stdMat.opacity = 1.0;
+                stdMat.depthWrite = true;
+                stdMat.side = THREE.DoubleSide;
+                stdMat.needsUpdate = true;
+              };
+
               if (Array.isArray(mesh.material)) {
-                mesh.material.forEach(mat => {
-                  mat.transparent = false;
-                  mat.opacity = 1.0;
-                  mat.depthWrite = true;
-                  mat.side = THREE.DoubleSide;
-                  mat.needsUpdate = true;
-                });
+                mesh.material.forEach(checkMat);
               } else {
-                mesh.material.transparent = false;
-                mesh.material.opacity = 1.0;
-                mesh.material.depthWrite = true;
-                mesh.material.side = THREE.DoubleSide;
-                mesh.material.needsUpdate = true;
+                checkMat(mesh.material);
               }
             }
           }
         });
+
+        CatCharacter.diagnosticFlags.meshCount = meshCnt;
+        CatCharacter.diagnosticFlags.totalVertices = vertCnt;
+        CatCharacter.diagnosticFlags.boneCount = boneCnt;
+        CatCharacter.diagnosticFlags.hasSkinnedMesh = hasSkinned;
+        CatCharacter.diagnosticFlags.hasTextures = hasTex;
+        CatCharacter.diagnosticFlags.modelRootY = this.gltfModel.position.y;
 
         // Bind Skeletal Animation Mixer
         if (gltf.animations && gltf.animations.length > 0) {
