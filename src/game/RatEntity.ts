@@ -23,7 +23,7 @@ export class RatEntity {
   private bodyMesh: THREE.Mesh | null = null;
   private tailMesh: THREE.Line | null = null;
 
-  private gltfModel: THREE.Group | null = null;
+  public gltfModel: THREE.Group | null = null;
   public mixer: THREE.AnimationMixer | null = null;
   private animations: { [key: string]: THREE.AnimationAction } = {};
   private currentAction: THREE.AnimationAction | null = null;
@@ -35,6 +35,17 @@ export class RatEntity {
   private scentPositions: Float32Array;
   private scentHeadIndex: number = 0;
   private scentTimer: number = 0;
+
+  public static diagnosticFlags = {
+    gltfFetchAttempted: false,
+    gltfLoadSuccess: false,
+    childCount: 0,
+    activeMode: 'PROCEDURAL' as 'PROCEDURAL' | 'GLTF' | 'HYBRID_DEBUG',
+    scaleMultiplier: 1.0,
+    forcedMagenta: false
+  };
+
+  public proceduralGroup: THREE.Group;
 
   constructor(position: THREE.Vector3, isKingpin: boolean = false) {
     this.isKingpin = isKingpin;
@@ -49,21 +60,28 @@ export class RatEntity {
     this.maxHealth = isKingpin ? 3 : 1;
     this.health = this.maxHealth;
 
-    const proceduralGroup = new THREE.Group();
+    this.proceduralGroup = new THREE.Group();
+    const proceduralGroup = this.proceduralGroup;
     this.mesh.add(proceduralGroup);
 
     // Load Real 3D Rat GLB Model (in browser)
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      RatEntity.diagnosticFlags.gltfFetchAttempted = true;
       const gltfLoader = new GLTFLoader();
       gltfLoader.load('/models/rat.glb', (gltf) => {
         this.gltfModel = gltf.scene;
-        // Center and scale 3D rat model
-        const modelScale = isKingpin ? 0.024 : 0.014;
-        this.gltfModel.scale.set(modelScale, modelScale, modelScale);
+        RatEntity.diagnosticFlags.gltfLoadSuccess = true;
+        RatEntity.diagnosticFlags.childCount = gltf.scene.children.length;
+        RatEntity.diagnosticFlags.activeMode = 'GLTF';
+
+        // Center and scale 3D rat model (0.014 scale normalizes Blender 50-unit space to 0.35m)
+        const baseScale = isKingpin ? 0.024 : 0.014;
+        const finalScale = baseScale * RatEntity.diagnosticFlags.scaleMultiplier;
+        this.gltfModel.scale.set(finalScale, finalScale, finalScale);
         this.gltfModel.position.set(0, 0, 0);
 
         const ratFurMat = new THREE.MeshStandardMaterial({
-          color: isKingpin ? 0x221308 : 0x785338, // Kingpin: Dark charred brown; Shipyard mice: Warm chestnut brown
+          color: RatEntity.diagnosticFlags.forcedMagenta ? 0xff00ff : (isKingpin ? 0x221308 : 0x785338),
           roughness: 0.75,
           metalness: 0.1,
           side: THREE.DoubleSide
@@ -98,7 +116,7 @@ export class RatEntity {
         }
 
         this.mesh.add(this.gltfModel);
-        proceduralGroup.visible = false;
+        proceduralGroup.visible = RatEntity.diagnosticFlags.activeMode !== 'GLTF';
       }, undefined, () => {
         proceduralGroup.visible = true;
       });

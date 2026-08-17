@@ -16,6 +16,8 @@ export class MutantCatEntity {
   private attackCooldown: number = 0;
   public gltfModel: THREE.Group | null = null;
   public mixer: THREE.AnimationMixer | null = null;
+  private animations: { [key: string]: THREE.AnimationAction } = {};
+  private currentAction: THREE.AnimationAction | null = null;
 
   constructor(name: string, position: THREE.Vector3) {
     this.name = name;
@@ -53,8 +55,16 @@ export class MutantCatEntity {
 
         if (gltf.animations && gltf.animations.length > 0) {
           this.mixer = new THREE.AnimationMixer(this.gltfModel);
-          const anim = this.mixer.clipAction(gltf.animations[0]);
-          anim.play();
+          const walkClip = gltf.animations.find(a => a.name.includes('Walk-IP') || a.name.includes('Walk')) || gltf.animations[0];
+          const runClip = gltf.animations.find(a => a.name.includes('Run-IP') || a.name.includes('Sprint')) || walkClip;
+          const attackClip = gltf.animations.find(a => a.name.includes('Attack_Agressive') || a.name.includes('Attack')) || runClip;
+
+          this.animations['walk'] = this.mixer.clipAction(walkClip);
+          this.animations['run'] = this.mixer.clipAction(runClip);
+          this.animations['attack'] = this.mixer.clipAction(attackClip);
+
+          this.animations['walk'].play();
+          this.currentAction = this.animations['walk'];
         }
 
         this.mesh.add(this.gltfModel);
@@ -185,6 +195,24 @@ export class MutantCatEntity {
     }
 
     const distToPlayer = this.mesh.position.distanceTo(playerPos);
+
+    if (this.mixer) {
+      this.mixer.update(deltaTime);
+      let targetAnim = this.animations['walk'];
+      if (this.isDefeated) {
+        // Stop animation
+      } else if (distToPlayer < 1.4 && this.attackCooldown > 0.8) {
+        targetAnim = this.animations['attack'] || this.animations['run'] || this.animations['walk'];
+      } else if (distToPlayer < 7.0) {
+        targetAnim = this.animations['run'] || this.animations['walk'];
+      }
+
+      if (targetAnim && targetAnim !== this.currentAction) {
+        if (this.currentAction) this.currentAction.fadeOut(0.2);
+        targetAnim.reset().fadeIn(0.2).play();
+        this.currentAction = targetAnim;
+      }
+    }
 
     if (distToPlayer < 7.0) {
       // Aggro on Alba!

@@ -59,8 +59,14 @@ export class ColonyCatEntity {
 
           if (gltf.animations && gltf.animations.length > 0) {
             this.mixer = new THREE.AnimationMixer(this.gltfModel);
-            const idleAction = this.mixer.clipAction(gltf.animations[0]);
-            idleAction.play();
+            // Look for sitting, sleeping, survey standing, or stretching animations
+            const sitClip = gltf.animations.find(a => a.name.includes('Sitting_00-IP') || a.name.includes('Sitting')) ||
+                            gltf.animations.find(a => a.name.includes('Idle_00-IP') || a.name.includes('Idle_03_LookAround')) ||
+                            gltf.animations[0];
+            if (sitClip) {
+              const action = this.mixer.clipAction(sitClip);
+              action.play();
+            }
           }
 
           this.mesh.add(this.gltfModel);
@@ -71,6 +77,12 @@ export class ColonyCatEntity {
       } else {
         this.buildCatMesh(color, proceduralGroup);
       }
+    }
+  }
+
+  public update(deltaTime: number) {
+    if (this.mixer) {
+      this.mixer.update(deltaTime);
     }
   }
 

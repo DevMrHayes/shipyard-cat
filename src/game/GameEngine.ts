@@ -801,6 +801,11 @@ export class GameEngine {
       );
     }
 
+    // Animate Colony Cats (NPCs)
+    for (const npc of this.colonyNPCs) {
+      npc.update(deltaTime);
+    }
+
     // Animate active shipbuilder torches and tools
     for (const builder of this.shipbuilders) {
       builder.animate(deltaTime);

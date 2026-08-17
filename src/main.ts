@@ -2,6 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 import { GameEngine } from './game/GameEngine';
 import { CatCharacter } from './game/CatCharacter';
+import { RatEntity } from './game/RatEntity';
 import { TestRunner, TestResult } from './tests/TestRunner';
 import { CatVitals } from './core/VitalsSystem';
 import { ShipbuildingAssistEvent } from './core/AssistanceEngine';
@@ -395,6 +396,54 @@ document.addEventListener('DOMContentLoaded', () => {
     if (shadowLabel) shadowLabel.textContent = 'OFF (Mobile Battery Saver)';
     soundEngine.playSuccess();
     showToast('Graphics Preset: Battery Saver', 'Dynamic shadows disabled for max framerate and cool battery', 'warn');
+  });
+
+  // Rat Diagnostic Buttons
+  document.getElementById('btn-rat-gltf')?.addEventListener('click', () => {
+    RatEntity.diagnosticFlags.activeMode = 'GLTF';
+    game.rats.forEach(r => {
+      if (r.gltfModel) r.gltfModel.visible = true;
+      if (r.proceduralGroup) r.proceduralGroup.visible = false;
+    });
+    soundEngine.playSuccess();
+    showToast('Rat Diagnostic', 'Forced 3D Animated Skeletal GLTF Rats', 'info');
+  });
+
+  document.getElementById('btn-rat-procedural')?.addEventListener('click', () => {
+    RatEntity.diagnosticFlags.activeMode = 'PROCEDURAL';
+    game.rats.forEach(r => {
+      if (r.gltfModel) r.gltfModel.visible = false;
+      if (r.proceduralGroup) r.proceduralGroup.visible = true;
+    });
+    soundEngine.playSuccess();
+    showToast('Rat Diagnostic', 'Forced High-Visibility Geometric Mice', 'warn');
+  });
+
+  document.getElementById('btn-rat-magenta')?.addEventListener('click', () => {
+    RatEntity.diagnosticFlags.forcedMagenta = !RatEntity.diagnosticFlags.forcedMagenta;
+    const magentaMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, side: THREE.DoubleSide });
+    game.rats.forEach(r => {
+      if (r.gltfModel) {
+        r.gltfModel.traverse((child: any) => {
+          if (child.isMesh) child.material = magentaMat;
+        });
+      }
+    });
+    soundEngine.playMeow();
+    showToast('Rat Diagnostic', RatEntity.diagnosticFlags.forcedMagenta ? 'Forced Bright Magenta Shader on Rats' : 'Restored Natural Fur', 'info');
+  });
+
+  document.getElementById('btn-rat-scale')?.addEventListener('click', () => {
+    RatEntity.diagnosticFlags.scaleMultiplier = RatEntity.diagnosticFlags.scaleMultiplier === 1.0 ? 2.5 : 1.0;
+    game.rats.forEach(r => {
+      if (r.gltfModel) {
+        const base = r.isKingpin ? 0.024 : 0.014;
+        const s = base * RatEntity.diagnosticFlags.scaleMultiplier;
+        r.gltfModel.scale.set(s, s, s);
+      }
+    });
+    soundEngine.playSuccess();
+    showToast('Rat Diagnostic', `Set Rat Scale to ${RatEntity.diagnosticFlags.scaleMultiplier}x`, 'info');
   });
 
   function renderLogbookChapters() {
