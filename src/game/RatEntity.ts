@@ -24,7 +24,7 @@ export class RatEntity {
   private tailMesh: THREE.Line | null = null;
 
   private gltfModel: THREE.Group | null = null;
-  private mixer: THREE.AnimationMixer | null = null;
+  public mixer: THREE.AnimationMixer | null = null;
   private animations: { [key: string]: THREE.AnimationAction } = {};
   private currentAction: THREE.AnimationAction | null = null;
 

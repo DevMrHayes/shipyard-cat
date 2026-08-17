@@ -232,18 +232,25 @@ export class ShipyardEnvironment {
       height: 1.4
     });
 
-    // Mooring Bollards along pier (with physical colliders)
+    // Mooring Bollards along pier (Optimized Single-Draw-Call InstancedMesh)
     const bollardMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.85 });
-    for (let z = -120; z <= 120; z += 20) {
-      const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.8, 12), bollardMat);
-      bollard.position.set(55.5, 1.8, z);
-      bollard.castShadow = true;
-      this.group.add(bollard);
-    }
+    const bollardGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.8, 10);
+    const bollardZPositions: number[] = [];
+    for (let z = -120; z <= 120; z += 20) bollardZPositions.push(z);
 
-    // Add Shipyard Light Posts
+    const instancedBollards = new THREE.InstancedMesh(bollardGeo, bollardMat, bollardZPositions.length);
+    const dummyMatrix = new THREE.Matrix4();
+    bollardZPositions.forEach((z, i) => {
+      dummyMatrix.setPosition(55.5, 1.8, z);
+      instancedBollards.setMatrixAt(i, dummyMatrix);
+    });
+    instancedBollards.instanceMatrix.needsUpdate = true;
+    instancedBollards.castShadow = true;
+    this.group.add(instancedBollards);
+
+    // Shipyard Light Posts (Optimized InstancedMesh)
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 });
-    const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    const poleGeo = new THREE.CylinderGeometry(0.12, 0.15, 7, 8);
     const lightPositions = [
       new THREE.Vector3(-12, 0, -8),
       new THREE.Vector3(-30, 0, -25),
@@ -251,20 +258,14 @@ export class ShipyardEnvironment {
       new THREE.Vector3(10, 0, -5)
     ];
 
-    lightPositions.forEach(pos => {
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 7, 8), poleMat);
-      pole.position.set(pos.x, 3.5, pos.z);
-      pole.castShadow = true;
-      this.group.add(pole);
-
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), bulbMat);
-      bulb.position.set(pos.x, 7.2, pos.z);
-      this.group.add(bulb);
-
-      const poleLight = new THREE.PointLight(0xfffbeb, 1.8, 25);
-      poleLight.position.set(pos.x, 7.0, pos.z);
-      this.group.add(poleLight);
+    const instancedPoles = new THREE.InstancedMesh(poleGeo, poleMat, lightPositions.length);
+    lightPositions.forEach((pos, i) => {
+      dummyMatrix.setPosition(pos.x, 3.5, pos.z);
+      instancedPoles.setMatrixAt(i, dummyMatrix);
     });
+    instancedPoles.instanceMatrix.needsUpdate = true;
+    instancedPoles.castShadow = true;
+    this.group.add(instancedPoles);
   }
 
   private buildHistoricSouthYard() {

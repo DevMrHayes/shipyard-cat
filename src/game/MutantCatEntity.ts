@@ -14,8 +14,8 @@ export class MutantCatEntity {
   private patrolOrigin: THREE.Vector3;
   private patrolAngle: number = 0;
   private attackCooldown: number = 0;
-  private gltfModel: THREE.Group | null = null;
-  private mixer: THREE.AnimationMixer | null = null;
+  public gltfModel: THREE.Group | null = null;
+  public mixer: THREE.AnimationMixer | null = null;
 
   constructor(name: string, position: THREE.Vector3) {
     this.name = name;

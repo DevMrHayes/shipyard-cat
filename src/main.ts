@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('game-container');
   if (!container) return;
 
+  // Register High-Performance Asset Cache Service Worker
+  if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
+      console.warn('[SW Registration Note]', err);
+    });
+  }
+
   // Loading Screen Elements
   const loadingScreen = document.getElementById('loading-screen') as HTMLElement;
   const loadingProgressBar = document.getElementById('loading-progress-bar') as HTMLElement;

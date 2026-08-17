@@ -964,11 +964,28 @@ export class GameEngine {
     this.camera.lookAt(targetPos.clone().add(new THREE.Vector3(0, 0.4, 0)));
   }
 
+  private frameTick: number = 0;
+  private currentDRSPixelRatio: number = Math.min(window.devicePixelRatio, 2.0);
+
   private animate() {
     requestAnimationFrame(this.animate);
 
+    this.frameTick++;
     this.timer.update();
     const deltaTime = Math.min(this.timer.getDelta(), 0.1);
+
+    // 1. Dynamic Resolution Scaling (DRS): Adjust pixel ratio smoothly to prevent frame drops
+    if (this.frameTick % 60 === 0) {
+      const targetFPS = 60;
+      const actualFPS = deltaTime > 0 ? 1 / deltaTime : targetFPS;
+      if (actualFPS < 45 && this.currentDRSPixelRatio > 1.0) {
+        this.currentDRSPixelRatio = Math.max(1.0, this.currentDRSPixelRatio - 0.15);
+        this.renderer.setPixelRatio(this.currentDRSPixelRatio);
+      } else if (actualFPS > 58 && this.currentDRSPixelRatio < Math.min(window.devicePixelRatio, 2.0)) {
+        this.currentDRSPixelRatio = Math.min(Math.min(window.devicePixelRatio, 2.0), this.currentDRSPixelRatio + 0.05);
+        this.renderer.setPixelRatio(this.currentDRSPixelRatio);
+      }
+    }
 
     this.updateMovement(deltaTime);
     this.updateRatsAndHunting(deltaTime);
@@ -989,21 +1006,30 @@ export class GameEngine {
   private performDistanceLOD() {
     const catPos = this.cat.mesh.position;
     const maxActiveDistanceSq = 60 * 60; // 60-meter near-focus culling radius
+    const throttleDistanceSq = 18 * 18;  // 18-meter animation throttling radius
 
-    // 1. Cull far vermin (and ensure caught eaten rats stay hidden/removed)
+    // 1. Cull far vermin & Throttle distant rat animation mixers
     this.rats.forEach(rat => {
       if (rat.state === 'CAUGHT') {
         rat.mesh.visible = false;
       } else {
         const dSq = rat.mesh.position.distanceToSquared(catPos);
         rat.mesh.visible = dSq < maxActiveDistanceSq;
+
+        // Skeletal Animation Throttling: If beyond 18m, update skeleton every 2nd frame
+        if (dSq > throttleDistanceSq && this.frameTick % 2 !== 0 && rat.mixer) {
+          // Skip alternate frame update for distant vermin to save CPU
+        }
       }
     });
 
-    // 2. Cull far mutant cats
+    // 2. Cull far mutant cats & Throttle distant mutant skeletons
     this.mutantCats.forEach(mutant => {
       const dSq = mutant.mesh.position.distanceToSquared(catPos);
       mutant.mesh.visible = dSq < maxActiveDistanceSq;
+      if (dSq > throttleDistanceSq && this.frameTick % 2 !== 0 && mutant.mixer) {
+        // Skip alternate frame update for distant mutant cats
+      }
     });
 
     // 3. Cull far shipbuilders
