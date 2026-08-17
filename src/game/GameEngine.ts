@@ -990,9 +990,6 @@ export class GameEngine {
       targetPos.z - Math.cos(totalHeading) * camDist
     );
 
-    // Wall collision prevention: push camera in front of solid obstacles
-    desiredCameraPos = this.environment.resolveCollision(desiredCameraPos, 0.45);
-
     // If indoors in Machine Shop, clamp camera to room interior boundaries
     if (isInsideMachineShop) {
       desiredCameraPos.x = Math.max(-55.0, Math.min(-35.0, desiredCameraPos.x));
@@ -1000,9 +997,10 @@ export class GameEngine {
       desiredCameraPos.y = Math.max(0.4, Math.min(6.5, desiredCameraPos.y));
     }
 
-    this.currentCameraPos.lerp(desiredCameraPos, deltaTime * 12);
+    // Smooth dampening camera position tracking
+    this.currentCameraPos.lerp(desiredCameraPos, Math.min(1.0, deltaTime * 14));
     this.camera.position.copy(this.currentCameraPos);
-    this.camera.lookAt(targetPos.clone().add(new THREE.Vector3(0, 0.4, 0)));
+    this.camera.lookAt(targetPos.x, targetPos.y + 0.4, targetPos.z);
   }
 
   private frameTick: number = 0;
