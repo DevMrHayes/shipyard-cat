@@ -141,8 +141,9 @@ export class CatCharacter {
           // High Speed Sprint & Gallop
           this.animations['run'] = this.animations['Cat|Run-IP'] || this.animations['Cat|Sprint-IP'] || this.animations['Cat|Run'] || this.animations['walk_straight'];
 
-          // True Jump (Only active when in air / leaping)
-          this.animations['jump'] = this.animations['Cat|Jump_Up-IP'] || this.animations['Cat|Jump_Run-IP'] || this.animations['Cat|Jump_Up'] || this.animations['run'];
+          // True Jump (Airborne leap) & Combat Pounce (Fast predatory bound)
+          this.animations['jump'] = this.animations['Cat|Jump_Trot-IP'] || this.animations['Cat|Jump_Up-IP'] || this.animations['Cat|Jump_Up'] || this.animations['run'];
+          this.animations['pounce'] = this.animations['Cat|Jump_Run-IP'] || this.animations['Cat|Jump_Run'] || this.animations['jump'];
 
           // Attack & Strike Combos
           this.animations['attack'] = this.animations['Cat|Attack_Agressive_Legs_01-IP'] || this.animations['Cat|Attack_Left-IP'] || this.animations['Cat|Attack_Right-IP'] || this.animations['stand'];
@@ -448,8 +449,9 @@ export class CatCharacter {
         targetName = 'attack';
       } else if (this.eatTimer > 0 && this.animations['eat']) {
         targetName = 'eat';
-      } else if (this.isPouncing || (!isGrounded && this.mesh.position.y > 0.35)) {
-        // True Jump: ONLY when in the air or pouncing
+      } else if (this.isPouncing && this.animations['pounce']) {
+        targetName = 'pounce';
+      } else if (!isGrounded && this.mesh.position.y > 0.35 && this.animations['jump']) {
         targetName = 'jump';
       } else if (speed > 5.0) {
         targetName = 'run';

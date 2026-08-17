@@ -698,50 +698,28 @@ export class ShipyardEnvironment {
     const subGroup = new THREE.Group();
     subGroup.position.set(-30, 0, 45);
 
-    // 3D Submarine Model
-    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-      const gltfLoader = new GLTFLoader();
-      gltfLoader.load('/models/submarine.glb', (gltf) => {
-        const sub = gltf.scene;
-        sub.scale.set(1.4, 1.4, 1.4);
-        sub.position.set(0, 1.8, 0);
-        sub.rotation.y = Math.PI / 2;
+    // Optimized Modular Submarine Hull (Ultra-Smooth 60 FPS Low-Poly Geometry)
+    const subMat = new THREE.MeshStandardMaterial({
+      color: 0x09090b,
+      metalness: 0.8,
+      roughness: 0.3
+    });
+    const subGeo = new THREE.CylinderGeometry(4.8, 4.8, 28, 20);
+    subGeo.rotateX(Math.PI / 2);
+    const subHull = new THREE.Mesh(subGeo, subMat);
+    subHull.position.set(0, 4.8, 0);
+    subHull.castShadow = true;
+    subHull.receiveShadow = true;
+    subGroup.add(subHull);
 
-        sub.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-          }
-        });
-        subGroup.add(sub);
-      }, undefined, () => {
-        const subMat = new THREE.MeshStandardMaterial({
-          color: 0x09090b,
-          metalness: 0.8,
-          roughness: 0.3
-        });
-        const subGeo = new THREE.CylinderGeometry(4.8, 4.8, 28, 24);
-        subGeo.rotateX(Math.PI / 2);
-        const subHull = new THREE.Mesh(subGeo, subMat);
-        subHull.position.set(0, 4.8, 0);
-        subHull.castShadow = true;
-        subHull.receiveShadow = true;
-        subGroup.add(subHull);
-      });
-    } else {
-      const subMat = new THREE.MeshStandardMaterial({
-        color: 0x09090b,
-        metalness: 0.8,
-        roughness: 0.3
-      });
-      const subGeo = new THREE.CylinderGeometry(4.8, 4.8, 28, 24);
-      subGeo.rotateX(Math.PI / 2);
-      const subHull = new THREE.Mesh(subGeo, subMat);
-      subHull.position.set(0, 4.8, 0);
-      subHull.castShadow = true;
-      subHull.receiveShadow = true;
-      subGroup.add(subHull);
-    }
+    // Conning Tower Sail
+    const sailMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.7, roughness: 0.35 });
+    const sail = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.8, 6.0), sailMat);
+    sail.position.set(0, 9.5, 2.0);
+    sail.castShadow = true;
+    subGroup.add(sail);
+
+    this.group.add(subGroup);
 
     this.registerObstacle(new THREE.Vector3(-35, 0, 31), new THREE.Vector3(-25, 9.6, 59), 'Submarine Hull Module');
 
