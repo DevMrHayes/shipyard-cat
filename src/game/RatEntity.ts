@@ -57,7 +57,7 @@ export class RatEntity {
       const gltfLoader = new GLTFLoader();
       gltfLoader.load('/models/rat.glb', (gltf) => {
         this.gltfModel = gltf.scene;
-        // Raw rat model coordinates are ~50 units in Blender; 0.015 scale normalizes to authentic 0.35m rodent length
+        // Center and scale 3D rat model
         const modelScale = isKingpin ? 0.024 : 0.014;
         this.gltfModel.scale.set(modelScale, modelScale, modelScale);
         this.gltfModel.position.set(0, 0, 0);
@@ -120,14 +120,14 @@ export class RatEntity {
     this.bodyMesh = new THREE.Mesh(bodyGeo, ratMat);
     this.bodyMesh.position.y = 0.12 * scale;
     this.bodyMesh.castShadow = true;
-    this.mesh.add(this.bodyMesh);
+    proceduralGroup.add(this.bodyMesh);
 
     // Head & Snout
     const headGeo = new THREE.ConeGeometry(0.08 * scale, 0.2 * scale, 6);
     headGeo.rotateX(Math.PI / 2);
     const headMesh = new THREE.Mesh(headGeo, ratMat);
     headMesh.position.set(0, 0.12 * scale, 0.22 * scale);
-    this.mesh.add(headMesh);
+    proceduralGroup.add(headMesh);
 
     // Pink Ears
     const earMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.5 });
@@ -137,7 +137,7 @@ export class RatEntity {
     earL.position.set(-0.06 * scale, 0.2 * scale, 0.16 * scale);
     const earR = new THREE.Mesh(earGeo, earMat);
     earR.position.set(0.06 * scale, 0.2 * scale, 0.16 * scale);
-    this.mesh.add(earL, earR);
+    proceduralGroup.add(earL, earR);
 
     // Glowing Eyes
     const eyeGeo = new THREE.SphereGeometry(0.02 * scale, 6, 6);
@@ -145,7 +145,7 @@ export class RatEntity {
     leftEye.position.set(-0.04 * scale, 0.16 * scale, 0.24 * scale);
     const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
     rightEye.position.set(0.04 * scale, 0.16 * scale, 0.24 * scale);
-    this.mesh.add(leftEye, rightEye);
+    proceduralGroup.add(leftEye, rightEye);
 
     // 4 Articulated Tiny Rat Paws
     const pawMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.6 });
@@ -158,9 +158,9 @@ export class RatEntity {
     legBL.position.set(-0.07 * scale, 0.04 * scale, -0.12 * scale);
     const legBR = new THREE.Mesh(legGeo, pawMat);
     legBR.position.set(0.07 * scale, 0.04 * scale, -0.12 * scale);
-    this.mesh.add(legFL, legFR, legBL, legBR);
+    proceduralGroup.add(legFL, legFR, legBL, legBR);
 
-    // Tail (Thin articulated segment chain)
+    // Tail
     const tailPoints = [
       new THREE.Vector3(0, 0.1 * scale, -0.15 * scale),
       new THREE.Vector3(0.04 * scale, 0.08 * scale, -0.3 * scale),
@@ -169,7 +169,7 @@ export class RatEntity {
     const tailGeo = new THREE.BufferGeometry().setFromPoints(tailPoints);
     const tailMat = new THREE.LineBasicMaterial({ color: 0xf43f5e, linewidth: 2 });
     this.tailMesh = new THREE.Line(tailGeo, tailMat);
-    this.mesh.add(this.tailMesh);
+    proceduralGroup.add(this.tailMesh);
 
     // --- WHISKERS THERMAL AURA ---
     const auraGeo = new THREE.SphereGeometry(0.4 * scale, 12, 12);
