@@ -11,7 +11,7 @@ export class CatCharacter {
   public dosimeterTag: THREE.Mesh;
   public whiskers: THREE.LineSegments[] = [];
 
-  private gltfModel: THREE.Group | null = null;
+  public gltfModel: THREE.Group | null = null;
   private mixer: THREE.AnimationMixer | null = null;
   private animations: { [key: string]: THREE.AnimationAction } = {};
   private currentAction: THREE.AnimationAction | null = null;
@@ -21,16 +21,35 @@ export class CatCharacter {
   public isCrouching: boolean = false;
   public isPouncing: boolean = false;
 
+  // Diagnostic Flags for Debugger / Sandbox inspection
+  public static diagnosticFlags = {
+    gltfFetchAttempted: false,
+    gltfLoadSuccess: false,
+    gltfError: null as string | null,
+    gltfChildCount: 0,
+    activeMeshMode: 'PROCEDURAL' as 'PROCEDURAL' | 'GLTF' | 'HYBRID_DEBUG',
+    meshVisible: true,
+    boundingBoxSize: { x: 0, y: 0, z: 0 }
+  };
+
+  public proceduralGroup: THREE.Group;
+
   constructor() {
     this.mesh = new THREE.Group();
-    const proceduralGroup = new THREE.Group();
-    this.mesh.add(proceduralGroup);
+    this.proceduralGroup = new THREE.Group();
+    const proceduralGroup = this.proceduralGroup;
+    this.mesh.add(this.proceduralGroup);
 
     // 1. Load Real 3D Quadruped Cat GLB Model
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      CatCharacter.diagnosticFlags.gltfFetchAttempted = true;
       const gltfLoader = new GLTFLoader();
       gltfLoader.load('/models/cat.glb', (gltf) => {
         this.gltfModel = gltf.scene;
+        CatCharacter.diagnosticFlags.gltfLoadSuccess = true;
+        CatCharacter.diagnosticFlags.gltfChildCount = gltf.scene.children.length;
+        CatCharacter.diagnosticFlags.activeMeshMode = 'GLTF';
+
         // Cat model bounding box is ~30 units tall, 0.018 scale normalizes it to ~0.55m height
         this.gltfModel.scale.set(0.018, 0.018, 0.018);
         this.gltfModel.position.set(0, 0, 0);
@@ -77,11 +96,19 @@ export class CatCharacter {
 
         // Hide procedural fallback geometry only after verifying GLTF is attached
         if (this.gltfModel && this.gltfModel.children.length > 0) {
-          proceduralGroup.visible = false;
+          this.proceduralGroup.visible = false;
         }
+
+        // Measure bounding box for diagnostics
+        const bbox = new THREE.Box3().setFromObject(this.mesh);
+        const sz = new THREE.Vector3();
+        bbox.getSize(sz);
+        CatCharacter.diagnosticFlags.boundingBoxSize = { x: sz.x, y: sz.y, z: sz.z };
       }, undefined, (err) => {
         console.warn('GLTF Cat load fallback note:', err);
-        proceduralGroup.visible = true;
+        CatCharacter.diagnosticFlags.gltfError = err instanceof Error ? err.message : String(err);
+        CatCharacter.diagnosticFlags.activeMeshMode = 'PROCEDURAL';
+        this.proceduralGroup.visible = true;
       });
     }
 

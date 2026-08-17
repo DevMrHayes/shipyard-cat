@@ -212,7 +212,7 @@ export class MinimapSystem {
 
     ctx.save();
     ctx.translate(ax, ay);
-    ctx.rotate(-albaHeading);
+    ctx.rotate(albaHeading); // Points directly in Alba's true forward direction
 
     ctx.fillStyle = '#38bdf8';
     ctx.beginPath();

@@ -1,5 +1,6 @@
 import './style.css';
 import { GameEngine } from './game/GameEngine';
+import { CatCharacter } from './game/CatCharacter';
 import { TestRunner, TestResult } from './tests/TestRunner';
 import { CatVitals } from './core/VitalsSystem';
 import { ShipbuildingAssistEvent } from './core/AssistanceEngine';
@@ -304,7 +305,79 @@ document.addEventListener('DOMContentLoaded', () => {
     statCombo.textContent = `${p.maxComboHits}-Hit (${p.hasClawFlurry ? 'Claw Flurry' : 'Basic Swipe'})`;
     statWhiskers.textContent = `Tier ${p.whiskersTier} (${p.whiskersTier === 3 ? 'Geiger Sonar' : p.whiskersTier === 2 ? 'Mutant Auras' : p.whiskersTier === 1 ? 'Scent Trails' : 'Prey'})`;
     statRighting.textContent = p.hasAlwaysLandOnFeet ? 'Active (Immune)' : 'Normal';
+
+    renderDiagnostics();
   }
+
+  function renderDiagnostics() {
+    const flags = CatCharacter.diagnosticFlags;
+    const badge = document.getElementById('diag-mesh-mode-badge');
+    const flagFetch = document.getElementById('flag-fetch');
+    const flagParse = document.getElementById('flag-parse');
+    const flagNodes = document.getElementById('flag-nodes');
+    const flagBbox = document.getElementById('flag-bbox');
+
+    if (badge) {
+      badge.textContent = `ACTIVE: ${flags.activeMeshMode}`;
+      badge.style.background = flags.activeMeshMode === 'GLTF' ? '#0284c7' : flags.activeMeshMode === 'PROCEDURAL' ? '#eab308' : '#a855f7';
+      badge.style.color = flags.activeMeshMode === 'PROCEDURAL' ? '#000' : '#fff';
+    }
+    if (flagFetch) {
+      flagFetch.textContent = flags.gltfFetchAttempted ? 'SUCCESS (200 OK)' : 'WAITING...';
+      flagFetch.style.color = flags.gltfFetchAttempted ? '#4ade80' : '#f59e0b';
+    }
+    if (flagParse) {
+      if (flags.gltfError) {
+        flagParse.textContent = `FAILED (${flags.gltfError})`;
+        flagParse.style.color = '#ef4444';
+      } else if (flags.gltfLoadSuccess) {
+        flagParse.textContent = 'VALID GLTF SKELETON ✓';
+        flagParse.style.color = '#4ade80';
+      } else {
+        flagParse.textContent = 'PARSING...';
+        flagParse.style.color = '#f59e0b';
+      }
+    }
+    if (flagNodes) {
+      flagNodes.textContent = `${flags.gltfChildCount} Mesh Root Groups`;
+      flagNodes.style.color = flags.gltfChildCount > 0 ? '#4ade80' : '#94a3b8';
+    }
+    if (flagBbox) {
+      flagBbox.textContent = `${flags.boundingBoxSize.x.toFixed(2)}m × ${flags.boundingBoxSize.y.toFixed(2)}m × ${flags.boundingBoxSize.z.toFixed(2)}m`;
+    }
+  }
+
+  // Diagnostic Force Mesh Buttons
+  document.getElementById('btn-force-procedural')?.addEventListener('click', () => {
+    game.cat.proceduralGroup.visible = true;
+    if (game.cat.gltfModel) game.cat.gltfModel.visible = false;
+    CatCharacter.diagnosticFlags.activeMeshMode = 'PROCEDURAL';
+    soundEngine.playSuccess();
+    showToast('Diagnostic Override', 'Forced High-Visibility Procedural Tuxedo Mesh (Black Velvet + White Bib)', 'success');
+    renderDiagnostics();
+  });
+
+  document.getElementById('btn-force-gltf')?.addEventListener('click', () => {
+    game.cat.proceduralGroup.visible = false;
+    if (game.cat.gltfModel) {
+      game.cat.gltfModel.visible = true;
+      CatCharacter.diagnosticFlags.activeMeshMode = 'GLTF';
+      soundEngine.playSuccess();
+      showToast('Diagnostic Override', 'Forced Skeletal Quadruped GLTF Model', 'success');
+    } else {
+      showToast('GLTF Not Ready', 'cat.glb is still downloading/parsing. Procedural mesh preserved.', 'warn');
+    }
+    renderDiagnostics();
+  });
+
+  document.getElementById('btn-force-hybrid')?.addEventListener('click', () => {
+    game.cat.proceduralGroup.visible = true;
+    if (game.cat.gltfModel) game.cat.gltfModel.visible = true;
+    CatCharacter.diagnosticFlags.activeMeshMode = 'HYBRID_DEBUG';
+    soundEngine.playSuccess();
+    showToast('Dual Diagnostic Mode', 'Rendering both GLTF and Procedural meshes simultaneously', 'info');
+    renderDiagnostics();
+  });
 
   function renderLogbookChapters() {
     const missions = game.missionManager.getMissions();

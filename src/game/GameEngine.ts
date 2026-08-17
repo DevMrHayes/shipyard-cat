@@ -976,7 +976,7 @@ export class GameEngine {
 
   private performDistanceLOD() {
     const catPos = this.cat.mesh.position;
-    const maxActiveDistanceSq = 70 * 70; // 70-meter near-focus culling radius
+    const maxActiveDistanceSq = 60 * 60; // 60-meter near-focus culling radius
 
     // 1. Cull far vermin
     this.rats.forEach(rat => {
