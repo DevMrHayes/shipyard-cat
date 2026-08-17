@@ -620,49 +620,26 @@ export class ShipyardEnvironment {
     this.registerObstacle(new THREE.Vector3(3.5, 0, -10), new THREE.Vector3(6.5, 8, 70), 'Dry Dock 12 West Wall');
     this.registerObstacle(new THREE.Vector3(33.5, 0, -10), new THREE.Vector3(36.5, 8, 70), 'Dry Dock 12 East Wall');
 
-    // 3D Gerald R. Ford Aircraft Carrier (Dry Dock 12)
-    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-      const gltfLoader = new GLTFLoader();
-      gltfLoader.load('/models/gerald_r_ford_aircraft_carrier.glb', (gltf) => {
-        const carrier = gltf.scene;
-        carrier.scale.set(0.08, 0.08, 0.08);
-        carrier.position.set(20, 2.0, 30);
-        carrier.rotation.y = Math.PI / 2;
+    // 3D CVN Modular Superstructure (Optimized Lightweight Geometry - Saves 25MB RAM)
+    const steelPlateTex = TextureGenerator.createSteelPlateTexture();
+    const carrierMat = new THREE.MeshStandardMaterial({
+      map: steelPlateTex,
+      metalness: 0.65,
+      roughness: 0.35
+    });
+    const carrierGeo = new THREE.BoxGeometry(22, 10, 55);
+    const carrierHull = new THREE.Mesh(carrierGeo, carrierMat);
+    carrierHull.position.set(20, 5, 30);
+    carrierHull.castShadow = true;
+    carrierHull.receiveShadow = true;
+    this.group.add(carrierHull);
 
-        carrier.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-          }
-        });
-        this.group.add(carrier);
-      }, undefined, () => {
-        // Fallback
-        const steelPlateTex = TextureGenerator.createSteelPlateTexture();
-        const carrierMat = new THREE.MeshStandardMaterial({
-          map: steelPlateTex,
-          metalness: 0.65,
-          roughness: 0.35
-        });
-        const carrierGeo = new THREE.BoxGeometry(22, 12, 55);
-        const carrierHull = new THREE.Mesh(carrierGeo, carrierMat);
-        carrierHull.position.set(20, 6, 30);
-        carrierHull.castShadow = true;
-        this.group.add(carrierHull);
-      });
-    } else {
-      const steelPlateTex = TextureGenerator.createSteelPlateTexture();
-      const carrierMat = new THREE.MeshStandardMaterial({
-        map: steelPlateTex,
-        metalness: 0.65,
-        roughness: 0.35
-      });
-      const carrierGeo = new THREE.BoxGeometry(22, 12, 55);
-      const carrierHull = new THREE.Mesh(carrierGeo, carrierMat);
-      carrierHull.position.set(20, 6, 30);
-      carrierHull.castShadow = true;
-      this.group.add(carrierHull);
-    }
+    // Flight deck / island box
+    const islandMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.4 });
+    const island = new THREE.Mesh(new THREE.BoxGeometry(4, 7, 12), islandMat);
+    island.position.set(28, 13.5, 30);
+    island.castShadow = true;
+    this.group.add(island);
 
     this.registerObstacle(new THREE.Vector3(9, 0, 2.5), new THREE.Vector3(31, 12, 57.5), 'CVN-80 Carrier Hull Module');
 

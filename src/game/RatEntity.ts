@@ -57,8 +57,8 @@ export class RatEntity {
       const gltfLoader = new GLTFLoader();
       gltfLoader.load('/models/rat.glb', (gltf) => {
         this.gltfModel = gltf.scene;
-        // Normal scale: rat model height is ~1.0 unit, scale down to 0.35m
-        const modelScale = (isKingpin ? 0.6 : 0.3);
+        // Authentic rodent proportions (small shipyard mice/rats compared to Alba)
+        const modelScale = (isKingpin ? 0.28 : 0.14);
         this.gltfModel.scale.set(modelScale, modelScale, modelScale);
         this.gltfModel.position.set(0, 0, 0);
 

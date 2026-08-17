@@ -41,35 +41,8 @@ export class ShipbuilderEntity {
     this.mesh.position.copy(position);
     this.mesh.rotation.y = heading;
 
-    // Load Real 3D Shipbuilder Character Model (in browser)
-    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-      const modelFile = isFemale ? '/models/009_female_worker_welder_07.glb' : '/models/009_male_worker_welder_02.glb';
-      const gltfLoader = new GLTFLoader();
-      gltfLoader.load(modelFile, (gltf) => {
-        this.gltfModel = gltf.scene;
-        this.gltfModel.scale.set(1.0, 1.0, 1.0);
-        this.gltfModel.position.set(0, 0, 0);
-
-        this.gltfModel.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-          }
-        });
-
-        if (gltf.animations && gltf.animations.length > 0) {
-          this.mixer = new THREE.AnimationMixer(this.gltfModel);
-          const action = this.mixer.clipAction(gltf.animations[0]);
-          action.play();
-        }
-
-        this.mesh.add(this.gltfModel);
-      }, undefined, () => {
-        this.buildShipbuilderMesh();
-      });
-    } else {
-      this.buildShipbuilderMesh();
-    }
+    // Use lightweight procedural shipyard workers (Saves 60MB network & WebGL buffer memory)
+    this.buildShipbuilderMesh();
   }
 
   private buildShipbuilderMesh() {

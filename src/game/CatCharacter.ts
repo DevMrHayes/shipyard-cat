@@ -60,18 +60,25 @@ export class CatCharacter {
         CatCharacter.diagnosticFlags.gltfChildCount = gltf.scene.children.length;
         CatCharacter.diagnosticFlags.activeMeshMode = 'GLTF';
 
-        // The cat.glb model is exported in real-world metric units (~0.55m height at scale 1.0)
-        this.gltfModel.scale.set(1.0, 1.0, 1.0);
+        // Cat model authored scale adjusted by 1.8x to make Alba a proud, full-sized shipyard master mouser
+        this.gltfModel.scale.set(1.8, 1.8, 1.8);
         this.gltfModel.position.set(0, 0, 0);
         this.gltfModel.rotation.y = 0; // Face forward (+Z direction)
-        CatCharacter.diagnosticFlags.currentScale = 1.0;
+        CatCharacter.diagnosticFlags.currentScale = 1.8;
 
-        // Traverse to enable shadows & disable frustum culling on animated bones
+        // Traverse to enable shadows, disable frustum culling, and apply authentic Tuxedo Fur Materials
         let meshCnt = 0;
         let vertCnt = 0;
         let boneCnt = 0;
         let hasSkinned = false;
         let hasTex = false;
+
+        const tuxedoFurMat = new THREE.MeshStandardMaterial({
+          color: 0x18181b, // Sleek deep velvet black tuxedo coat
+          roughness: 0.75,
+          metalness: 0.1,
+          side: THREE.DoubleSide
+        });
 
         this.gltfModel.traverse((child) => {
           if ((child as THREE.Bone).isBone) {
@@ -95,23 +102,9 @@ export class CatCharacter {
               }
             }
 
-            // CRITICAL FIX: Ensure materials are fully opaque, double-sided, and not culled or alpha-masked out
+            // Apply high-contrast rich tuxedo black coat to the raw white GLTF geometry
             if (mesh.material) {
-              const checkMat = (m: THREE.Material) => {
-                const stdMat = m as THREE.MeshStandardMaterial;
-                if (stdMat.map) hasTex = true;
-                stdMat.transparent = false;
-                stdMat.opacity = 1.0;
-                stdMat.depthWrite = true;
-                stdMat.side = THREE.DoubleSide;
-                stdMat.needsUpdate = true;
-              };
-
-              if (Array.isArray(mesh.material)) {
-                mesh.material.forEach(checkMat);
-              } else {
-                checkMat(mesh.material);
-              }
+              mesh.material = tuxedoFurMat;
             }
           }
         });
