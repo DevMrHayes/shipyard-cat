@@ -1004,14 +1004,22 @@ export class GameEngine {
   }
 
   private frameTick: number = 0;
-  private currentDRSPixelRatio: number = Math.min(window.devicePixelRatio, 2.0);
+  private lastFrameTimestamp: number = 0;
+  private currentDRSPixelRatio: number = Math.min(window.devicePixelRatio, 1.25);
 
-  private animate() {
+  private animate(now: number = performance.now()) {
     requestAnimationFrame(this.animate);
 
+    if (this.lastFrameTimestamp === 0) {
+      this.lastFrameTimestamp = now;
+      return;
+    }
+
+    const rawDelta = (now - this.lastFrameTimestamp) / 1000;
+    this.lastFrameTimestamp = now;
+    const deltaTime = Math.min(Math.max(rawDelta, 0.001), 0.066);
+
     this.frameTick++;
-    this.timer.update();
-    const deltaTime = Math.min(this.timer.getDelta(), 0.05);
 
     // 1. Dynamic Resolution Scaling (DRS)
     if (this.frameTick % 45 === 0) {
