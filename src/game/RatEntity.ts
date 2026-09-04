@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ModelManager } from '../core/ModelManager';
+import { soundEngine } from '../core/SoundEngine';
 
 export type RatAIState = 'FORAGING' | 'SUSPICIOUS' | 'FLEEING' | 'CAUGHT';
 
@@ -22,6 +23,8 @@ export class RatEntity {
   private runCycle: number = 0;
   private bodyMesh: THREE.Mesh | null = null;
   private tailMesh: THREE.Line | null = null;
+  private panicBurstSpeed: number = 1.0;
+  private panicSqueakTimer: number = 0;
 
   public gltfModel: THREE.Group | null = null;
   public mixer: THREE.AnimationMixer | null = null;
@@ -46,6 +49,34 @@ export class RatEntity {
   };
 
   public proceduralGroup: THREE.Group;
+  public readyPromise: Promise<void> = Promise.resolve();
+
+  private static standardRatMat: THREE.MeshStandardMaterial | null = null;
+  private static kingpinRatMat: THREE.MeshStandardMaterial | null = null;
+
+  public static getRatMaterial(isKingpin: boolean): THREE.MeshStandardMaterial {
+    if (isKingpin) {
+      if (!this.kingpinRatMat) {
+        this.kingpinRatMat = new THREE.MeshStandardMaterial({
+          color: 0x1a0f0a, // Rich dark chocolate rodent brown for boss
+          roughness: 0.75,
+          metalness: 0.1,
+          side: THREE.DoubleSide
+        });
+      }
+      return this.kingpinRatMat;
+    } else {
+      if (!this.standardRatMat) {
+        this.standardRatMat = new THREE.MeshStandardMaterial({
+          color: 0x3d2618, // Rodent brown
+          roughness: 0.75,
+          metalness: 0.1,
+          side: THREE.DoubleSide
+        });
+      }
+      return this.standardRatMat;
+    }
+  }
 
   constructor(position: THREE.Vector3, isKingpin: boolean = false) {
     this.isKingpin = isKingpin;
@@ -67,8 +98,7 @@ export class RatEntity {
     // Load Real 3D Rat GLB Model (in browser)
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
       RatEntity.diagnosticFlags.gltfFetchAttempted = true;
-      const gltfLoader = new GLTFLoader();
-      gltfLoader.load('/models/rat.glb', (gltf) => {
+      this.readyPromise = ModelManager.loadRatModel().then((gltf) => {
         this.gltfModel = gltf.scene;
         RatEntity.diagnosticFlags.gltfLoadSuccess = true;
         RatEntity.diagnosticFlags.childCount = gltf.scene.children.length;
@@ -83,12 +113,7 @@ export class RatEntity {
         const center = box.getCenter(new THREE.Vector3());
         this.gltfModel.position.set(-center.x, -box.min.y, -center.z);
 
-        const ratFurMat = new THREE.MeshStandardMaterial({
-          color: RatEntity.diagnosticFlags.forcedMagenta ? 0xff00ff : (isKingpin ? 0x1a0f0a : 0x3d2618), // Rich dark chocolate rodent brown
-          roughness: 0.75,
-          metalness: 0.1,
-          side: THREE.DoubleSide
-        });
+        const ratFurMat = RatEntity.getRatMaterial(isKingpin);
 
         this.gltfModel.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
@@ -109,18 +134,26 @@ export class RatEntity {
             if (name.includes('idle')) this.animations['idle'] = action;
             if (name.includes('run')) this.animations['run'] = action;
             if (name.includes('eat')) this.animations['eat'] = action;
+            action.enabled = true;
+            action.setEffectiveWeight(1.0);
+            action.play();
           });
+
+          // Pre-evaluate 1 mixer tick to bind bone tracks ahead of gameplay
+          this.mixer.update(0.016);
 
           const initialAction = this.animations['run'] || this.animations['idle'] || Object.values(this.animations)[0];
           if (initialAction) {
             initialAction.play();
             this.currentAction = initialAction;
+            this.mixer.update(0);
           }
         }
 
         this.mesh.add(this.gltfModel);
-        proceduralGroup.visible = RatEntity.diagnosticFlags.activeMode !== 'GLTF';
-      }, undefined, () => {
+        this.mesh.remove(proceduralGroup);
+        proceduralGroup.visible = false;
+      }).catch(() => {
         proceduralGroup.visible = true;
       });
     }
@@ -237,8 +270,14 @@ export class RatEntity {
     this.scentTrailParticles.visible = active && this.state !== 'CAUGHT';
   }
 
-  public update(deltaTime: number, catPosition: THREE.Vector3, catIsCrouching: boolean) {
-    if (this.mixer) {
+  // Static Scratch Vectors for Zero Runtime Garbage Collection
+  private static readonly scratchLungeDir = new THREE.Vector3();
+  private static readonly scratchFleeDir = new THREE.Vector3();
+  private static readonly scratchPatrolOffset = new THREE.Vector3();
+  private static readonly scratchDir = new THREE.Vector3();
+
+  public update(deltaTime: number, catPosition: THREE.Vector3, catIsCrouching: boolean, skipMixer: boolean = false) {
+    if (this.mixer && !skipMixer) {
       this.mixer.update(deltaTime);
       const isMoving = this.state === 'FLEEING' || this.state === 'FORAGING' || this.isKingpin;
       const targetAnim = isMoving ? (this.animations['run'] || this.animations['eat']) : this.animations['idle'];
@@ -277,7 +316,7 @@ export class RatEntity {
     if (this.isKingpin) {
       if (distToCat < 4.5 && this.attackCooldown <= 0) {
         // Lunge attack toward Alba
-        const lungeDir = new THREE.Vector3().subVectors(catPosition, this.mesh.position).normalize();
+        const lungeDir = RatEntity.scratchLungeDir.subVectors(catPosition, this.mesh.position).normalize();
         lungeDir.y = 0;
         this.mesh.position.addScaledVector(lungeDir, this.moveSpeed * 1.8 * deltaTime);
         this.mesh.rotation.y = Math.atan2(lungeDir.x, lungeDir.z);
@@ -292,34 +331,60 @@ export class RatEntity {
       return;
     }
 
-    // Standard Rat AI State Transitions
-    if (distToCat < 2.2) {
-      this.state = 'FLEEING';
+    // Standard Rat AI State Transitions & Panic Mechanics
+    const prevState = this.state;
+    if (distToCat < 3.2) {
+      if (this.state !== 'FLEEING') {
+        this.state = 'FLEEING';
+        this.panicBurstSpeed = 1.75; // Initial adrenaline panic burst
+        this.panicSqueakTimer = 0; // Trigger squeak immediately
+      }
     } else if (distToCat < detectionRadius) {
       if (this.state === 'FORAGING') {
         this.state = 'SUSPICIOUS';
-        this.alertTimer = 1.5;
+        this.alertTimer = 1.2;
       }
     } else if (this.state === 'FLEEING' && distToCat > 14) {
       this.state = 'FORAGING';
+      this.panicBurstSpeed = 1.0;
     }
 
     // Execute state behavior
     if (this.state === 'FLEEING') {
-      const fleeDir = new THREE.Vector3().subVectors(this.mesh.position, catPosition).normalize();
+      // Decay panic burst speed back toward base run speed
+      this.panicBurstSpeed = Math.max(1.0, this.panicBurstSpeed - deltaTime * 0.45);
+
+      // Periodic panic squeaks when being pursued closely
+      this.panicSqueakTimer -= deltaTime;
+      if (this.panicSqueakTimer <= 0) {
+        soundEngine.playRatPanic();
+        this.panicSqueakTimer = 1.4 + Math.random() * 1.6;
+      }
+
+      // Compute panic flee direction with evasive scampering zigzag
+      const fleeDir = RatEntity.scratchFleeDir.subVectors(this.mesh.position, catPosition).normalize();
       fleeDir.y = 0;
-      this.mesh.position.addScaledVector(fleeDir, this.moveSpeed * 2.2 * deltaTime);
+      
+      const perpX = -fleeDir.z;
+      const perpZ = fleeDir.x;
+      const zigzag = Math.sin(this.runCycle * 1.8) * 0.3;
+      fleeDir.x += perpX * zigzag;
+      fleeDir.z += perpZ * zigzag;
+      fleeDir.normalize();
+
+      const currentSpeed = this.moveSpeed * 2.4 * this.panicBurstSpeed;
+      this.mesh.position.addScaledVector(fleeDir, currentSpeed * deltaTime);
       this.mesh.rotation.y = Math.atan2(fleeDir.x, fleeDir.z);
     } else if (this.state === 'FORAGING') {
       if (this.mesh.position.distanceTo(this.patrolTarget) < 0.5 || Math.random() < 0.008) {
-        const offset = new THREE.Vector3(
+        RatEntity.scratchPatrolOffset.set(
           (Math.random() - 0.5) * 8,
           0,
           (Math.random() - 0.5) * 8
         );
-        this.patrolTarget.addVectors(this.spawnOrigin, offset);
+        this.patrolTarget.addVectors(this.spawnOrigin, RatEntity.scratchPatrolOffset);
       }
-      const dir = new THREE.Vector3().subVectors(this.patrolTarget, this.mesh.position).normalize();
+      const dir = RatEntity.scratchDir.subVectors(this.patrolTarget, this.mesh.position).normalize();
       dir.y = 0;
       this.mesh.position.addScaledVector(dir, this.moveSpeed * 0.7 * deltaTime);
       if (dir.lengthSq() > 0.001) {
@@ -327,8 +392,9 @@ export class RatEntity {
       }
     }
 
-    // Run animation wobble & thermal pulse
-    this.runCycle += deltaTime * 12;
+    // Run animation wobble & thermal pulse (accelerated on panic flee)
+    const animRate = this.state === 'FLEEING' ? (20 * this.panicBurstSpeed) : 12;
+    this.runCycle += deltaTime * animRate;
     if (this.bodyMesh) {
       this.bodyMesh.position.y = (this.isKingpin ? 0.22 : 0.12) + Math.abs(Math.sin(this.runCycle)) * 0.03;
     }
@@ -348,7 +414,39 @@ export class RatEntity {
       this.scentPositions[idx + 2] = this.mesh.position.z + (Math.random() - 0.5) * 0.1;
 
       this.scentHeadIndex = (this.scentHeadIndex + 1) % (this.scentPositions.length / 3);
-      (this.scentTrailParticles.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      if (this.scentTrailParticles.visible) {
+        (this.scentTrailParticles.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      }
     }
+  }
+
+  public takeDamage(damage: number = 1): boolean {
+    this.health -= damage;
+    if (this.health <= 0) {
+      this.state = 'CAUGHT';
+      this.mesh.visible = false;
+      return true;
+    }
+    return false;
+  }
+
+  public prewarmAnimations(): void {
+    if (!this.mixer) return;
+    const keys = ['idle', 'run', 'eat'];
+    keys.forEach(k => {
+      const act = this.animations[k];
+      if (act) {
+        act.enabled = true;
+        act.setEffectiveWeight(1.0);
+        act.play();
+      }
+    });
+    this.mixer.update(0.016);
+    const initialAction = this.animations['run'] || this.animations['idle'];
+    if (initialAction) {
+      initialAction.play();
+      this.currentAction = initialAction;
+    }
+    this.mixer.update(0);
   }
 }

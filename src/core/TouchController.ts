@@ -20,6 +20,15 @@ export class TouchController {
   public onMeow: (() => void) | null = null;
   public onToggleMap: (() => void) | null = null;
 
+  // Stored listener references for clean disposal
+  private onJoystickStartBound: ((e: TouchEvent) => void) | null = null;
+  private onJoystickMoveBound: ((e: TouchEvent) => void) | null = null;
+  private onJoystickEndBound: ((e: TouchEvent) => void) | null = null;
+  private onCameraStartBound: ((e: TouchEvent) => void) | null = null;
+  private onCameraMoveBound: ((e: TouchEvent) => void) | null = null;
+  private onCameraEndBound: ((e: TouchEvent) => void) | null = null;
+  private cleanups: (() => void)[] = [];
+
   constructor() {
     this.init();
   }
@@ -33,18 +42,26 @@ export class TouchController {
     if (!this.joystickZone || !this.joystickThumb) return;
 
     // Joystick Touch Listeners
-    this.joystickZone.addEventListener('touchstart', this.handleJoystickStart.bind(this), { passive: false });
-    window.addEventListener('touchmove', this.handleJoystickMove.bind(this), { passive: false });
-    window.addEventListener('touchend', this.handleJoystickEnd.bind(this), { passive: false });
-    window.addEventListener('touchcancel', this.handleJoystickEnd.bind(this), { passive: false });
+    this.onJoystickStartBound = this.handleJoystickStart.bind(this);
+    this.onJoystickMoveBound = this.handleJoystickMove.bind(this);
+    this.onJoystickEndBound = this.handleJoystickEnd.bind(this);
+
+    this.joystickZone.addEventListener('touchstart', this.onJoystickStartBound, { passive: false });
+    window.addEventListener('touchmove', this.onJoystickMoveBound, { passive: false });
+    window.addEventListener('touchend', this.onJoystickEndBound, { passive: false });
+    window.addEventListener('touchcancel', this.onJoystickEndBound, { passive: false });
 
     // Camera Swipe Gesture on Viewport
     const viewport = document.getElementById('game-container');
     if (viewport) {
-      viewport.addEventListener('touchstart', this.handleCameraStart.bind(this), { passive: true });
-      viewport.addEventListener('touchmove', this.handleCameraMove.bind(this), { passive: true });
-      viewport.addEventListener('touchend', this.handleCameraEnd.bind(this), { passive: true });
-      viewport.addEventListener('touchcancel', this.handleCameraEnd.bind(this), { passive: true });
+      this.onCameraStartBound = this.handleCameraStart.bind(this);
+      this.onCameraMoveBound = this.handleCameraMove.bind(this);
+      this.onCameraEndBound = this.handleCameraEnd.bind(this);
+
+      viewport.addEventListener('touchstart', this.onCameraStartBound, { passive: true });
+      viewport.addEventListener('touchmove', this.onCameraMoveBound, { passive: true });
+      viewport.addEventListener('touchend', this.onCameraEndBound, { passive: true });
+      viewport.addEventListener('touchcancel', this.onCameraEndBound, { passive: true });
     }
 
     // Connect Action Touch Buttons
@@ -55,21 +72,54 @@ export class TouchController {
     this.bindActionButton('touch-btn-map', () => this.onToggleMap?.());
   }
 
+  public dispose(): void {
+    if (this.joystickZone && this.onJoystickStartBound) {
+      this.joystickZone.removeEventListener('touchstart', this.onJoystickStartBound);
+    }
+    if (this.onJoystickMoveBound) {
+      window.removeEventListener('touchmove', this.onJoystickMoveBound);
+    }
+    if (this.onJoystickEndBound) {
+      window.removeEventListener('touchend', this.onJoystickEndBound);
+      window.removeEventListener('touchcancel', this.onJoystickEndBound);
+    }
+
+    const viewport = document.getElementById('game-container');
+    if (viewport) {
+      if (this.onCameraStartBound) viewport.removeEventListener('touchstart', this.onCameraStartBound);
+      if (this.onCameraMoveBound) viewport.removeEventListener('touchmove', this.onCameraMoveBound);
+      if (this.onCameraEndBound) {
+        viewport.removeEventListener('touchend', this.onCameraEndBound);
+        viewport.removeEventListener('touchcancel', this.onCameraEndBound);
+      }
+    }
+
+    for (const fn of this.cleanups) {
+      fn();
+    }
+    this.cleanups = [];
+  }
+
   private bindActionButton(id: string, callback: () => void) {
     const btn = document.getElementById(id);
     if (btn) {
-      btn.addEventListener('touchstart', (e) => {
+      const onStart = (e: TouchEvent) => {
         e.preventDefault();
         e.stopPropagation();
         btn.classList.add('active');
         callback();
-      }, { passive: false });
+      };
+      const onEnd = () => {
+        btn.classList.remove('active');
+      };
+      btn.addEventListener('touchstart', onStart, { passive: false });
+      btn.addEventListener('touchend', onEnd);
+      btn.addEventListener('touchcancel', onEnd);
 
-      btn.addEventListener('touchend', () => {
-        btn.classList.remove('active');
-      });
-      btn.addEventListener('touchcancel', () => {
-        btn.classList.remove('active');
+      this.cleanups.push(() => {
+        btn.removeEventListener('touchstart', onStart);
+        btn.removeEventListener('touchend', onEnd);
+        btn.removeEventListener('touchcancel', onEnd);
       });
     }
   }
@@ -182,9 +232,13 @@ export class TouchController {
     }
   }
 
+  private consumedCameraDelta = { x: 0, y: 0 };
+
   public consumeCameraDelta() {
-    const delta = { ...this.cameraDelta };
-    this.cameraDelta = { x: 0, y: 0 };
-    return delta;
+    this.consumedCameraDelta.x = this.cameraDelta.x;
+    this.consumedCameraDelta.y = this.cameraDelta.y;
+    this.cameraDelta.x = 0;
+    this.cameraDelta.y = 0;
+    return this.consumedCameraDelta;
   }
 }

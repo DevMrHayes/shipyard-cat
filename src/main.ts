@@ -1,6 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
-import { GameEngine } from './game/GameEngine';
+import { GameEngine, ContextualPrompt } from './game/GameEngine';
 import { CatCharacter } from './game/CatCharacter';
 import { RatEntity } from './game/RatEntity';
 import { TestRunner, TestResult } from './tests/TestRunner';
@@ -25,38 +25,45 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadingStatusText = document.getElementById('loading-status-text') as HTMLElement;
   const btnEnterGame = document.getElementById('btn-enter-game') as HTMLButtonElement;
 
-  // Simulate smooth asset staging progress
-  let loadProgress = 20;
-  const loadInterval = setInterval(() => {
-    loadProgress += 25;
-    if (loadingProgressBar) loadingProgressBar.style.width = `${Math.min(100, loadProgress)}%`;
-    
-    if (loadProgress === 45 && loadingStatusText) {
-      loadingStatusText.textContent = 'Rigging Alba (Master Mouser) & Shipyard Vermin...';
-    } else if (loadProgress === 70 && loadingStatusText) {
-      loadingStatusText.textContent = 'Calibrating Dosimeter & Historic Dry Docks...';
-    } else if (loadProgress >= 100) {
-      clearInterval(loadInterval);
-      if (loadingStatusText) loadingStatusText.textContent = 'Ready to Patrol the Yard!';
-      if (btnEnterGame) {
-        btnEnterGame.style.display = 'inline-block';
-        btnEnterGame.onclick = () => {
-          soundEngine.playPurr();
-          loadingScreen.style.opacity = '0';
-          setTimeout(() => {
-            loadingScreen.style.display = 'none';
-          }, 800);
-        };
-      }
-    }
-  }, 250);
-
   let game: GameEngine;
   try {
     game = new GameEngine(container);
     game.onFrameUpdate = () => {
       updatePerformanceProfiler();
+      updateSonarDistanceBadge();
     };
+    game.onFreezeDetected = (incident) => {
+      handleFreezeIncidentDetected(incident);
+    };
+
+    // Execute real GPU Shader & Texture Warmup Pipeline
+    game.initPipeline((pct, stage) => {
+      if (loadingProgressBar) loadingProgressBar.style.width = `${pct}%`;
+      if (loadingStatusText) loadingStatusText.textContent = stage;
+    }).then(() => {
+      if (btnEnterGame) {
+        btnEnterGame.style.display = 'inline-block';
+        btnEnterGame.onclick = () => {
+          soundEngine.init();
+          soundEngine.prewarmAudioBuffers();
+          soundEngine.playPurr();
+          game.startLoop();
+          loadingScreen.style.opacity = '0';
+          setTimeout(() => {
+            loadingScreen.style.display = 'none';
+          }, 600);
+        };
+      }
+    }).catch((err) => {
+      console.warn('[Engine Warmup Pipeline Note]', err);
+      if (btnEnterGame) {
+        btnEnterGame.style.display = 'inline-block';
+        btnEnterGame.onclick = () => {
+          game.startLoop();
+          loadingScreen.style.display = 'none';
+        };
+      }
+    });
   } catch (err: any) {
     console.error('[Shipyard Cat Fatal Init]', err);
     const fallback = document.getElementById('engine-error-fallback');
@@ -76,7 +83,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const missionTitle = document.getElementById('mission-title') as HTMLElement;
   const missionSubtitle = document.getElementById('mission-subtitle') as HTMLElement;
   const objectiveList = document.getElementById('objective-list') as HTMLElement;
+  const objectiveDistanceBadge = document.getElementById('objective-distance-badge') as HTMLElement;
   const toastContainer = document.getElementById('toast-container') as HTMLElement;
+
+  const onboardingCard = document.getElementById('onboarding-card') as HTMLElement;
+  const btnDismissOnboarding = document.getElementById('btn-dismiss-onboarding') as HTMLButtonElement;
+  const btnControls = document.getElementById('btn-controls') as HTMLButtonElement;
+  const btnWorkorder = document.getElementById('btn-workorder') as HTMLButtonElement;
+  const modalWorkorder = document.getElementById('modal-workorder') as HTMLElement;
 
   const btnWhiskers = document.getElementById('btn-whiskers') as HTMLButtonElement;
   const btnMeow = document.getElementById('btn-meow') as HTMLButtonElement;
@@ -109,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
     if (dialogueArchive.length > 50) dialogueArchive.pop();
-    renderCommsLog();
 
     toastQueue.push({ title, message, type });
     processToastQueue();
@@ -142,23 +155,180 @@ document.addEventListener('DOMContentLoaded', () => {
 
   game.onNotification = showToast;
 
-  // 2. Vitals & Radiation HUD Updates
-  game.onVitalsUpdate = (vitals: CatVitals, rad: number) => {
-    staminaFill.style.width = `${(vitals.currentStamina / vitals.maxStamina) * 100}%`;
-    hungerFill.style.width = `${(vitals.currentHunger / vitals.maxHunger) * 100}%`;
-    healthFill.style.width = `${(vitals.currentHealth / vitals.maxHealth) * 100}%`;
+  // 2. Vitals & Radiation HUD Updates (Cached & Throttled to 0.5% Delta to Eliminate DOM Thrashing)
+  let lastStaminaPct = -1;
+  let lastHungerPct = -1;
+  let lastHealthPct = -1;
+  let lastRadDose = -1;
 
-    radVal.textContent = rad.toFixed(2);
-    if (rad > 4.0) {
-      radVal.style.color = '#ef4444';
-    } else if (rad > 1.0) {
-      radVal.style.color = '#f59e0b';
-    } else {
-      radVal.style.color = '#f8fafc';
+  game.onVitalsUpdate = (vitals: CatVitals, rad: number) => {
+    const staminaPct = (vitals.currentStamina / vitals.maxStamina) * 100;
+    if (Math.abs(staminaPct - lastStaminaPct) >= 0.5) {
+      staminaFill.style.width = `${staminaPct.toFixed(1)}%`;
+      lastStaminaPct = staminaPct;
+    }
+
+    const hungerPct = (vitals.currentHunger / vitals.maxHunger) * 100;
+    if (Math.abs(hungerPct - lastHungerPct) >= 0.5) {
+      hungerFill.style.width = `${hungerPct.toFixed(1)}%`;
+      lastHungerPct = hungerPct;
+    }
+
+    const healthPct = (vitals.currentHealth / vitals.maxHealth) * 100;
+    if (Math.abs(healthPct - lastHealthPct) >= 0.5) {
+      healthFill.style.width = `${healthPct.toFixed(1)}%`;
+      lastHealthPct = healthPct;
+    }
+
+    if (Math.abs(rad - lastRadDose) >= 0.05) {
+      radVal.textContent = rad.toFixed(2);
+      if (rad > 4.0) {
+        radVal.style.color = '#ef4444';
+      } else if (rad > 1.0) {
+        radVal.style.color = '#f59e0b';
+      } else {
+        radVal.style.color = '#f8fafc';
+      }
+      lastRadDose = rad;
     }
   };
 
-  // 3. Mission Objectives Rendering
+  // 2b. Dynamic Floating 3D In-World Contextual Prompts Handler (Zero-Reflow GPU Transform Positioning)
+  const floatingPromptsLayer = document.getElementById('floating-prompts-layer') as HTMLElement;
+  interface CachedPromptEntry {
+    element: HTMLElement;
+    keyBadge: HTMLElement;
+    mainTitle: HTMLElement;
+    subDesc: HTMLElement;
+    lastX: number;
+    lastY: number;
+    lastVisible: boolean;
+    lastTitle: string;
+    lastSubtitle: string;
+  }
+  const promptElementCache: Map<string, CachedPromptEntry> = new Map();
+  const activePromptIds: Set<string> = new Set();
+
+  game.onContextualPromptsUpdate = (prompts: ContextualPrompt[]) => {
+    if (!floatingPromptsLayer) return;
+    activePromptIds.clear();
+
+    for (let i = 0; i < prompts.length; i++) {
+      const p = prompts[i];
+      activePromptIds.add(p.id);
+      let entry = promptElementCache.get(p.id);
+
+      if (!entry) {
+        const el = document.createElement('div');
+        el.className = `floating-prompt prompt-${p.type.toLowerCase()}`;
+        el.style.position = 'absolute';
+        el.style.left = '0px';
+        el.style.top = '0px';
+        el.style.willChange = 'transform';
+
+        const keyBadge = document.createElement('span');
+        keyBadge.className = 'prompt-key-badge';
+        keyBadge.textContent = p.keyText;
+        el.appendChild(keyBadge);
+
+        const textBlock = document.createElement('div');
+        textBlock.className = 'prompt-text-block';
+
+        const mainTitle = document.createElement('div');
+        mainTitle.className = 'prompt-main-title';
+        mainTitle.textContent = p.title;
+        textBlock.appendChild(mainTitle);
+
+        const subDesc = document.createElement('div');
+        subDesc.className = 'prompt-sub-desc';
+        subDesc.textContent = p.subtitle || '';
+        subDesc.style.display = p.subtitle ? 'block' : 'none';
+        textBlock.appendChild(subDesc);
+
+        el.appendChild(textBlock);
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (p.type === 'TALK' || p.type === 'EAT') {
+            game.handleInteractOrMeow();
+          } else if (p.type === 'POUNCE') {
+            game.executePounce();
+          }
+        });
+
+        floatingPromptsLayer.appendChild(el);
+        entry = {
+          element: el,
+          keyBadge,
+          mainTitle,
+          subDesc,
+          lastX: -9999,
+          lastY: -9999,
+          lastVisible: false,
+          lastTitle: p.title,
+          lastSubtitle: p.subtitle || ''
+        };
+        promptElementCache.set(p.id, entry);
+      }
+
+      // Update text contents only if changed (no innerHTML thrashing)
+      if (entry.lastTitle !== p.title) {
+        entry.mainTitle.textContent = p.title;
+        entry.lastTitle = p.title;
+      }
+      const sub = p.subtitle || '';
+      if (entry.lastSubtitle !== sub) {
+        entry.subDesc.textContent = sub;
+        entry.subDesc.style.display = sub ? 'block' : 'none';
+        entry.lastSubtitle = sub;
+      }
+
+      // Fast GPU transform translation avoiding layout/reflow recalculations
+      const roundX = Math.round(p.screenX);
+      const roundY = Math.round(p.screenY);
+      if (entry.lastX !== roundX || entry.lastY !== roundY) {
+        entry.element.style.transform = `translate3d(${roundX}px, ${roundY}px, 0)`;
+        entry.lastX = roundX;
+        entry.lastY = roundY;
+      }
+
+      if (entry.lastVisible !== p.visible) {
+        entry.element.style.display = p.visible ? 'flex' : 'none';
+        entry.lastVisible = p.visible;
+      }
+    }
+
+    // Clean up stale prompts
+    for (const [id, entry] of promptElementCache.entries()) {
+      if (!activePromptIds.has(id)) {
+        entry.element.remove();
+        promptElementCache.delete(id);
+      }
+    }
+  };
+
+  // Live Sonar Waypoint Nav Distance Updater
+  let navUpdateCounter = 0;
+  function updateSonarDistanceBadge() {
+    navUpdateCounter++;
+    if (navUpdateCounter % 8 !== 0) return; // Throttled update
+
+    const waypoint = game.missionManager.getActiveWaypoint();
+    if (!objectiveDistanceBadge) return;
+
+    if (waypoint && game.cat) {
+      const catPos = game.cat.mesh.position;
+      const dx = waypoint.x - catPos.x;
+      const dz = waypoint.z - catPos.z;
+      const dist = Math.hypot(dx, dz);
+
+      objectiveDistanceBadge.textContent = `📍 ${Math.round(dist)}m • ${waypoint.zoneName} (${waypoint.hint})`;
+    } else {
+      objectiveDistanceBadge.textContent = `✓ ALL DIRECTIVES COMPLETE • Check Dispatch [O]`;
+    }
+  }
+
+  // 3. Mission Objectives & Work Order Rendering
   function renderObjectives() {
     const mission = game.missionManager.getCurrentMission();
     missionTitle.textContent = mission.title;
@@ -176,10 +346,71 @@ document.addEventListener('DOMContentLoaded', () => {
 
       item.innerHTML = `
         <div class="obj-checkbox">${obj.isCompleted ? '✓' : ''}</div>
-        <span>${obj.description}${countText}</span>
+        <div>
+          <span>${obj.description}${countText}</span>
+          ${!obj.isCompleted && obj.hint ? `<div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">💡 ${obj.hint}</div>` : ''}
+        </div>
       `;
       objectiveList.appendChild(item);
     });
+
+    updateSonarDistanceBadge();
+    renderWorkOrderModal();
+  }
+
+  // Official Work Order Dispatch Modal Rendering
+  function renderWorkOrderModal() {
+    if (!modalWorkorder) return;
+    const mission = game.missionManager.getCurrentMission();
+    const missions = game.missionManager.getMissions();
+
+    const titleEl = document.getElementById('workorder-title');
+    const codeEl = document.getElementById('workorder-code');
+    const locEl = document.getElementById('workorder-location');
+    const briefEl = document.getElementById('workorder-briefing');
+    const speakerEl = document.getElementById('workorder-speaker');
+    const dialEl = document.getElementById('workorder-dialogue');
+    const objsEl = document.getElementById('workorder-objectives');
+    const selEl = document.getElementById('workorder-mission-selector');
+
+    if (titleEl) titleEl.textContent = `Chapter ${mission.id}: ${mission.title}`;
+    if (codeEl) codeEl.textContent = `WORK ORDER: NNS-WO-${1000 + mission.id * 14}`;
+    if (locEl) locEl.textContent = `📍 Sector: ${mission.location}`;
+    if (briefEl) briefEl.textContent = mission.briefing;
+    if (speakerEl) speakerEl.textContent = mission.dialogueSpeaker;
+    if (dialEl) dialEl.textContent = `"${mission.dialogueText}"`;
+
+    if (objsEl) {
+      objsEl.innerHTML = mission.objectives.map(obj => `
+        <div class="objective-item ${obj.isCompleted ? 'done' : ''}" style="margin-bottom: 0.4rem;">
+          <div class="obj-checkbox">${obj.isCompleted ? '✓' : ''}</div>
+          <div>
+            <strong style="color: ${obj.isCompleted ? '#64748b' : '#f8fafc'};">${obj.description}${obj.requiredCount ? ` (${obj.currentCount || 0}/${obj.requiredCount})` : ''}</strong>
+            ${obj.hint ? `<div style="font-size: 0.75rem; color: #94a3b8;">${obj.hint}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    if (selEl) {
+      selEl.innerHTML = missions.map(m => `
+        <button class="hud-btn" data-mission-select="${m.id}" style="width: 100%; justify-content: space-between; font-size: 0.78rem; padding: 0.4rem 0.75rem; background: ${m.id === mission.id ? 'rgba(56, 189, 248, 0.2)' : 'rgba(30, 41, 59, 0.6)'}; border-color: ${m.isCompleted ? '#22c55e' : m.id === mission.id ? '#38bdf8' : '#475569'}; opacity: ${m.isUnlocked ? '1' : '0.5'}; cursor: ${m.isUnlocked ? 'pointer' : 'not-allowed'};">
+          <span>Chapter ${m.id}: ${m.title}</span>
+          <span style="font-size: 0.7rem; color: ${m.isCompleted ? '#4ade80' : m.id === mission.id ? '#38bdf8' : '#64748b'};">${m.isCompleted ? 'COMPLETED ✓' : m.id === mission.id ? 'ACTIVE' : m.isUnlocked ? 'UNLOCKED' : 'LOCKED 🔒'}</span>
+        </button>
+      `).join('');
+
+      selEl.querySelectorAll('[data-mission-select]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const mid = parseInt((e.currentTarget as HTMLElement).getAttribute('data-mission-select') || '1');
+          if (game.missionManager.selectMission(mid)) {
+            soundEngine.playSuccess();
+            showToast('Work Order Switched', `Active Chapter set to: ${game.missionManager.getCurrentMission().title}`, 'info');
+            renderObjectives();
+          }
+        });
+      });
+    }
   }
 
   game.onMissionObjectiveUpdated = renderObjectives;
@@ -189,10 +420,74 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     showToast(
       'Welcome to Newport News Shipbuilding!',
-      'Use WASD to roam, Shift to sprint, Ctrl to crouch/stalk, and Space/F to pounce on rats.',
+      'Controls: WASD to roam, Shift to sprint, Q for Whiskers Sonar, and Space/F to pounce.',
       'info'
     );
   }, 1000);
+
+  // Keypress Interactive Visual Feedback & Shortcut Handlers
+  const keyAliases: { [code: string]: string[] } = {
+    'KeyW': ['KeyW'],
+    'KeyA': ['KeyA'],
+    'KeyS': ['KeyS'],
+    'KeyD': ['KeyD'],
+    'ArrowUp': ['KeyW'],
+    'ArrowLeft': ['KeyA'],
+    'ArrowDown': ['KeyS'],
+    'ArrowRight': ['KeyD'],
+    'ShiftLeft': ['ShiftLeft'],
+    'ShiftRight': ['ShiftLeft'],
+    'KeyQ': ['KeyQ'],
+    'KeyF': ['KeyF'],
+    'KeyJ': ['KeyJ'],
+    'KeyR': ['KeyJ'],
+    'KeyK': ['KeyK'],
+    'KeyT': ['KeyK'],
+    'KeyE': ['KeyE'],
+    'KeyC': ['KeyC'],
+    'ControlLeft': ['KeyC'],
+    'KeyM': ['KeyM']
+  };
+
+  window.addEventListener('keydown', (e) => {
+    const targets = keyAliases[e.code] || [e.code];
+    targets.forEach(code => {
+      document.querySelectorAll(`[data-key="${code}"]`).forEach(el => el.classList.add('pressed'));
+    });
+
+    // Shortcuts: M for Map, O for Work Order, H for Controls banner
+    if (e.code === 'KeyM' && !e.repeat && modalMap) {
+      modalMap.classList.toggle('open');
+    }
+    if (e.code === 'KeyO' && !e.repeat && modalWorkorder) {
+      modalWorkorder.classList.toggle('open');
+      if (modalWorkorder.classList.contains('open')) renderWorkOrderModal();
+    }
+    if (e.code === 'KeyH' && !e.repeat && onboardingCard) {
+      onboardingCard.classList.toggle('hidden');
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    const targets = keyAliases[e.code] || [e.code];
+    targets.forEach(code => {
+      document.querySelectorAll(`[data-key="${code}"]`).forEach(el => el.classList.remove('pressed'));
+    });
+  });
+
+  // Onboarding & Work Order Buttons
+  btnDismissOnboarding?.addEventListener('click', () => {
+    onboardingCard?.classList.add('hidden');
+  });
+
+  btnControls?.addEventListener('click', () => {
+    onboardingCard?.classList.toggle('hidden');
+  });
+
+  btnWorkorder?.addEventListener('click', () => {
+    modalWorkorder?.classList.add('open');
+    renderWorkOrderModal();
+  });
 
   const btnSwipe = document.getElementById('btn-swipe') as HTMLButtonElement;
   const btnTailSweep = document.getElementById('btn-tailsweep') as HTMLButtonElement;
@@ -341,7 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentFps = 60;
   let currentFrameTime = 16.6;
 
-  // 30-Second Rolling Telemetry Buffer (Sampled twice per second)
+  // 30-Second Rolling Telemetry Buffer (Preallocated Fixed Circular Buffer)
   interface TelemetryRecord {
     timestamp: string;
     fps: number;
@@ -356,8 +651,24 @@ document.addEventListener('DOMContentLoaded', () => {
     isAirborne: boolean;
     activeMissionId: number;
   }
-  const telemetryHistory: TelemetryRecord[] = [];
   const maxTelemetryRecords = 60; // 60 samples @ 500ms = 30 seconds
+  const telemetryHistory: TelemetryRecord[] = Array.from({ length: maxTelemetryRecords }, () => ({
+    timestamp: '',
+    fps: 0,
+    frameRenderTimeMs: 0,
+    drawCalls: 0,
+    triangles: 0,
+    texturesInVRAM: 0,
+    heapMemoryMB: 'N/A',
+    catPosition: '',
+    isMoving: false,
+    isPouncing: false,
+    isAirborne: false,
+    activeMissionId: 1
+  }));
+  let telemetryHeadIndex = 0;
+  let totalTelemetryRecorded = 0;
+  const scratchTelemetryPos = new THREE.Vector3();
 
   function updatePerformanceProfiler() {
     const now = performance.now();
@@ -392,37 +703,29 @@ document.addEventListener('DOMContentLoaded', () => {
       if (texElem && game.renderer.info) {
         texElem.textContent = `${game.renderer.info.memory.textures} Textures in VRAM`;
       }
-      let memoryUsage: number | string = 'N/A';
+      let memoryUsage: number | string = 'Optimized';
       if (memElem) {
-        if ((performance as any).memory) {
-          const usedMB = Math.round((performance as any).memory.usedJSHeapSize / (1024 * 1024));
-          memoryUsage = usedMB;
-          memElem.textContent = `${usedMB} MB / Heap`;
-        } else {
-          memElem.textContent = `Optimized (WebGL 2.0)`;
-        }
+        memElem.textContent = 'Optimized (WebGL 2.0)';
       }
 
-      // Record telemetry snapshot
-      const catPos = game.cat ? game.cat.mesh.position : new THREE.Vector3();
-      telemetryHistory.push({
-        timestamp: new Date().toISOString().substring(11, 23),
-        fps: currentFps,
-        frameRenderTimeMs: parseFloat(currentFrameTime.toFixed(1)),
-        drawCalls: game.renderer.info ? game.renderer.info.render.calls : 0,
-        triangles: game.renderer.info ? game.renderer.info.render.triangles : 0,
-        texturesInVRAM: game.renderer.info ? game.renderer.info.memory.textures : 0,
-        heapMemoryMB: memoryUsage,
-        catPosition: `X:${catPos.x.toFixed(1)} Y:${catPos.y.toFixed(1)} Z:${catPos.z.toFixed(1)}`,
-        isMoving: game.cat ? game.cat.isCrouching : false,
-        isPouncing: game.cat ? game.cat.isPouncing : false,
-        isAirborne: !game.isGrounded,
-        activeMissionId: game.missionManager ? game.missionManager.getCurrentMission().id : 1
-      });
+      // Record telemetry snapshot into preallocated circular slot
+      const catPos = game.cat ? game.cat.mesh.position : scratchTelemetryPos;
+      const rec = telemetryHistory[telemetryHeadIndex];
+      rec.timestamp = new Date().toISOString().substring(11, 23);
+      rec.fps = currentFps;
+      rec.frameRenderTimeMs = parseFloat(currentFrameTime.toFixed(1));
+      rec.drawCalls = game.renderer.info ? game.renderer.info.render.calls : 0;
+      rec.triangles = game.renderer.info ? game.renderer.info.render.triangles : 0;
+      rec.texturesInVRAM = game.renderer.info ? game.renderer.info.memory.textures : 0;
+      rec.heapMemoryMB = memoryUsage;
+      rec.catPosition = `X:${catPos.x.toFixed(1)} Y:${catPos.y.toFixed(1)} Z:${catPos.z.toFixed(1)}`;
+      rec.isMoving = game.cat ? game.cat.isCrouching : false;
+      rec.isPouncing = game.cat ? game.cat.isPouncing : false;
+      rec.isAirborne = !game.isGrounded;
+      rec.activeMissionId = game.missionManager ? game.missionManager.getCurrentMission().id : 1;
 
-      if (telemetryHistory.length > maxTelemetryRecords) {
-        telemetryHistory.shift();
-      }
+      telemetryHeadIndex = (telemetryHeadIndex + 1) % maxTelemetryRecords;
+      totalTelemetryRecorded++;
     }
   }
 
@@ -435,10 +738,15 @@ document.addEventListener('DOMContentLoaded', () => {
     logContent += `INDEX | TIME (UTC) | FPS | FRAME TIME (ms) | CALLS | TRIANGLES | VRAM TEX | HEAP (MB) | CAT POSITION | MOVING | AIRBORNE | POUNCING | MISSION\n`;
     logContent += `--------------------------------------------------------------------------------------------------------------------------------------------\n`;
 
-    telemetryHistory.forEach((r, idx) => {
+    const count = Math.min(totalTelemetryRecorded, maxTelemetryRecords);
+    const startIdx = totalTelemetryRecorded > maxTelemetryRecords ? telemetryHeadIndex : 0;
+
+    for (let i = 0; i < count; i++) {
+      const idx = (startIdx + i) % maxTelemetryRecords;
+      const r = telemetryHistory[idx];
       const pad = (s: any, len: number) => String(s).padEnd(len, ' ');
-      logContent += `${pad(idx + 1, 5)} | ${pad(r.timestamp, 12)} | ${pad(r.fps, 3)} | ${pad(r.frameRenderTimeMs, 15)} | ${pad(r.drawCalls, 5)} | ${pad(r.triangles, 9)} | ${pad(r.texturesInVRAM, 8)} | ${pad(r.heapMemoryMB, 9)} | ${pad(r.catPosition, 18)} | ${pad(r.isMoving, 6)} | ${pad(r.isAirborne, 8)} | ${pad(r.isPouncing, 8)} | Mission ${r.activeMissionId}\n`;
-    });
+      logContent += `${pad(i + 1, 5)} | ${pad(r.timestamp, 12)} | ${pad(r.fps, 3)} | ${pad(r.frameRenderTimeMs, 15)} | ${pad(r.drawCalls, 5)} | ${pad(r.triangles, 9)} | ${pad(r.texturesInVRAM, 8)} | ${pad(r.heapMemoryMB, 9)} | ${pad(r.catPosition, 18)} | ${pad(r.isMoving, 6)} | ${pad(r.isAirborne, 8)} | ${pad(r.isPouncing, 8)} | Mission ${r.activeMissionId}\n`;
+    }
 
     logContent += `\n=========================================================================\n`;
     logContent += `END OF TELEMETRY LOG\n`;
@@ -455,6 +763,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
     soundEngine.playSuccess();
     showToast('Telemetry Downloaded', 'Saved 30-second rolling engine performance log to your device.', 'success');
+  });
+
+  // Flight Recorder Live HUD & Incident Handler
+  let freezeBannerTimeout: number | null = null;
+  function handleFreezeIncidentDetected(incident: any) {
+    const flightStatusText = document.getElementById('flight-status-text');
+    const flightIncidentCount = document.getElementById('flight-incident-count');
+    const freezeBanner = document.getElementById('freeze-alert-banner');
+    const freezeDetails = document.getElementById('freeze-culprit-details');
+    const pulseDot = document.getElementById('flight-pulse-dot');
+    const container = document.getElementById('flight-incidents-container');
+
+    const incidents = game.flightRecorder.getRecentIncidents();
+
+    if (pulseDot) pulseDot.style.background = '#ef4444';
+    if (flightIncidentCount) {
+      flightIncidentCount.style.display = 'inline-block';
+      flightIncidentCount.textContent = `${incidents.length} Stall${incidents.length > 1 ? 's' : ''}`;
+    }
+    if (flightStatusText) {
+      flightStatusText.textContent = `Stall Trapped: ${incident.culpritSection} (${incident.sectionDurationMs}ms)`;
+      flightStatusText.style.color = '#f87171';
+    }
+
+    if (freezeBanner && freezeDetails) {
+      freezeBanner.style.display = 'block';
+      freezeDetails.innerHTML = `<span style="color: #fef08a;">${incident.culpritSection}</span> took <strong>${incident.sectionDurationMs}ms</strong> at (${incident.catPosition.x}, ${incident.catPosition.z}) | State: <em>${incident.catState}</em>${incident.nearestRatDist ? ` | Rat: ${incident.nearestRatDist}m` : ''}`;
+      
+      if (freezeBannerTimeout) clearTimeout(freezeBannerTimeout);
+      freezeBannerTimeout = window.setTimeout(() => {
+        freezeBanner.style.display = 'none';
+        if (pulseDot) pulseDot.style.background = '#22c55e';
+        if (flightStatusText) {
+          flightStatusText.textContent = `Flight Recorder: Active (${currentFps} FPS)`;
+          flightStatusText.style.color = '#cbd5e1';
+        }
+      }, 4500);
+    }
+
+    if (container) {
+      container.innerHTML = incidents.slice(-8).reverse().map((inc: any) => `
+        <div style="margin-bottom: 0.4rem; padding: 0.35rem 0.5rem; border-radius: 4px; background: rgba(239, 68, 68, 0.15); border-left: 3px solid #ef4444;">
+          <div style="display: flex; justify-content: space-between; font-weight: bold; color: #fca5a5;">
+            <span>⚠️ ${inc.culpritSection} (+${inc.sectionDurationMs}ms)</span>
+            <span style="color: #94a3b8; font-size: 0.7rem;">${inc.timestamp}</span>
+          </div>
+          <div style="color: #cbd5e1; font-size: 0.7rem; margin-top: 0.1rem;">
+            Pos: (${inc.catPosition.x}, ${inc.catPosition.y}, ${inc.catPosition.z}) | Action: ${inc.catState} | Total Frame: ${inc.totalFrameDurationMs}ms
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Flight Recorder JSON Download & Copy Handlers
+  document.getElementById('btn-download-flightlog')?.addEventListener('click', () => {
+    const jsonStr = game.flightRecorder.exportLogJSON();
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shipyard_cat_flightlog_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    soundEngine.playSuccess();
+    showToast('Flight Log Downloaded', 'Exported high-resolution engine flight log with microsecond timings.', 'success');
+  });
+
+  document.getElementById('btn-copy-flightlog')?.addEventListener('click', () => {
+    const jsonStr = game.flightRecorder.exportLogJSON();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(jsonStr).then(() => {
+        soundEngine.playSuccess();
+        showToast('Flight Log Copied', 'Copied full JSON flight log to clipboard for AI agents to analyze!', 'success');
+      }).catch(() => {
+        showToast('Copy Note', 'Clipboard write blocked. Use Download button instead.', 'info');
+      });
+    }
   });
 
   // Graphics Quality Preset Buttons

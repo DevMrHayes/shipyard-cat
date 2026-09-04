@@ -1,12 +1,13 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ModelManager } from '../core/ModelManager';
+import { soundEngine } from '../core/SoundEngine';
 
 export class MutantCatEntity {
   public mesh: THREE.Group;
   public name: string;
   public health: number = 60;
   public maxHealth: number = 60;
-  public state: 'PATROL' | 'HOSTILE' | 'DEFEATED' = 'PATROL';
+  public state: 'PATROL' | 'HOSTILE' | 'STAGGER' | 'DEFEATED' = 'PATROL';
   public isDefeated: boolean = false;
   public radioactiveAura: THREE.Mesh;
   public eyeLight: THREE.PointLight;
@@ -14,14 +15,27 @@ export class MutantCatEntity {
   private patrolOrigin: THREE.Vector3;
   private patrolAngle: number = 0;
   private attackCooldown: number = 0;
+  public staggerTimer: number = 0;
+  private staggerDuration: number = 0.4;
+  private staggerKnockback: THREE.Vector3 = new THREE.Vector3();
+
   public gltfModel: THREE.Group | null = null;
   public mixer: THREE.AnimationMixer | null = null;
-  private animations: { [key: string]: THREE.AnimationAction } = {};
-  private currentAction: THREE.AnimationAction | null = null;
+  public animations: { [key: string]: THREE.AnimationAction } = {};
+  public currentAction: THREE.AnimationAction | null = null;
+  public readyPromise: Promise<void> = Promise.resolve();
+  public spawnOrigin: THREE.Vector3;
+  public isBoss: boolean;
+  public attackDamage: number;
 
-  constructor(name: string, position: THREE.Vector3) {
+  constructor(name: string, position: THREE.Vector3, isBoss: boolean = false) {
     this.name = name;
+    this.spawnOrigin = position.clone();
     this.patrolOrigin = position.clone();
+    this.isBoss = isBoss;
+    this.maxHealth = isBoss ? 240 : 60;
+    this.health = this.maxHealth;
+    this.attackDamage = isBoss ? 25 : 12;
     this.mesh = new THREE.Group();
     this.mesh.position.copy(position);
 
@@ -30,8 +44,7 @@ export class MutantCatEntity {
 
     // 3D Mutant Cat Model (Loads in browser environment)
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-      const gltfLoader = new GLTFLoader();
-      gltfLoader.load('/models/cat.glb', (gltf) => {
+      this.readyPromise = ModelManager.loadCatModel().then((gltf) => {
         this.gltfModel = gltf.scene;
         // Imposing mutant scale (2.1x)
         this.gltfModel.scale.set(2.1, 2.1, 2.1);
@@ -63,13 +76,22 @@ export class MutantCatEntity {
           this.animations['run'] = this.mixer.clipAction(runClip);
           this.animations['attack'] = this.mixer.clipAction(attackClip);
 
+          Object.values(this.animations).forEach(act => {
+            act.enabled = true;
+            act.setEffectiveWeight(1.0);
+            act.play();
+          });
+          this.mixer.update(0.016);
+
           this.animations['walk'].play();
           this.currentAction = this.animations['walk'];
+          this.mixer.update(0);
         }
 
         this.mesh.add(this.gltfModel);
+        this.mesh.remove(proceduralGroup);
         proceduralGroup.visible = false;
-      }, undefined, () => {
+      }).catch(() => {
         this.buildProceduralMutant(proceduralGroup);
       });
     } else {
@@ -98,7 +120,7 @@ export class MutantCatEntity {
       const canvas = document.createElement('canvas');
       canvas.width = 256;
       canvas.height = 64;
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
       ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
       ctx.roundRect(10, 10, 236, 44, 10);
       ctx.fill();
@@ -108,7 +130,7 @@ export class MutantCatEntity {
       ctx.font = 'bold 20px Courier New';
       ctx.fillStyle = '#c084fc';
       ctx.textAlign = 'center';
-      ctx.fillText('☣ ' + this.name, 128, 38);
+      ctx.fillText('â˜£ ' + this.name, 128, 38);
 
       const texture = new THREE.CanvasTexture(canvas);
       const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
@@ -182,11 +204,19 @@ export class MutantCatEntity {
     group.add(eyeL, eyeR);
   }
 
+  // Static Scratch Vectors for Zero Garbage Collection
+  private static readonly scratchDir = new THREE.Vector3();
+  private static readonly scratchNewPos = new THREE.Vector3();
+  private static readonly scratchKnockbackDir = new THREE.Vector3();
+  private static readonly scratchPrevPos = new THREE.Vector3();
+  private static readonly scratchKnockbackStep = new THREE.Vector3();
+
   public update(
     deltaTime: number,
     playerPos: THREE.Vector3,
     onAttackPlayer?: (damage: number) => void,
-    resolveCollision?: (pos: THREE.Vector3, radius: number) => THREE.Vector3
+    resolveCollision?: (pos: THREE.Vector3, radius: number, previousPos?: THREE.Vector3) => THREE.Vector3,
+    skipMixer: boolean = false
   ) {
     if (this.isDefeated) return;
 
@@ -194,9 +224,45 @@ export class MutantCatEntity {
       this.attackCooldown -= deltaTime;
     }
 
+    const prevPos = MutantCatEntity.scratchPrevPos.copy(this.mesh.position);
+
+    // 1. Handle Stagger Recoil State
+    if (this.state === 'STAGGER') {
+      this.staggerTimer -= deltaTime;
+      const progress = Math.max(0, this.staggerTimer / this.staggerDuration);
+      
+      // Apply knockback displacement
+      if (this.staggerKnockback.lengthSq() > 0.001) {
+        const knockbackStep = MutantCatEntity.scratchKnockbackStep.copy(this.staggerKnockback).multiplyScalar(progress * 4.0 * deltaTime);
+        const staggeredPos = MutantCatEntity.scratchNewPos.copy(this.mesh.position).add(knockbackStep);
+        if (resolveCollision) {
+          this.mesh.position.copy(resolveCollision(staggeredPos, 0.35, prevPos));
+        } else {
+          this.mesh.position.copy(staggeredPos);
+        }
+      }
+
+      // Visceral recoil flinch & tilt animation
+      const shudder = Math.sin(this.staggerTimer * 38) * 0.18 * progress;
+      this.mesh.rotation.z = shudder;
+      this.mesh.rotation.x = -0.25 * progress;
+      if (this.gltfModel) {
+        this.gltfModel.position.y = 0.08 * Math.sin(progress * Math.PI);
+      }
+
+      if (this.staggerTimer <= 0) {
+        this.state = 'HOSTILE';
+        this.mesh.rotation.z = 0;
+        this.mesh.rotation.x = 0;
+        if (this.gltfModel) this.gltfModel.position.y = 0;
+        this.attackCooldown = 0.9; // Brief recovery before next swipe
+      }
+      return;
+    }
+
     const distToPlayer = this.mesh.position.distanceTo(playerPos);
 
-    if (this.mixer) {
+    if (this.mixer && !skipMixer) {
       this.mixer.update(deltaTime);
       let targetAnim = this.animations['walk'];
       if (this.isDefeated) {
@@ -217,11 +283,11 @@ export class MutantCatEntity {
     if (distToPlayer < 7.0) {
       // Aggro on Alba!
       this.state = 'HOSTILE';
-      const dir = new THREE.Vector3().subVectors(playerPos, this.mesh.position).normalize();
+      const dir = MutantCatEntity.scratchDir.subVectors(playerPos, this.mesh.position).normalize();
       dir.y = 0;
-      const newPos = this.mesh.position.clone().addScaledVector(dir, 3.2 * deltaTime);
+      const newPos = MutantCatEntity.scratchNewPos.copy(this.mesh.position).addScaledVector(dir, 3.2 * deltaTime);
       if (resolveCollision) {
-        this.mesh.position.copy(resolveCollision(newPos, 0.3));
+        this.mesh.position.copy(resolveCollision(newPos, 0.3, prevPos));
       } else {
         this.mesh.position.copy(newPos);
       }
@@ -239,12 +305,12 @@ export class MutantCatEntity {
       const targetX = this.patrolOrigin.x + Math.sin(this.patrolAngle) * 3.5;
       const targetZ = this.patrolOrigin.z + Math.cos(this.patrolAngle) * 3.5;
       
-      const dir = new THREE.Vector3(targetX - this.mesh.position.x, 0, targetZ - this.mesh.position.z);
+      const dir = MutantCatEntity.scratchDir.set(targetX - this.mesh.position.x, 0, targetZ - this.mesh.position.z);
       if (dir.length() > 0.1) {
         dir.normalize();
-        const newPos = this.mesh.position.clone().addScaledVector(dir, 1.8 * deltaTime);
+        const newPos = MutantCatEntity.scratchNewPos.copy(this.mesh.position).addScaledVector(dir, 1.8 * deltaTime);
         if (resolveCollision) {
-          this.mesh.position.copy(resolveCollision(newPos, 0.3));
+          this.mesh.position.copy(resolveCollision(newPos, 0.3, prevPos));
         } else {
           this.mesh.position.copy(newPos);
         }
@@ -253,23 +319,33 @@ export class MutantCatEntity {
     }
   }
 
-  public takeDamage(amount: number): boolean {
+  public takeDamage(amount: number, hitSourcePos?: THREE.Vector3, isTailSweep: boolean = false): boolean {
     if (this.isDefeated) return false;
     this.health -= amount;
     
-    // Flinch
-    this.mesh.position.y += 0.2;
-    setTimeout(() => {
-      if (this.mesh) this.mesh.position.y = 0;
-    }, 150);
+    soundEngine.playMutantRecoil();
 
     if (this.health <= 0) {
       this.isDefeated = true;
       this.state = 'DEFEATED';
       this.mesh.rotation.z = Math.PI / 2; // Knocked out
+      this.mesh.rotation.x = 0;
       this.eyeLight.intensity = 0;
       return true; // Defeated!
     }
+
+    // Trigger Stagger & Recoil
+    this.state = 'STAGGER';
+    this.staggerDuration = isTailSweep ? 0.65 : 0.4;
+    this.staggerTimer = this.staggerDuration;
+
+    if (hitSourcePos) {
+      this.staggerKnockback.subVectors(this.mesh.position, hitSourcePos).normalize();
+      this.staggerKnockback.y = 0;
+    } else {
+      this.staggerKnockback.set(0, 0, 1).applyQuaternion(this.mesh.quaternion).negate();
+    }
+
     return false;
   }
 
@@ -282,4 +358,21 @@ export class MutantCatEntity {
       this.eyeLight.intensity = 1.2;
     }
   }
+
+  public prewarmAnimations(): void {
+    if (!this.mixer) return;
+    Object.values(this.animations).forEach(act => {
+      act.enabled = true;
+      act.setEffectiveWeight(1.0);
+      act.play();
+    });
+    this.mixer.update(0.016);
+    const initialAction = this.animations['walk'];
+    if (initialAction) {
+      initialAction.play();
+      this.currentAction = initialAction;
+    }
+    this.mixer.update(0);
+  }
 }
+

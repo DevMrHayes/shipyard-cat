@@ -39,6 +39,11 @@ export class RadiationSystem {
     return this.hotspots;
   }
 
+  private static readonly calcResult: { totalDose: number; nearestHotspot: RadiationHotspot | null } = {
+    totalDose: 0,
+    nearestHotspot: null
+  };
+
   public calculateRadiationAtPoint(point: THREE.Vector3): { totalDose: number; nearestHotspot: RadiationHotspot | null } {
     let totalDose = RadiationSystem.BackgroundLevel;
     let nearestHotspot: RadiationHotspot | null = null;
@@ -60,6 +65,8 @@ export class RadiationSystem {
       }
     }
 
-    return { totalDose: Math.round(totalDose * 100) / 100, nearestHotspot };
+    RadiationSystem.calcResult.totalDose = Math.round(totalDose * 100) / 100;
+    RadiationSystem.calcResult.nearestHotspot = nearestHotspot;
+    return RadiationSystem.calcResult;
   }
 }

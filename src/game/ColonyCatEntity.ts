@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ModelManager } from '../core/ModelManager';
 
 export interface ColonyDialogue {
   speaker: string;
@@ -18,6 +18,7 @@ export class ColonyCatEntity {
   public isHuman: boolean = false;
   private gltfModel: THREE.Group | null = null;
   private mixer: THREE.AnimationMixer | null = null;
+  public readyPromise: Promise<void> = Promise.resolve();
 
   constructor(name: string, role: string, position: THREE.Vector3, color: number, dialogue: ColonyDialogue[], isHuman: boolean = false) {
     this.name = name;
@@ -36,8 +37,7 @@ export class ColonyCatEntity {
       this.mesh.add(proceduralGroup);
 
       if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-        const gltfLoader = new GLTFLoader();
-        gltfLoader.load('/models/cat.glb', (gltf) => {
+        this.readyPromise = ModelManager.loadCatModel().then((gltf) => {
           this.gltfModel = gltf.scene;
           this.gltfModel.scale.set(1.8, 1.8, 1.8);
           this.gltfModel.position.set(0, 0, 0);
@@ -70,8 +70,9 @@ export class ColonyCatEntity {
           }
 
           this.mesh.add(this.gltfModel);
+          this.mesh.remove(proceduralGroup);
           proceduralGroup.visible = false;
-        }, undefined, () => {
+        }).catch(() => {
           this.buildCatMesh(color, proceduralGroup);
         });
       } else {
@@ -164,7 +165,7 @@ export class ColonyCatEntity {
       const nameCanvas = document.createElement('canvas');
       nameCanvas.width = 256;
       nameCanvas.height = 64;
-      const ctx = nameCanvas.getContext('2d')!;
+      const ctx = nameCanvas.getContext('2d', { willReadFrequently: true })!;
       ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
       ctx.roundRect(10, 10, 236, 44, 10);
       ctx.fill();
@@ -215,7 +216,7 @@ export class ColonyCatEntity {
       const nameCanvas = document.createElement('canvas');
       nameCanvas.width = 300;
       nameCanvas.height = 64;
-      const ctx = nameCanvas.getContext('2d')!;
+      const ctx = nameCanvas.getContext('2d', { willReadFrequently: true })!;
       ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
       ctx.roundRect(10, 10, 280, 44, 10);
       ctx.fill();
@@ -242,3 +243,4 @@ export class ColonyCatEntity {
     return d;
   }
 }
+
