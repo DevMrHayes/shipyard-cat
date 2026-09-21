@@ -21,6 +21,13 @@ export class TextureGenerator {
   }
 
   /**
+   * Get current cached texture count
+   */
+  public static getCacheSize(): number {
+    return this.textureCache.size;
+  }
+
+  /**
    * Dispose a single cached texture by identifier
    */
   public static disposeTexture(key: string): void {

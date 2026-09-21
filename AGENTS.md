@@ -7,11 +7,16 @@
 ## 🏛️ System Architecture
 
 - **`src/game/` — Game World & Entities**
-  - `GameEngine.ts`: Core simulation loop, Three.js scene setup, camera controllers, input polling, event bus.
+  - `GameEngine.ts`: Core simulation loop, coordinator decoupling physics, rendering, input polling, and event bus.
   - `CatCharacter.ts`: Alba character controller (locomotion, animations, jumping, mantling, raycast step-up tolerance, bounding boxes).
   - `ShipyardEnvironment.ts`: Newport News Shipbuilding layout (Dry Docks, Gantry Cranes, Rigger Machine Shops, James River, third rails).
   - `RatEntity.ts`, `MutantCatEntity.ts`, `ColonyCatEntity.ts`, `ShipbuilderEntity.ts`: Interactive NPCs and AI entities.
+- **`src/physics/` — Kinematics & Collisions**
+  - `PhysicsSubsystem.ts`: 60Hz fixed-timestep sub-stepping, swept-capsule collision sliding, step-up ground clamping, and pounce leap kinematics.
+- **`src/render/` — Graphics & Camera**
+  - `RenderSubsystem.ts`: WebGL pipeline, spring-arm collision avoidance camera, indoor/outdoor clamping, golden-hour sun, shadow cascades, and impact spark particles.
 - **`src/core/` — Subsystems**
+  - `events/GameEventBus.ts`: Zero-runtime-allocation high-speed typed pub/sub event bus.
   - `VitalsSystem.ts`: Alba stamina, health, hunger, and speed modifiers.
   - `RadiationSystem.ts`: RCOH nuclear overhaul zones with inverse-square falloff math and dosimeter telemetry.
   - `MissionManager.ts`: Objectives, mission unlocking, and tracking.
@@ -19,7 +24,8 @@
   - `SoundEngine.ts`: Web Audio API synthetic industrial audio and sfx.
   - `MinimapSystem.ts`: 2D canvas minimap tracking Alba, NPCs, objectives.
 - **`src/tests/` & `run-tests.ts` — Diagnostics & Testing**
-  - `TestRunner.ts`: Suite of 15+ automated unit and integration tests.
+  - `TestRunner.ts`: Suite of 37 unit tests and 7 integration test suites.
+  - `PlaytestHarness.ts`: 21 comprehensive gameplay simulation sessions.
 
 ---
 

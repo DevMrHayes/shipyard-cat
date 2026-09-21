@@ -2670,5 +2670,10 @@ export class ShipyardEnvironment {
         }
       }
     });
+    this.group.clear();
+    this.spatialGrid.clear();
+    this.solidObstacles = [];
+    this.platforms = [];
+    this.foodBowls = [];
   }
 }

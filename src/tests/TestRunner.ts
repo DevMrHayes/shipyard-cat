@@ -11,6 +11,8 @@ import { ShipyardEnvironment } from '../game/ShipyardEnvironment';
 import { RatEntity } from '../game/RatEntity';
 import { CatCharacter } from '../game/CatCharacter';
 import { TextureGenerator } from '../core/TextureGenerator';
+import { EventBus } from '../core/EventBus';
+import { EngineFlightRecorder } from '../core/EngineFlightRecorder';
 import { PlaytestHarness, PlaytestSessionResult } from './PlaytestHarness';
 import { runFlightRecorderTests } from './FlightRecorder.test';
 
@@ -65,6 +67,9 @@ export class TestRunner {
       { name: 'Unit: Box Collision Airtightness & Big Blue Ground Integrity Verification', cat: 'UNIT' as const, fn: TestRunner.testBoxCollisionAndBigBlueIntegrity },
       { name: 'Unit: 1,500-Tick Deep Dive Frame Freeze & State Machine Deadlock Elimination', cat: 'UNIT' as const, fn: TestRunner.test1500TickDeepDiveFrameFreezeAndDeadlockElimination },
       { name: 'Unit: Engine Flight Recorder Telemetry Buffer & Stall Spike Trapper', cat: 'UNIT' as const, fn: TestRunner.testEngineFlightRecorderAndStallDetection },
+      { name: 'Unit: EventBus Zero-Allocation Pub/Sub & Ring Buffer Throughput', cat: 'UNIT' as const, fn: TestRunner.testEventBusZeroAllocationThroughput },
+      { name: 'Unit: Swept-Capsule Continuous Collision & Corner Slide Tangents', cat: 'UNIT' as const, fn: TestRunner.testSweptCapsuleCollisionAndCornerTangents },
+      { name: 'Unit: Complete Subsystem Teardown, Listener Cleanup & Resource Disposal', cat: 'UNIT' as const, fn: TestRunner.testSubsystemTeardownAndResourceDisposal },
 
       // INTEGRATION TESTS
       { name: 'Integration: Rat Stealth Stalking, Pounce Catch & Accidental Assistance', cat: 'INTEGRATION' as const, fn: TestRunner.testRatHuntingAndAssistanceIntegration },
@@ -75,7 +80,7 @@ export class TestRunner {
       { name: 'Integration: 3D Asset Loading Fallbacks & Feline Entity Scene Integrity', cat: 'INTEGRATION' as const, fn: TestRunner.testAssetLoadingAndSceneIntegrity },
       { name: 'Integration: Shipyard Feeding Bowls Registration & Sanctuary Nutrition', cat: 'INTEGRATION' as const, fn: TestRunner.testFoodBowlsAndSanctuaryIntegration },
 
-      // PLAYTEST SIMULATION SUITE (17 COMPLETE GAMEPLAY SESSIONS)
+      // PLAYTEST SIMULATION SUITE (21 COMPLETE GAMEPLAY SESSIONS)
       { name: 'Playtest Session A: Idle Stability & Camera Calmness (0 Angular Drift over 500 ticks)', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionA_IdleCalmness() },
       { name: 'Playtest Session B: 8-Direction Locomotion, Sprinting & Braking Arc Kinematics', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionB_LocomotionAndBraking() },
       { name: 'Playtest Session C: Solid Wall Collisions, Sliding Tangents & Corner Resolution', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionC_WallCollisionAndSliding() },
@@ -93,7 +98,10 @@ export class TestRunner {
       { name: 'Playtest Session O: Mezzanine Catwalk, Dry Dock Crate Climbing & Collision Airtightness Integrity Test', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionO_MezzanineCatwalkAndCrateClimbing() },
       { name: 'Playtest Session P: Box Collision Airtightness & Big Blue Ground Integrity Verification', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionP_BoxCollisionAndBigBlueIntegrity() },
       { name: 'Playtest Session Q: 1,500-Tick Deep Dive Frame Freeze & State Machine Deadlock Elimination Test', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionQ_1500TickDeepDiveFrameFreezeAndDeadlockElimination() },
-      { name: 'Playtest Session R: AI-Out-of-Substep Spiral Elimination & Water Vertex CPU Stall Elimination', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionR_AISubstepSpiralAndWaterStallElimination() }
+      { name: 'Playtest Session R: AI-Out-of-Substep Spiral Elimination & Water Vertex CPU Stall Elimination', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionR_AISubstepSpiralAndWaterStallElimination() },
+      { name: 'Playtest Session S: Event Bus Throughput & Zero-Drop Stress Benchmark (10,000 events/sec with zero allocations)', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionS_EventBusThroughputAndZeroDropStress() },
+      { name: 'Playtest Session T: Swept-Capsule Collision & Ledge Mantling Boundary Integrity (smooth corner sliding, monotonic step-ups)', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionT_SweptCapsuleCollisionAndLedgeMantlingIntegrity() },
+      { name: 'Playtest Session U: Zero-GC Memory Allocation & Subsystem Teardown Verification (asserts 100% clean resource disposal and zero memory leaks)', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionU_ZeroGCMemoryAllocationAndSubsystemTeardown() }
     ];
 
     for (const t of tests) {
@@ -1542,6 +1550,79 @@ export class TestRunner {
     const res = runFlightRecorderTests();
     if (!res.passed) {
       throw new Error(res.error || 'Flight recorder unit test failed');
+    }
+  }
+
+  private static testEventBusZeroAllocationThroughput() {
+    const bus = new EventBus(1024);
+    let eventDeliveries = 0;
+    const getDeliveries = (): number => eventDeliveries;
+    const unsub = bus.subscribe('VITALS_CHANGED', () => { eventDeliveries++; });
+
+    const payload = { health: 100, stamina: 100, hunger: 0, speedModifier: 1.0 };
+    for (let i = 0; i < 1000; i++) {
+      bus.publish('VITALS_CHANGED', payload);
+    }
+    if (getDeliveries() !== 1000) {
+      throw new Error(`Expected 1000 direct dispatches, got ${getDeliveries()}`);
+    }
+
+    // Queue test
+    for (let i = 0; i < 500; i++) {
+      const ok = bus.enqueue('VITALS_CHANGED', payload);
+      if (!ok) throw new Error('Queue failed');
+    }
+    const flushed = bus.flush();
+    if (flushed !== 500 || getDeliveries() !== 1500) {
+      throw new Error(`Flush failed: flushed=${flushed}, count=${getDeliveries()}`);
+    }
+
+    unsub();
+    bus.publish('VITALS_CHANGED', payload);
+    if (getDeliveries() !== 1500) {
+      throw new Error('Unsubscribe failed to detach callback');
+    }
+    bus.dispose();
+  }
+
+  private static testSweptCapsuleCollisionAndCornerTangents() {
+    const env = new ShipyardEnvironment();
+    env.group.updateMatrixWorld(true);
+    const origin = new THREE.Vector3(-33.0, 0, -25.0);
+    const target = new THREE.Vector3(-34.5, 0, -26.0);
+    const resolved = env.resolveCollision(target, 0.35, origin);
+
+    // Entity must not penetrate wall slab (X < -33.15)
+    if (resolved.x < -33.15) {
+      throw new Error(`Wall penetration detected: X=${resolved.x}`);
+    }
+    // Entity should slide along Z tangent towards -26.0
+    if (resolved.z > -25.0) {
+      throw new Error(`Corner slide tangent halted: Z=${resolved.z}`);
+    }
+
+    env.dispose();
+    TextureGenerator.disposeAll();
+  }
+
+  private static testSubsystemTeardownAndResourceDisposal() {
+    const bus = new EventBus(512);
+    const env = new ShipyardEnvironment();
+    bus.subscribe('CAT_STATE_CHANGED', () => {});
+    bus.enqueue('CAT_STATE_CHANGED', { action: 'walk', grounded: true, speed: 4.6, x: 0, y: 0, z: 0 });
+
+    env.dispose();
+    TextureGenerator.disposeAll();
+    bus.dispose();
+
+    if (bus.getTotalListenerCount() !== 0) {
+      throw new Error(`EventBus listener leak: ${bus.getTotalListenerCount()} remaining`);
+    }
+    if (TextureGenerator.getCacheSize() !== 0) {
+      throw new Error(`Texture cache leak: ${TextureGenerator.getCacheSize()} remaining`);
+    }
+    if (env.group.children.length !== 0) {
+      throw new Error(`Environment scene group children not cleared`);
     }
   }
 

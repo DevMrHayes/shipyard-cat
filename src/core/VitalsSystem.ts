@@ -98,6 +98,12 @@ export class CatVitals {
     this.currentHealth = Math.max(0, this.currentHealth - amount);
   }
 
+  public getSpeedMultiplier(): number {
+    if (this.currentHunger <= 0) return 0.65;
+    if (this.isExhausted) return 0.75;
+    return 1.0;
+  }
+
   public healAtSanctuary() {
     this.currentHealth = this.maxHealth;
     this.currentStamina = this.maxStamina;
