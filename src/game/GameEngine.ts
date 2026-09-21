@@ -170,6 +170,16 @@ export class GameEngine {
     this.physics.prevBankAngle = val;
   }
 
+  public get isPouncing(): boolean {
+    return this.physics.isPouncing;
+  }
+  public set isPouncing(val: boolean) {
+    this.physics.isPouncing = val;
+    if (this.cat) {
+      this.cat.isPouncing = val;
+    }
+  }
+
   public get cameraShakeIntensity(): number {
     return this.renderSystem.cameraShakeIntensity;
   }
@@ -1457,6 +1467,7 @@ export class GameEngine {
 
     // 5. Turn Input & Feline Render Frame Animation
     this.flightRecorder.startSection('cat_character_anim');
+    this.cat.isPouncing = this.physics.isPouncing;
     this.cat.animate(frameDelta, this.physics.currentSpeed, this.physics.isGrounded, turnInput);
     this.flightRecorder.endSection('cat_character_anim');
 

@@ -289,6 +289,8 @@ export class PhysicsSubsystem {
       this.position.y = 0.0;
       this.velocity.y = Math.max(0, this.velocity.y);
       this.isGrounded = true;
+      this.isPouncing = false;
+      this.pounceTimer = 0;
     }
   }
 
