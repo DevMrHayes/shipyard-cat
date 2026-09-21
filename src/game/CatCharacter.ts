@@ -14,6 +14,11 @@ export class CatCharacter {
   public dosimeterScreen: THREE.Mesh | null = null;
   public dosimeterLight: THREE.PointLight | null = null;
   public whiskers: THREE.LineSegments[] = [];
+  public neckBone: THREE.Bone | null = null;
+
+  private static readonly scratchBonePos = new THREE.Vector3();
+  private static readonly scratchBoneQuat = new THREE.Quaternion();
+  private static readonly scratchMeshQuat = new THREE.Quaternion();
 
   public gltfModel: THREE.Group | null = null;
   private mixer: THREE.AnimationMixer | null = null;
@@ -100,6 +105,12 @@ export class CatCharacter {
         this.gltfModel.traverse((child) => {
           if ((child as THREE.Bone).isBone) {
             boneCnt++;
+            const name = child.name;
+            if (name === 'RigNeck2_014' || name === 'RigNeck1_00' || name.toLowerCase().includes('neck')) {
+              if (!this.neckBone || name === 'RigNeck2_014') {
+                this.neckBone = child as THREE.Bone;
+              }
+            }
           }
           if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
             hasSkinned = true;
@@ -211,9 +222,7 @@ export class CatCharacter {
 
           // Attach Alba's signature fitted Safety-Orange Collar and OLED Dosimeter Tag to GLTF rig
           if (this.collarGroup) {
-            this.collarGroup.scale.set(1.0, 1.0, 1.0);
-            this.collarGroup.position.set(0, 0.31, 0.22);
-            this.collarGroup.rotation.set(0.42, 0, 0);
+            this.collarGroup.scale.set(1.65, 1.65, 1.65);
             this.mesh.add(this.collarGroup);
           }
         }
@@ -620,6 +629,19 @@ export class CatCharacter {
         this.gltfModel.position.y = THREE.MathUtils.lerp(this.gltfModel.position.y, 0, deltaTime * 10);
         this.gltfModel.rotation.x = THREE.MathUtils.lerp(this.gltfModel.rotation.x, 0, deltaTime * 8);
       }
+    }
+
+    // Dynamic Skeletal Socket Tracking: Keeps Alba's safety collar & dosimeter locked to her neck bone
+    if (this.neckBone && this.collarGroup) {
+      this.neckBone.getWorldPosition(CatCharacter.scratchBonePos);
+      this.neckBone.getWorldQuaternion(CatCharacter.scratchBoneQuat);
+
+      this.mesh.worldToLocal(CatCharacter.scratchBonePos);
+      this.collarGroup.position.copy(CatCharacter.scratchBonePos);
+
+      this.mesh.getWorldQuaternion(CatCharacter.scratchMeshQuat);
+      this.collarGroup.quaternion.copy(CatCharacter.scratchMeshQuat.invert().multiply(CatCharacter.scratchBoneQuat));
+      this.collarGroup.rotateX(0.42);
     }
 
     // 1. Combat Strike Animation Overrides
