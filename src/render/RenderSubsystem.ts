@@ -63,6 +63,11 @@ export class RenderSubsystem {
   // Location tracking state
   private lastLocationName: string = '';
   private lastLocationNotificationTime: number = -4000;
+  private currentLocationString: string = 'Shipyard Grounds (South Yard)';
+
+  public getCurrentLocationName(): string {
+    return this.currentLocationString;
+  }
 
   public events: RenderEvents = {};
 
@@ -276,9 +281,25 @@ export class RenderSubsystem {
     const isInsideMotel = targetPos.x >= -62 && targetPos.x <= -48 && targetPos.z >= -71 && targetPos.z <= -59;
     const isIndoors = isInsideMachineShop || isInsideMotel;
 
-    // Location notification on transition with 4-second debounce
-    const currentLocation = isInsideMachineShop ? 'Machine Shop No. 1 (Interior)' :
-                            isInsideMotel ? 'Cat Motel Hub Sanctuary' : 'Shipyard Grounds (South Yard)';
+    // Full 7-Zone spatial recognition
+    let currentLocation = 'Shipyard Grounds (South Yard)';
+    if (isInsideMachineShop) {
+      currentLocation = 'Machine Shop No. 1 (Mezzanine Catwalk)';
+    } else if (isInsideMotel) {
+      currentLocation = 'Cat Motel Hub Sanctuary';
+    } else if (targetPos.x >= 15 && targetPos.x <= 40 && targetPos.z >= -45 && targetPos.z <= -5) {
+      currentLocation = 'Historic Dry Dock 1 (Basin)';
+    } else if (targetPos.x >= 0 && targetPos.x <= 45 && targetPos.z >= 10 && targetPos.z <= 60) {
+      currentLocation = 'Dry Dock 12 (Big Blue Gantry Apron)';
+    } else if (targetPos.x <= -15 && targetPos.z >= 20) {
+      currentLocation = 'Submarine MOF (Modular Outfitting)';
+    } else if (targetPos.x >= 35 && targetPos.z >= -10 && targetPos.z <= 40) {
+      currentLocation = 'East Pier Boardwalk & James River';
+    } else if (targetPos.x >= 30 && targetPos.z <= -45) {
+      currentLocation = 'RCOH Nuclear Overhaul Vault';
+    }
+
+    this.currentLocationString = currentLocation;
 
     const now = performance.now();
     if (currentLocation !== this.lastLocationName) {

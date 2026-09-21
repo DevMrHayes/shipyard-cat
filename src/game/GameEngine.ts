@@ -321,71 +321,135 @@ export class GameEngine {
     this.rats.forEach((r) => r.prewarmAnimations());
     this.mutantCats.forEach((m) => m.prewarmAnimations());
 
-    // Temporarily bypass frustum culling on all objects so Three.js compiles EVERY mesh shader
+    // 4. Force-activate ALL visibility and disable frustum culling across entire scene hierarchy
+    const originalVisibilityStates = new Map<THREE.Object3D, boolean>();
     const originalCullingStates = new Map<THREE.Object3D, boolean>();
+
     this.scene.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh) {
+      originalVisibilityStates.set(obj, obj.visible);
+      obj.visible = true;
+      if ((obj as THREE.Mesh).isMesh || (obj as THREE.Line).isLine || (obj as THREE.Points).isPoints || (obj as THREE.InstancedMesh).isInstancedMesh) {
         originalCullingStates.set(obj, obj.frustumCulled);
         obj.frustumCulled = false;
       }
     });
 
-    const originalFov = this.camera.fov;
-    this.camera.fov = 120;
-    this.camera.updateProjectionMatrix();
+    // Explicitly toggle trajectory visualizer in both amber and locked green modes
+    this.trajectoryVisualizer.setVisible(true);
+    this.trajectoryVisualizer.setTargetLock(false);
+    this.trajectoryVisualizer.updateTrajectory(this.physics.position, new THREE.Vector3(0, 5, 5), 18.0, 0);
 
+    // Warm up all character entities, thermal auras, scent particles, lights
+    this.rats.forEach((r) => {
+      r.mesh.visible = true;
+      r.thermalAura.visible = true;
+      r.scentTrailParticles.visible = true;
+      r.thermalLight.intensity = 1.0;
+    });
+    this.mutantCats.forEach((m) => {
+      m.mesh.visible = true;
+      m.radioactiveAura.visible = true;
+      m.eyeLight.intensity = 1.0;
+    });
+    this.shipbuilders.forEach((s) => {
+      s.mesh.visible = true;
+    });
+
+    // Ensure particle system has active points
+    this.renderSystem.triggerImpactFeedback(this.physics.position, true);
     this.renderSystem.hitFlashLight.intensity = 5.0;
+
+    // Enable shadow maps and force shadow update
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.needsUpdate = true;
+
+    const originalFov = this.camera.fov;
+    this.camera.fov = 135;
+    this.camera.updateProjectionMatrix();
 
     // Compile entire scene graph
     if (this.renderer && typeof this.renderer.compile === 'function') {
       this.renderer.compile(this.scene, this.camera);
     }
 
-    // 5. Run Warmup Render Passes across all 7 major shipyard zones and 360-degree orientations
+    // 5. Run Warmup Render Passes across all 7 major shipyard zones, elevations, and 360-degree orientations
     try {
       const tempCamPos = this.camera.position.clone();
       const zonePositions = [
         new THREE.Vector3(-10, 2, -20),  // South Yard & Dorothy Tugboat
         new THREE.Vector3(-45, 2, -30),  // Machine Shop Interior & Mezzanine
-        new THREE.Vector3(25, 2, -25),   // Historic Dry Dock 1 & Sunken Basin
+        new THREE.Vector3(-45, 5, -20),  // Machine Shop High Catwalk
+        new THREE.Vector3(25, 1, -25),   // Historic Dry Dock 1 & Sunken Basin
         new THREE.Vector3(20, 15, 35),   // Big Blue Gantry & Dry Dock 12
+        new THREE.Vector3(20, 1, 35),    // Dry Dock 12 Basin Floor
         new THREE.Vector3(-30, 2, 45),   // Submarine MOF Outfitting
         new THREE.Vector3(52, 2, 10),    // East Pier Boardwalk & James River
         new THREE.Vector3(45, 2, -60)    // RCOH Radiation Vault
       ];
 
+      // Pass A: Normal maritime dusk lighting & shadow cascades
       for (const zonePos of zonePositions) {
         this.camera.position.copy(zonePos);
         const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
         for (const ang of angles) {
-          this.camera.lookAt(zonePos.x + Math.sin(ang) * 20, zonePos.y, zonePos.z + Math.cos(ang) * 20);
+          this.camera.lookAt(zonePos.x + Math.sin(ang) * 30, zonePos.y, zonePos.z + Math.cos(ang) * 30);
+          this.renderer.shadowMap.needsUpdate = true;
           this.renderer.render(this.scene, this.camera);
         }
       }
 
-      // Warmup Sonar Whiskers Blueprint Shader variant across all zones
+      // Pass B: Target Lock Green Trajectory variant
+      this.trajectoryVisualizer.setTargetLock(true);
+      this.renderer.render(this.scene, this.camera);
+
+      // Pass C: Sonar Whiskers Blueprint mode across all zones
       this.renderSystem.setWhiskersMode(this.scene, true);
+      for (let i = 0; i < this.rats.length; i++) this.rats[i].setWhiskersMode(true);
+      for (let i = 0; i < this.mutantCats.length; i++) this.mutantCats[i].setWhiskersAura(true, true);
+      this.environment.setWhiskersMode(true);
+
       if (typeof this.renderer.compile === 'function') {
         this.renderer.compile(this.scene, this.camera);
       }
-      this.renderer.render(this.scene, this.camera);
+      for (const zonePos of zonePositions) {
+        this.camera.position.copy(zonePos);
+        const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+        for (const ang of angles) {
+          this.camera.lookAt(zonePos.x + Math.sin(ang) * 30, zonePos.y, zonePos.z + Math.cos(ang) * 30);
+          this.renderer.render(this.scene, this.camera);
+        }
+      }
 
       // Restore normal environment & camera to Alba
       this.renderSystem.setWhiskersMode(this.scene, false);
+      for (let i = 0; i < this.rats.length; i++) this.rats[i].setWhiskersMode(false);
+      for (let i = 0; i < this.mutantCats.length; i++) this.mutantCats[i].setWhiskersAura(false, false);
+      this.environment.setWhiskersMode(false);
+
       this.renderSystem.hitFlashLight.intensity = 0.0;
       this.camera.fov = originalFov;
       this.camera.updateProjectionMatrix();
 
-      // Restore original frustum culling states
+      // Restore original visibility & frustum culling states
       this.scene.traverse((obj) => {
-        const orig = originalCullingStates.get(obj);
-        if (orig !== undefined) {
-          obj.frustumCulled = orig;
+        const origVis = originalVisibilityStates.get(obj);
+        if (origVis !== undefined) {
+          obj.visible = origVis;
+        }
+        const origCull = originalCullingStates.get(obj);
+        if (origCull !== undefined) {
+          obj.frustumCulled = origCull;
         }
       });
 
+      this.trajectoryVisualizer.setVisible(false);
+      this.trajectoryVisualizer.setTargetLock(false);
+
       this.camera.position.copy(tempCamPos);
       this.camera.lookAt(this.physics.position.x, this.physics.position.y + 0.4, this.physics.position.z);
+
+      const totalPrograms = this.renderer.info?.programs?.length ?? 0;
+      console.log(`🚀 [PRE-WARM] WebGL Pipeline Ready: ${totalPrograms} compiled shader programs linked to GPU driver ahead of gameplay.`);
     } catch (e) {
       console.warn('Pre-warm render note:', e);
     }
@@ -1209,8 +1273,11 @@ export class GameEngine {
     this.eventBus.emit('ui:contextualPrompts', this.activePromptsList);
   }
 
+  private currentRadDose: number = 0;
+
   private updateRadiationAndHazards(deltaTime: number = 0.016) {
     const radData = this.radiationSystem.calculateRadiationAtPoint(this.cat.mesh.position);
+    this.currentRadDose = radData.totalDose;
     soundEngine.updateRadiationLevel(radData.totalDose, deltaTime);
     this.cat.updateDosimeterRadiation(radData.totalDose);
 
@@ -1473,7 +1540,22 @@ export class GameEngine {
     this.renderSystem.render(this.scene);
     this.flightRecorder.endSection('webgl_render');
 
-    this.flightRecorder.endFrame(this.cat ? this.cat.mesh.position : undefined, this.cat?.currentActionName || 'stand');
+    this.flightRecorder.endFrame({
+      catPos: this.cat ? this.cat.mesh.position : undefined,
+      catState: this.cat?.currentActionName || 'stand',
+      speed: this.physics.currentSpeed,
+      heading: this.physics.heading,
+      isGrounded: this.physics.isGrounded,
+      isPouncing: this.physics.isPouncing,
+      isCrouching: this.cat ? this.cat.isCrouching : false,
+      stamina: this.vitals.currentStamina,
+      hunger: this.vitals.currentHunger,
+      health: this.vitals.currentHealth,
+      radDose: this.currentRadDose,
+      zone: this.renderSystem.getCurrentLocationName(),
+      mission: this.missionManager.getCurrentMission().title,
+      rendererInfo: this.renderer.info
+    });
 
     this.onFrameUpdate?.();
     this.eventBus.emit('engine:frameUpdate', { tick: this.frameTick, deltaTime: frameDelta });

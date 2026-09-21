@@ -817,29 +817,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Flight Recorder JSON Download & Copy Handlers
+  // Flight Recorder Comprehensive 30-Second Diagnostic Export Handlers
   document.getElementById('btn-download-flightlog')?.addEventListener('click', () => {
-    const jsonStr = game.flightRecorder.exportLogJSON();
-    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    const payload = game.flightRecorder.exportComprehensiveClipboardPayload();
+    const blob = new Blob([payload], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `shipyard_cat_flightlog_${Date.now()}.json`;
+    a.download = `shipyard_cat_telemetry_30s_${Date.now()}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
     soundEngine.playSuccess();
-    showToast('Flight Log Downloaded', 'Exported high-resolution engine flight log with microsecond timings.', 'success');
+    showToast('30s Telemetry Downloaded', 'Exported comprehensive 30-second flight log (JSON + GPU Matrix).', 'success');
   });
 
   document.getElementById('btn-copy-flightlog')?.addEventListener('click', () => {
-    const jsonStr = game.flightRecorder.exportLogJSON();
+    const payload = game.flightRecorder.exportComprehensiveClipboardPayload();
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(jsonStr).then(() => {
+      navigator.clipboard.writeText(payload).then(() => {
         soundEngine.playSuccess();
-        showToast('Flight Log Copied', 'Copied full JSON flight log to clipboard for AI agents to analyze!', 'success');
+        showToast('30s Telemetry Copied!', 'Copied full 30-second flight log & GPU diagnostics to clipboard!', 'success');
       }).catch(() => {
         showToast('Copy Note', 'Clipboard write blocked. Use Download button instead.', 'info');
       });
