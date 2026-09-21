@@ -382,27 +382,48 @@ export class GameEngine {
       this.renderer.compile(this.scene, this.camera);
     }
 
-    // 5. Run Warmup Render Passes across all 7 major shipyard zones, elevations, and 360-degree orientations
+    // 5. Run Warmup Render Passes across all major shipyard zones, elevations, and 360-degree orientations
     try {
       const tempCamPos = this.camera.position.clone();
+      const tempCatPos = this.physics.position.clone();
       const zonePositions = [
-        new THREE.Vector3(-10, 2, -20),  // South Yard & Dorothy Tugboat
-        new THREE.Vector3(-45, 2, -30),  // Machine Shop Interior & Mezzanine
-        new THREE.Vector3(-45, 5, -20),  // Machine Shop High Catwalk
-        new THREE.Vector3(25, 1, -25),   // Historic Dry Dock 1 & Sunken Basin
-        new THREE.Vector3(20, 15, 35),   // Big Blue Gantry & Dry Dock 12
-        new THREE.Vector3(20, 1, 35),    // Dry Dock 12 Basin Floor
-        new THREE.Vector3(-30, 2, 45),   // Submarine MOF Outfitting
-        new THREE.Vector3(52, 2, 10),    // East Pier Boardwalk & James River
-        new THREE.Vector3(45, 2, -60)    // RCOH Radiation Vault
+        new THREE.Vector3(-10, 0, -20),   // South Yard & Dorothy Tugboat
+        new THREE.Vector3(-45, 0, -30),   // Machine Shop Interior & Mezzanine
+        new THREE.Vector3(-45, 3.5, -20), // Machine Shop High Catwalk
+        new THREE.Vector3(25, -2, -25),   // Historic Dry Dock 1 Sunken Basin
+        new THREE.Vector3(20, 0, 35),     // Big Blue Gantry & Dry Dock 12
+        new THREE.Vector3(20, -2.5, 35),  // Dry Dock 12 Basin Floor
+        new THREE.Vector3(-30, 0, 45),    // Submarine MOF Outfitting
+        new THREE.Vector3(-14.6, 0, 16.2),// Submarine MOF Interior & Piping
+        new THREE.Vector3(-3.1, 0, 36.7), // Dry Dock 12 / MOF Border
+        new THREE.Vector3(52, 0, 10),     // East Pier Boardwalk & James River
+        new THREE.Vector3(45, 0, -60)     // RCOH Radiation Vault
       ];
 
-      // Pass A: Normal maritime dusk lighting & shadow cascades
+      const catActions = ['stand', 'sit', 'walk', 'run', 'jump', 'pounce', 'attack', 'eat'];
+      const ratPositions = this.rats.map((r) => r.mesh.position.clone());
+      const mutantPositions = this.mutantCats.map((m) => m.mesh.position.clone());
+
+      // Pass A: Normal maritime dusk lighting, spot cascades, point lights, and dynamic animation poses across all zones
       for (const zonePos of zonePositions) {
-        this.camera.position.copy(zonePos);
+        this.physics.position.copy(zonePos);
+        this.cat.mesh.position.copy(zonePos);
+        this.camera.position.set(zonePos.x, zonePos.y + 1.8, zonePos.z + 3.5);
+        this.camera.lookAt(zonePos.x, zonePos.y + 0.4, zonePos.z);
+
+        if (this.rats[0]) this.rats[0].mesh.position.set(zonePos.x + 1.2, zonePos.y, zonePos.z - 1.5);
+        if (this.mutantCats[0]) this.mutantCats[0].mesh.position.set(zonePos.x - 1.2, zonePos.y, zonePos.z - 1.5);
+
+        for (const actionKey of catActions) {
+          this.cat.cyclePrewarmAction(actionKey);
+
+          this.renderer.shadowMap.needsUpdate = true;
+          this.renderer.render(this.scene, this.camera);
+        }
+
         const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
         for (const ang of angles) {
-          this.camera.lookAt(zonePos.x + Math.sin(ang) * 30, zonePos.y, zonePos.z + Math.cos(ang) * 30);
+          this.camera.lookAt(zonePos.x + Math.sin(ang) * 30, zonePos.y + 0.4, zonePos.z + Math.cos(ang) * 30);
           this.renderer.shadowMap.needsUpdate = true;
           this.renderer.render(this.scene, this.camera);
         }
@@ -422,7 +443,7 @@ export class GameEngine {
         this.renderer.compile(this.scene, this.camera);
       }
       for (const zonePos of zonePositions) {
-        this.camera.position.copy(zonePos);
+        this.camera.position.set(zonePos.x, zonePos.y + 1.8, zonePos.z + 3.5);
         const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
         for (const ang of angles) {
           this.camera.lookAt(zonePos.x + Math.sin(ang) * 30, zonePos.y, zonePos.z + Math.cos(ang) * 30);
@@ -455,8 +476,19 @@ export class GameEngine {
       this.trajectoryVisualizer.setVisible(false);
       this.trajectoryVisualizer.setTargetLock(false);
 
+      this.physics.position.copy(tempCatPos);
+      this.cat.mesh.position.copy(tempCatPos);
       this.camera.position.copy(tempCamPos);
       this.camera.lookAt(this.physics.position.x, this.physics.position.y + 0.4, this.physics.position.z);
+
+      this.rats.forEach((r, idx) => {
+        if (ratPositions[idx]) r.mesh.position.copy(ratPositions[idx]);
+      });
+      this.mutantCats.forEach((m, idx) => {
+        if (mutantPositions[idx]) m.mesh.position.copy(mutantPositions[idx]);
+      });
+
+      this.cat.resetToStand();
 
       const totalPrograms = this.renderer.info?.programs?.length ?? 0;
       console.log(`🚀 [PRE-WARM] WebGL Pipeline Ready: ${totalPrograms} compiled shader programs linked to GPU driver ahead of gameplay.`);

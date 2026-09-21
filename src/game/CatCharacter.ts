@@ -587,13 +587,14 @@ export class CatCharacter {
         }
       }
 
-      // Transition animation clip with minimum 150ms dwell time protection (high-priority combat/jumps bypass dwell)
+      // Transition animation clip with minimum 150ms dwell time protection (high-priority combat/jumps and recovery bypass dwell)
       if (targetName !== this.currentActionName) {
-        if (isHighPriorityAction || this.actionDwellTime >= CatCharacter.MIN_ACTION_DWELL_TIME) {
+        const isExitingSpecialAction = (this.currentActionName === 'pounce' || this.currentActionName === 'jump' || this.currentActionName === 'attack' || this.currentActionName === 'eat');
+        if (isHighPriorityAction || isExitingSpecialAction || this.actionDwellTime >= CatCharacter.MIN_ACTION_DWELL_TIME) {
           const targetAction = this.animations[targetName] || this.animations['stand'] || Object.values(this.animations)[0];
           if (targetAction) {
             if (targetAction !== this.currentAction) {
-              const fadeDuration = 0.2;
+              const fadeDuration = 0.15;
               if (this.currentAction) {
                 this.currentAction.fadeOut(fadeDuration);
               }
@@ -633,6 +634,9 @@ export class CatCharacter {
 
     // Dynamic Skeletal Socket Tracking: Keeps Alba's safety collar & dosimeter locked to her neck bone
     if (this.neckBone && this.collarGroup) {
+      if (this.gltfModel) {
+        this.gltfModel.updateMatrixWorld(true);
+      }
       this.neckBone.getWorldPosition(CatCharacter.scratchBonePos);
       this.neckBone.getWorldQuaternion(CatCharacter.scratchBoneQuat);
 
@@ -855,6 +859,49 @@ export class CatCharacter {
 
   public getCurrentActionName(): string {
     return this.currentActionName;
+  }
+
+  public cyclePrewarmAction(actionKey: string): void {
+    if (!this.mixer) return;
+    const action = this.animations[actionKey];
+    if (action) {
+      action.reset();
+      action.enabled = true;
+      action.setEffectiveWeight(1.0);
+      action.play();
+      this.currentAction = action;
+      this.currentActionName = actionKey;
+      this.mixer.update(0.016);
+    }
+    if (this.gltfModel) {
+      this.gltfModel.updateMatrixWorld(true);
+    }
+    if (this.neckBone && this.collarGroup) {
+      this.neckBone.getWorldPosition(CatCharacter.scratchBonePos);
+      this.neckBone.getWorldQuaternion(CatCharacter.scratchBoneQuat);
+      this.mesh.worldToLocal(CatCharacter.scratchBonePos);
+      this.collarGroup.position.copy(CatCharacter.scratchBonePos);
+      this.mesh.getWorldQuaternion(CatCharacter.scratchMeshQuat);
+      this.collarGroup.quaternion.copy(CatCharacter.scratchMeshQuat.invert().multiply(CatCharacter.scratchBoneQuat));
+      this.collarGroup.rotateX(0.42);
+    }
+  }
+
+  public resetToStand(): void {
+    if (!this.mixer) return;
+    Object.values(this.animations).forEach(a => {
+      if (a) a.stop();
+    });
+    const initialAction = this.animations['stand'];
+    if (initialAction) {
+      initialAction.reset();
+      initialAction.enabled = true;
+      initialAction.setEffectiveWeight(1.0);
+      initialAction.play();
+      this.currentAction = initialAction;
+      this.currentActionName = 'stand';
+    }
+    this.mixer.update(0);
   }
 
   public prewarmAnimations(): void {
