@@ -54,6 +54,29 @@ export class RenderSubsystem {
   public normalFog = new THREE.FogExp2(0x131d2e, 0.0075);
   public sonarFog = new THREE.Fog(0x021726, 40, 300);
 
+  // --- Whiskers Vision Sonar Pulse Wave & Thermal Signature Properties ---
+  public sonarWaveRing!: THREE.Mesh;
+  public sonarWaveMaterial!: THREE.MeshBasicMaterial;
+  public sonarWaveActive: boolean = false;
+  public sonarWaveElapsed: number = 0;
+  public static readonly SONAR_WAVE_DURATION = 1.2; // 1.2s expansion to 35m
+  public static readonly SONAR_WAVE_MAX_RADIUS = 35.0;
+
+  public static readonly THERMAL_COLORS = {
+    PREY_AMBER: new THREE.Color(0xff9500),       // Warm high-contrast amber/orange for mice & rats
+    KINGPIN_GOLD: new THREE.Color(0xffd700),     // Vivid gold silhouette for Rat Kingpin
+    MUTANT_VIOLET: new THREE.Color(0xc026d3),    // Radioactive vibrant violet for mutants
+    NEUTRAL_CYAN: new THREE.Color(0x06b6d4)      // Cool blueprint cyan
+  };
+
+  // --- Spring-Arm Camera Collision State & Zero-Allocation Scratch Buffers ---
+  private currentCamDist: number = 3.8;
+  private static readonly DEFAULT_CAM_DIST = 3.8;
+  private static readonly MIN_CAM_DIST = 1.2;
+  private static readonly CAM_COLLISION_OFFSET = 0.25;
+  private static readonly scratchRayOrigin = new THREE.Vector3();
+  private static readonly scratchRayDir = new THREE.Vector3();
+
   // Static preallocated scratch objects (Zero GC in hot frame loop)
   private static readonly scratchDesiredCamPos = new THREE.Vector3();
   private static readonly scratchLookAt = new THREE.Vector3();
@@ -165,6 +188,22 @@ export class RenderSubsystem {
     this.hitFlashLight = new THREE.PointLight(0xf59e0b, 0, 10);
     scene.add(this.hitFlashLight);
 
+    // 6B. Expanding Radial Sonar Ripple Ring (0 -> 35m over 1.2s)
+    const ringGeo = new THREE.RingGeometry(0.88, 1.0, 64);
+    ringGeo.rotateX(-Math.PI / 2);
+    this.sonarWaveMaterial = new THREE.MeshBasicMaterial({
+      color: 0x22d3ee,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.sonarWaveRing = new THREE.Mesh(ringGeo, this.sonarWaveMaterial);
+    this.sonarWaveRing.visible = false;
+    this.sonarWaveRing.frustumCulled = false;
+    scene.add(this.sonarWaveRing);
+
     // 7. Initial Camera Placement
     this.currentCameraPos.set(-10.0, 1.6, -24.5);
     this.camera.position.copy(this.currentCameraPos);
@@ -189,13 +228,24 @@ export class RenderSubsystem {
   }
 
   /**
-   * Set Whiskers Vision Sonar Blueprint mode vs normal maritime dusk sky
+   * Set Whiskers Vision Sonar Blueprint mode vs normal maritime dusk sky,
+   * triggering the 35m expanding radial sonar pulse.
    */
-  public setWhiskersMode(scene: THREE.Scene, active: boolean): void {
+  public setWhiskersMode(scene: THREE.Scene, active: boolean, originPos?: THREE.Vector3): void {
     this.isWhiskersMode = active;
     if (active) {
       scene.background = RenderSubsystem.sonarBgColor;
       scene.fog = this.sonarFog;
+
+      // Trigger expanding radial sonar ripple wave from Alba's coordinates
+      this.sonarWaveActive = true;
+      this.sonarWaveElapsed = 0;
+      this.sonarWaveRing.visible = true;
+      if (originPos) {
+        this.sonarWaveRing.position.set(originPos.x, originPos.y + 0.12, originPos.z);
+      }
+      this.sonarWaveRing.scale.set(0.1, 1.0, 0.1);
+      this.sonarWaveMaterial.opacity = 0.92;
     } else {
       if (this.hdrSkyTexture) {
         scene.background = this.hdrSkyTexture;
@@ -203,6 +253,69 @@ export class RenderSubsystem {
         scene.background = RenderSubsystem.normalBgColor;
       }
       scene.fog = this.normalFog;
+      this.sonarWaveActive = false;
+      this.sonarWaveRing.visible = false;
+    }
+
+    const reticleEl = document.getElementById('whiskers-sensory-reticle');
+    if (reticleEl) {
+      reticleEl.classList.toggle('active', active);
+    }
+  }
+
+  /**
+   * Updates expanding 35m radial sonar wave and applies high-contrast thermal
+   * emissive signatures to prey (amber), Kingpin (gold), and mutants (violet).
+   */
+  public updateWhiskersSonarWave(
+    deltaTime: number,
+    albaPos: THREE.Vector3,
+    preyEntities?: Array<{ mesh: THREE.Object3D; type: 'prey' | 'kingpin' | 'mutant' }>
+  ): void {
+    if (this.sonarWaveActive) {
+      this.sonarWaveElapsed += deltaTime;
+      const t = Math.min(1.0, this.sonarWaveElapsed / RenderSubsystem.SONAR_WAVE_DURATION);
+      // Ease-out cubic expansion to 35m
+      const eased = 1.0 - Math.pow(1.0 - t, 3);
+      const radius = Math.max(0.1, eased * RenderSubsystem.SONAR_WAVE_MAX_RADIUS);
+
+      this.sonarWaveRing.position.x = albaPos.x;
+      this.sonarWaveRing.position.y = albaPos.y + 0.12;
+      this.sonarWaveRing.position.z = albaPos.z;
+      this.sonarWaveRing.scale.set(radius, 1.0, radius);
+      this.sonarWaveMaterial.opacity = (1.0 - t) * 0.85;
+
+      if (t >= 1.0) {
+        this.sonarWaveActive = false;
+        this.sonarWaveRing.visible = false;
+      }
+    }
+
+    if (preyEntities) {
+      for (let i = 0; i < preyEntities.length; i++) {
+        const entity = preyEntities[i];
+        const targetColor =
+          entity.type === 'kingpin'
+            ? RenderSubsystem.THERMAL_COLORS.KINGPIN_GOLD
+            : entity.type === 'mutant'
+            ? RenderSubsystem.THERMAL_COLORS.MUTANT_VIOLET
+            : RenderSubsystem.THERMAL_COLORS.PREY_AMBER;
+
+        entity.mesh.traverse((child) => {
+          const mesh = child as THREE.Mesh;
+          if (mesh.isMesh && mesh.material) {
+            const mat = mesh.material as THREE.MeshStandardMaterial;
+            if ('emissive' in mat) {
+              if (this.isWhiskersMode) {
+                mat.emissive.copy(targetColor);
+                mat.emissiveIntensity = entity.type === 'kingpin' ? 2.4 : 1.85;
+              } else if (entity.type === 'prey') {
+                mat.emissiveIntensity = 0.0;
+              }
+            }
+          }
+        });
+      }
     }
   }
 
@@ -263,13 +376,15 @@ export class RenderSubsystem {
   }
 
   /**
-   * Spring-Arm Camera Update with indoor/outdoor room clamping and exponential decay smoothing
+   * Spring-Arm Camera Update with obstacle collision avoidance, indoor/outdoor room clamping,
+   * camera shake, and exponential decay smoothing.
    */
   public updateCamera(
     deltaTime: number,
     targetPos: THREE.Vector3,
     catHeading: number,
-    isFreeLooking: boolean = false
+    isFreeLooking: boolean = false,
+    obstacleRaycastFn?: (origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number) => number | null
   ): void {
     if (!isFreeLooking) {
       // Smoothly re-center camera behind Alba with exponential decay
@@ -311,16 +426,44 @@ export class RenderSubsystem {
       }
     }
 
-    // Dynamic camera distance with spring-arm collision avoidance
-    const maxDist = isIndoors ? 1.8 : 3.8;
+    const headHeight = isIndoors ? 0.35 : 0.45;
+    const rawLookTarget = RenderSubsystem.scratchLookAt.set(
+      targetPos.x,
+      targetPos.y + headHeight,
+      targetPos.z
+    );
+
+    const maxDesiredDist = isIndoors ? 1.8 : RenderSubsystem.DEFAULT_CAM_DIST;
     const totalHeading = catHeading + this.cameraYaw;
-    const camHeight = isIndoors ? 1.1 : (1.4 + Math.sin(this.cameraPitch) * 1.5);
-    const camDist = maxDist * Math.cos(this.cameraPitch);
+    const cosPitch = Math.cos(this.cameraPitch);
+    const dirX = -Math.sin(totalHeading) * cosPitch;
+    const dirY = Math.sin(this.cameraPitch);
+    const dirZ = -Math.cos(totalHeading) * cosPitch;
+
+    const rayDir = RenderSubsystem.scratchRayDir.set(dirX, dirY, dirZ).normalize();
+    const rayOrigin = RenderSubsystem.scratchRayOrigin.copy(rawLookTarget);
+
+    let targetAllowedDist = maxDesiredDist;
+    if (obstacleRaycastFn) {
+      const hitDistance = obstacleRaycastFn(rayOrigin, rayDir, maxDesiredDist);
+      if (hitDistance !== null && hitDistance < maxDesiredDist) {
+        targetAllowedDist = Math.max(
+          RenderSubsystem.MIN_CAM_DIST,
+          hitDistance - RenderSubsystem.CAM_COLLISION_OFFSET
+        );
+      }
+    }
+
+    // Asymmetric exponential spring damping:
+    // Fast pull-in on obstacle occlusion (lambda=24), smooth restoration when clear (lambda=8)
+    const distLambda = targetAllowedDist < this.currentCamDist ? 24.0 : 8.0;
+    const distLerp = 1.0 - Math.exp(-distLambda * deltaTime);
+    this.currentCamDist += (targetAllowedDist - this.currentCamDist) * Math.min(1.0, distLerp);
 
     const desiredCameraPos = RenderSubsystem.scratchDesiredCamPos.set(
-      targetPos.x - Math.sin(totalHeading) * camDist,
-      targetPos.y + camHeight,
-      targetPos.z - Math.cos(totalHeading) * camDist
+      rawLookTarget.x + rayDir.x * this.currentCamDist,
+      Math.max(targetPos.y + 0.25, rawLookTarget.y + rayDir.y * this.currentCamDist),
+      rawLookTarget.z + rayDir.z * this.currentCamDist
     );
 
     // Indoor Machine Shop room boundary clamping
@@ -345,7 +488,6 @@ export class RenderSubsystem {
     }
 
     // Smooth look-at target tracking
-    const rawLookTarget = RenderSubsystem.scratchLookAt.set(targetPos.x, targetPos.y + (isIndoors ? 0.35 : 0.45), targetPos.z);
     const lookLerpFactor = 1.0 - Math.exp(-16.0 * deltaTime);
     this.currentLookAt.lerp(rawLookTarget, Math.min(1.0, lookLerpFactor));
     this.camera.lookAt(this.currentLookAt);

@@ -1012,7 +1012,7 @@ export class GameEngine {
     }
 
     const nextMode = !this.renderSystem.isWhiskersMode;
-    this.renderSystem.setWhiskersMode(this.scene, nextMode);
+    this.renderSystem.setWhiskersMode(this.scene, nextMode, this.cat.mesh.position);
     soundEngine.playWhiskersPing();
 
     if (nextMode) {
@@ -1504,6 +1504,13 @@ export class GameEngine {
     this.flightRecorder.startSection('cat_character_anim');
     this.cat.isPouncing = this.physics.isPouncing;
     this.cat.animate(frameDelta, this.physics.currentSpeed, this.physics.isGrounded, turnInput);
+    this.cat.updateSlopePitchAndStride(
+      frameDelta,
+      this.physics.currentSpeed,
+      this.isDoubleTapSprint,
+      this.physics.isGrounded,
+      (x, z) => this.environment.getPlatformFloor(x, z, this.physics.position.y)
+    );
     this.flightRecorder.endSection('cat_character_anim');
 
     // 6. Touch Camera Drag Swipe Delta Consumption
@@ -1524,7 +1531,18 @@ export class GameEngine {
 
     // 7. Update Camera, Hazards, Story Progression & Environment
     this.flightRecorder.startSection('camera_spring');
-    this.renderSystem.updateCamera(frameDelta, this.cat.mesh.position, renderYaw, isFreeLooking);
+    this.renderSystem.updateCamera(
+      frameDelta,
+      this.cat.mesh.position,
+      renderYaw,
+      isFreeLooking,
+      (orig, dir, maxDist) => this.environment.raycastObstacles(orig, dir, maxDist)
+    );
+    this.renderSystem.updateWhiskersSonarWave(
+      frameDelta,
+      this.cat.mesh.position,
+      this.rats.map((r) => ({ mesh: r.mesh, type: (r.isKingpin ? 'kingpin' : 'prey') as 'kingpin' | 'prey' }))
+    );
     this.flightRecorder.endSection('camera_spring');
 
     this.flightRecorder.startSection('hazards_story');

@@ -91,6 +91,52 @@ export class ShipyardEnvironment {
 
   private static readonly scratchResolved = new THREE.Vector3();
 
+  /**
+   * Zero-allocation slab-method raycaster against all static solid obstacles.
+   * Returns closest hit distance in [0, maxDist], or null if ray path is clear.
+   */
+  public raycastObstacles(origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number): number | null {
+    let closestT = maxDist;
+    let hit = false;
+    const invDirX = dir.x !== 0 ? 1.0 / dir.x : 1e9;
+    const invDirY = dir.y !== 0 ? 1.0 / dir.y : 1e9;
+    const invDirZ = dir.z !== 0 ? 1.0 / dir.z : 1e9;
+
+    const count = this.solidObstacles.length;
+    for (let i = 0; i < count; i++) {
+      const obs = this.solidObstacles[i];
+      let tminX = (obs.min.x - origin.x) * invDirX;
+      let tmaxX = (obs.max.x - origin.x) * invDirX;
+      if (tminX > tmaxX) { const tmp = tminX; tminX = tmaxX; tmaxX = tmp; }
+
+      let tminY = (obs.min.y - origin.y) * invDirY;
+      let tmaxY = (obs.max.y - origin.y) * invDirY;
+      if (tminY > tmaxY) { const tmp = tminY; tminY = tmaxY; tmaxY = tmp; }
+
+      if (tminX > tmaxY || tminY > tmaxX) continue;
+
+      const tEnterY = Math.max(tminX, tminY);
+      const tExitY = Math.min(tmaxX, tmaxY);
+
+      let tminZ = (obs.min.z - origin.z) * invDirZ;
+      let tmaxZ = (obs.max.z - origin.z) * invDirZ;
+      if (tminZ > tmaxZ) { const tmp = tminZ; tminZ = tmaxZ; tmaxZ = tmp; }
+
+      if (tEnterY > tmaxZ || tminZ > tExitY) continue;
+
+      const tEnter = Math.max(tEnterY, tminZ);
+      const tExit = Math.min(tExitY, tmaxZ);
+
+      if (tExit < 0) continue; // Box is behind ray origin
+      const tHit = tEnter >= 0 ? tEnter : tExit;
+      if (tHit >= 0 && tHit < closestT) {
+        closestT = tHit;
+        hit = true;
+      }
+    }
+    return hit ? closestT : null;
+  }
+
   public resolveCollision(pos: THREE.Vector3, radius: number = 0.35, previousPos?: THREE.Vector3): THREE.Vector3 {
     const resolved = ShipyardEnvironment.scratchResolved.copy(pos);
 

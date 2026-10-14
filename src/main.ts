@@ -25,6 +25,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadingStatusText = document.getElementById('loading-status-text') as HTMLElement;
   const btnEnterGame = document.getElementById('btn-enter-game') as HTMLButtonElement;
 
+  if (btnEnterGame) {
+    btnEnterGame.disabled = true;
+    btnEnterGame.style.display = 'none';
+  }
+
   let game: GameEngine;
   try {
     game = new GameEngine(container);
@@ -36,34 +41,49 @@ document.addEventListener('DOMContentLoaded', () => {
       handleFreezeIncidentDetected(incident);
     };
 
-    // Execute real GPU Shader & Texture Warmup Pipeline
-    game.initPipeline((pct, stage) => {
-      if (loadingProgressBar) loadingProgressBar.style.width = `${pct}%`;
-      if (loadingStatusText) loadingStatusText.textContent = stage;
-    }).then(() => {
+    const setProgress = (pct: number, stage: string) => {
+      const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+      if (loadingProgressBar) loadingProgressBar.style.width = `${clamped}%`;
+      if (loadingStatusText) loadingStatusText.textContent = `[${clamped}%] ${stage}`;
+    };
+
+    // Execute Strict Multi-Stage Pre-Flight Asset & Shader Verification Gate
+    (async () => {
+      try {
+        setProgress(0, 'Initializing WebGL2 Context & Physics World...');
+
+        await game.initPipeline((pct, stage) => {
+          setProgress(pct, stage);
+        });
+
+        setProgress(100, 'Pre-Flight Verification Complete — Yard Ready');
+      } catch (pipelineErr) {
+        console.warn('[Engine Warmup Non-Critical Fallback]', pipelineErr);
+        setProgress(100, 'Pre-Flight Complete (Fallback Mode Ready)');
+      }
+
       if (btnEnterGame) {
+        btnEnterGame.disabled = false;
         btnEnterGame.style.display = 'inline-block';
         btnEnterGame.onclick = () => {
-          soundEngine.init();
-          soundEngine.prewarmAudioBuffers();
-          soundEngine.playPurr();
+          btnEnterGame.disabled = true;
+          try {
+            soundEngine.init();
+            soundEngine.prewarmAudioBuffers();
+            soundEngine.playPurr();
+          } catch (audioErr) {
+            console.warn('[Audio Subsystem Non-Critical Note]', audioErr);
+          }
           game.startLoop();
-          loadingScreen.style.opacity = '0';
-          setTimeout(() => {
-            loadingScreen.style.display = 'none';
-          }, 600);
+          if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+              loadingScreen.style.display = 'none';
+            }, 600);
+          }
         };
       }
-    }).catch((err) => {
-      console.warn('[Engine Warmup Pipeline Note]', err);
-      if (btnEnterGame) {
-        btnEnterGame.style.display = 'inline-block';
-        btnEnterGame.onclick = () => {
-          game.startLoop();
-          loadingScreen.style.display = 'none';
-        };
-      }
-    });
+    })();
   } catch (err: any) {
     console.error('[Shipyard Cat Fatal Init]', err);
     const fallback = document.getElementById('engine-error-fallback');

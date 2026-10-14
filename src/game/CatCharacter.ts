@@ -28,6 +28,14 @@ export class CatCharacter {
   public currentActionName: string = 'stand';
   public actionDwellTime: number = 0;
 
+  // --- Slope Pitch & Dynamic Stride Kinematics State ---
+  public currentSlopePitch: number = 0;
+  public currentBankRoll: number = 0;
+  private previousYaw: number = 0;
+  public static readonly MAX_SLOPE_PITCH_RAD = 0.58; // ~33 deg max ramp alignment
+  public static readonly BASE_WALK_SPEED = 2.6;
+  public static readonly BASE_RUN_SPEED = 6.2;
+
   private walkCycle: number = 0;
   private tailWagPhase: number = 0;
   public isCrouching: boolean = false;
@@ -929,6 +937,82 @@ export class CatCharacter {
       this.currentActionName = 'stand';
     }
     this.mixer.update(0);
+  }
+
+  /**
+   * Aligns Alba's spine/body pitch (+X ascending, -X descending) with the ground forward slope gradient,
+   * adds subtle cornering bank roll, and scales skeletal/procedural stride rate to eliminate foot-sliding.
+   *
+   * @param deltaTime Frame delta in seconds
+   * @param currentHorizontalSpeed Instantaneous planar velocity magnitude (m/s)
+   * @param isSprinting Whether sprint state is active
+   * @param isGrounded Whether Alba's paws are on a surface
+   * @param sampleGroundHeightFn Callback `(x: number, z: number) => number` returning terrain/ramp height
+   */
+  public updateSlopePitchAndStride(
+    deltaTime: number,
+    currentHorizontalSpeed: number,
+    isSprinting: boolean,
+    isGrounded: boolean,
+    sampleGroundHeightFn?: (x: number, z: number) => number
+  ): void {
+    // 1. Dynamic Slope Pitch Calculation along forward heading vector
+    let targetPitch = 0;
+    if (isGrounded && sampleGroundHeightFn) {
+      const probeDist = 0.35; // Half body-length forward/aft probe
+      const fwdX = Math.sin(this.mesh.rotation.y);
+      const fwdZ = Math.cos(this.mesh.rotation.y);
+
+      const hFront = sampleGroundHeightFn(
+        this.mesh.position.x + fwdX * probeDist,
+        this.mesh.position.z + fwdZ * probeDist
+      );
+      const hBack = sampleGroundHeightFn(
+        this.mesh.position.x - fwdX * probeDist,
+        this.mesh.position.z - fwdZ * probeDist
+      );
+
+      const deltaH = hFront - hBack;
+      // Positive X rotation pitches nose UP when ascending; negative X pitches nose DOWN when descending
+      const rawSlopeAngle = Math.atan2(deltaH, probeDist * 2.0);
+      targetPitch = Math.max(
+        -CatCharacter.MAX_SLOPE_PITCH_RAD,
+        Math.min(CatCharacter.MAX_SLOPE_PITCH_RAD, rawSlopeAngle)
+      );
+    }
+
+    const pitchLerp = 1.0 - Math.exp(-14.0 * deltaTime);
+    this.currentSlopePitch += (targetPitch - this.currentSlopePitch) * Math.min(1.0, pitchLerp);
+
+    // 2. Subtle Feline Cornering Bank Roll
+    let yawDelta = this.mesh.rotation.y - this.previousYaw;
+    while (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
+    while (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
+    this.previousYaw = this.mesh.rotation.y;
+
+    const yawRate = deltaTime > 0.0001 ? yawDelta / deltaTime : 0;
+    const speedFactor = Math.min(1.0, currentHorizontalSpeed / CatCharacter.BASE_RUN_SPEED);
+    const targetBank = Math.max(-0.22, Math.min(0.22, -yawRate * 0.045 * speedFactor));
+    const bankLerp = 1.0 - Math.exp(-12.0 * deltaTime);
+    this.currentBankRoll += (targetBank - this.currentBankRoll) * Math.min(1.0, bankLerp);
+
+    // Apply pitch (+X ascending / -X descending) and bank roll to active visual root
+    this.mesh.rotation.x = -this.currentSlopePitch;
+    this.mesh.rotation.z = this.currentBankRoll;
+
+    // 3. Dynamic Stride Rate Matching (currentSpeed / baseSpeed) to eliminate foot-sliding
+    const referenceBaseSpeed = isSprinting
+      ? CatCharacter.BASE_RUN_SPEED
+      : CatCharacter.BASE_WALK_SPEED;
+
+    const strideTimeScale =
+      currentHorizontalSpeed > 0.08
+        ? Math.max(0.45, Math.min(2.15, currentHorizontalSpeed / referenceBaseSpeed))
+        : 1.0;
+
+    if (this.currentAction) {
+      this.currentAction.timeScale = strideTimeScale;
+    }
   }
 }
 
