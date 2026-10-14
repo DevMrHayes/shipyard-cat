@@ -32,7 +32,7 @@ export class CatCharacter {
   public currentSlopePitch: number = 0;
   public currentBankRoll: number = 0;
   private previousYaw: number = 0;
-  public static readonly MAX_SLOPE_PITCH_RAD = 0.58; // ~33 deg max ramp alignment
+  public static readonly MAX_SLOPE_PITCH_RAD = 0.14; // ~8 deg max natural feline ramp alignment
   public static readonly BASE_WALK_SPEED = 2.6;
   public static readonly BASE_RUN_SPEED = 6.2;
 
@@ -973,15 +973,20 @@ export class CatCharacter {
       );
 
       const deltaH = hFront - hBack;
-      // Positive X rotation pitches nose UP when ascending; negative X pitches nose DOWN when descending
+      // On stairs and stepped platforms, feline spines remain largely level while paws handle the risers.
+      // On ramps, apply subtle natural forward slope inclination (max ~7 deg).
+      const isSteppedRiser = Math.abs(deltaH) > 0.12;
+      const slopeScale = isSteppedRiser ? 0.12 : 0.28;
+      const maxAllowedPitch = isSteppedRiser ? 0.05 : 0.12; // ~2.8 deg on stairs, 6.9 deg on smooth ramps
+
       const rawSlopeAngle = Math.atan2(deltaH, probeDist * 2.0);
       targetPitch = Math.max(
-        -CatCharacter.MAX_SLOPE_PITCH_RAD,
-        Math.min(CatCharacter.MAX_SLOPE_PITCH_RAD, rawSlopeAngle)
+        -maxAllowedPitch,
+        Math.min(maxAllowedPitch, rawSlopeAngle * slopeScale)
       );
     }
 
-    const pitchLerp = 1.0 - Math.exp(-14.0 * deltaTime);
+    const pitchLerp = 1.0 - Math.exp(-8.0 * deltaTime);
     this.currentSlopePitch += (targetPitch - this.currentSlopePitch) * Math.min(1.0, pitchLerp);
 
     // 2. Subtle Feline Cornering Bank Roll

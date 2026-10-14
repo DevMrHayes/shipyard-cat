@@ -1127,6 +1127,11 @@ canvas {
   animation: pounceLockPulse 1.2s infinite ease-in-out;
 }
 
+.floating-prompt.prompt-security {
+  border-color: #ef4444;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75), 0 0 15px rgba(239, 68, 68, 0.45);
+}
+
 .prompt-key-badge {
   background: linear-gradient(135deg, #f59e0b, #d97706);
   color: #0f172a;

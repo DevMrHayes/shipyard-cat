@@ -24,7 +24,7 @@ import { RenderSubsystem } from '../render/RenderSubsystem';
 
 export interface ContextualPrompt {
   id: string;
-  type: 'TALK' | 'EAT' | 'POUNCE';
+  type: 'TALK' | 'EAT' | 'POUNCE' | 'SECURITY';
   title: string;
   subtitle?: string;
   keyText: string;
@@ -1226,7 +1226,7 @@ export class GameEngine {
   private addContextualPrompt(
     count: number,
     id: string,
-    type: 'TALK' | 'EAT' | 'POUNCE',
+    type: 'TALK' | 'EAT' | 'POUNCE' | 'SECURITY',
     title: string,
     subtitle: string | undefined,
     keyText: string,
@@ -1343,6 +1343,27 @@ export class GameEngine {
           proj.screenX,
           proj.screenY,
           Math.round(pounceCandidate.dist * 10) / 10,
+          true
+        );
+      }
+    }
+
+    // 5. Check Gate 4 Main Security Turnstile (< 7.0m)
+    const turnstilePos = new THREE.Vector3(-104.5, 0.4, -1.0);
+    const distToTurnstile = turnstilePos.distanceTo(catPos);
+    if (distToTurnstile < 7.0) {
+      const proj = this.renderSystem.projectPoint(turnstilePos, 1.4);
+      if (proj.visible) {
+        count = this.addContextualPrompt(
+          count,
+          'turnstile-gate4',
+          'SECURITY',
+          'Gate 4 Security Turnstile',
+          'NNS Employee Badge Required • Alba is restricted to Shipyard Grounds',
+          '⛔ LOCKED',
+          proj.screenX,
+          proj.screenY,
+          Math.round(distToTurnstile * 10) / 10,
           true
         );
       }
