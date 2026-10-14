@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RemoteLogger } from './RemoteLogger';
 
 export interface SectionTiming {
   name: string;
@@ -109,6 +110,8 @@ export class EngineFlightRecorder {
   private lastAudioEvent: string = '';
   private nearestRatDistance: number = 999;
   private nearestMutantDistance: number = 999;
+  private lastRecordedSpikeFrameTick: number = -1;
+  public startupGraceFrames: number = 0;
 
   constructor(onFreeze?: FreezeIncidentCallback) {
     this.onFreezeIncident = onFreeze || null;
@@ -163,9 +166,12 @@ export class EngineFlightRecorder {
     const duration = performance.now() - start;
     this.currentFrameTimings[name] = duration;
 
-    // Check if single section stalled beyond threshold
-    if (duration >= EngineFlightRecorder.SECTION_STALL_THRESHOLD_MS) {
-      this.recordSpike(name, duration, 0);
+    // Check if single section stalled beyond threshold (ignore frameTick <= startupGraceFrames)
+    if (this.frameTick > this.startupGraceFrames && duration >= EngineFlightRecorder.SECTION_STALL_THRESHOLD_MS) {
+      if (this.lastRecordedSpikeFrameTick !== this.frameTick) {
+        this.lastRecordedSpikeFrameTick = this.frameTick;
+        this.recordSpike(name, duration, 0);
+      }
     }
     return duration;
   }
@@ -245,17 +251,20 @@ export class EngineFlightRecorder {
     this.bufferHeadIndex = (this.bufferHeadIndex + 1) % EngineFlightRecorder.SAMPLE_CAPACITY;
     this.totalFramesRecorded++;
 
-    // Check if total frame exceeded dropped frame threshold
-    if (totalFrameMs >= EngineFlightRecorder.FRAME_STALL_THRESHOLD_MS) {
-      let maxSectionName = 'frame_overload';
-      let maxSectionMs = 0;
-      for (const [sec, ms] of Object.entries(this.currentFrameTimings)) {
-        if (ms > maxSectionMs) {
-          maxSectionMs = ms;
-          maxSectionName = sec;
+    // Check if total frame exceeded dropped frame threshold (ignore frameTick <= startupGraceFrames)
+    if (this.frameTick > this.startupGraceFrames && totalFrameMs >= EngineFlightRecorder.FRAME_STALL_THRESHOLD_MS) {
+      if (this.lastRecordedSpikeFrameTick !== this.frameTick) {
+        this.lastRecordedSpikeFrameTick = this.frameTick;
+        let maxSectionName = 'frame_overload';
+        let maxSectionMs = 0;
+        for (const [sec, ms] of Object.entries(this.currentFrameTimings)) {
+          if (ms > maxSectionMs) {
+            maxSectionMs = ms;
+            maxSectionName = sec;
+          }
         }
+        this.recordSpike(maxSectionName, maxSectionMs, totalFrameMs, { x: posX, y: posY, z: posZ }, context?.catState, context);
       }
-      this.recordSpike(maxSectionName, maxSectionMs, totalFrameMs, { x: posX, y: posY, z: posZ }, context?.catState, context);
     }
 
     // Reset frame-transient tracking
@@ -302,6 +311,9 @@ export class EngineFlightRecorder {
     this.incidents.push(incident);
 
     console.warn(`⚠️ [SHIPYARD-FLIGHT-RECORDER] FREEZE SPIKE on Frame #${this.frameTick}:`, incident);
+
+    // Pipe directly to automated local runtime log
+    RemoteLogger.logFreezeIncident(incident);
 
     if (this.onFreezeIncident) {
       try {

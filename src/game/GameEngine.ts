@@ -205,6 +205,7 @@ export class GameEngine {
       this.onFreezeDetected?.(incident);
       this.eventBus.emit('engine:freezeDetected', incident);
     });
+    this.flightRecorder.startupGraceFrames = 5;
     soundEngine.onAudioEvent = (evt) => {
       this.flightRecorder.logAudioEvent(evt);
     };
@@ -415,36 +416,19 @@ export class GameEngine {
       const ratPositions = this.rats.map((r) => r.mesh.position.clone());
       const mutantPositions = this.mutantCats.map((m) => m.mesh.position.clone());
 
-      // Pass A: Normal maritime dusk lighting, spot cascades, point lights, and dynamic animation poses across all zones
-      for (const zonePos of zonePositions) {
-        this.physics.position.copy(zonePos);
-        this.cat.mesh.position.copy(zonePos);
-        this.camera.position.set(zonePos.x, zonePos.y + 1.8, zonePos.z + 3.5);
-        this.camera.lookAt(zonePos.x, zonePos.y + 0.4, zonePos.z);
-
-        if (this.rats[0]) this.rats[0].mesh.position.set(zonePos.x + 1.2, zonePos.y, zonePos.z - 1.5);
-        if (this.mutantCats[0]) this.mutantCats[0].mesh.position.set(zonePos.x - 1.2, zonePos.y, zonePos.z - 1.5);
-
-        for (const actionKey of catActions) {
-          this.cat.cyclePrewarmAction(actionKey);
-
-          this.renderer.shadowMap.needsUpdate = true;
-          this.renderer.render(this.scene, this.camera);
-        }
-
-        const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
-        for (const ang of angles) {
-          this.camera.lookAt(zonePos.x + Math.sin(ang) * 30, zonePos.y + 0.4, zonePos.z + Math.cos(ang) * 30);
-          this.renderer.shadowMap.needsUpdate = true;
-          this.renderer.render(this.scene, this.camera);
-        }
+      // Pass A: Pre-warm skeletal animation poses for cat and enemies
+      for (const actionKey of catActions) {
+        this.cat.cyclePrewarmAction(actionKey);
+        this.renderer.render(this.scene, this.camera);
       }
+      await new Promise(r => setTimeout(r, 16));
 
       // Pass B: Target Lock Green Trajectory variant
       this.trajectoryVisualizer.setTargetLock(true);
       this.renderer.render(this.scene, this.camera);
+      await new Promise(r => setTimeout(r, 16));
 
-      // Pass C: Sonar Whiskers Blueprint mode across all zones
+      // Pass C: Sonar Whiskers Blueprint mode across all materials
       this.renderSystem.setWhiskersMode(this.scene, true);
       for (let i = 0; i < this.rats.length; i++) this.rats[i].setWhiskersMode(true);
       for (let i = 0; i < this.mutantCats.length; i++) this.mutantCats[i].setWhiskersAura(true, true);
@@ -453,14 +437,8 @@ export class GameEngine {
       if (typeof this.renderer.compile === 'function') {
         this.renderer.compile(this.scene, this.camera);
       }
-      for (const zonePos of zonePositions) {
-        this.camera.position.set(zonePos.x, zonePos.y + 1.8, zonePos.z + 3.5);
-        const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
-        for (const ang of angles) {
-          this.camera.lookAt(zonePos.x + Math.sin(ang) * 30, zonePos.y, zonePos.z + Math.cos(ang) * 30);
-          this.renderer.render(this.scene, this.camera);
-        }
-      }
+      this.renderer.render(this.scene, this.camera);
+      await new Promise(r => setTimeout(r, 16));
 
       // Restore normal environment & camera to Alba
       this.renderSystem.setWhiskersMode(this.scene, false);

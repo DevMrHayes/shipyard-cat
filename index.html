@@ -32,14 +32,28 @@
     }
 
     // 2. Global Error Shield: Catch any uncaught runtime errors or failed script loads
+    function reportToDevLogger(type, message, details) {
+      try {
+        if (window.location.protocol.startsWith('http')) {
+          fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entries: [{ type, message, details, time: new Date().toISOString() }] })
+          }).catch(function() {});
+        }
+      } catch (e) {}
+    }
+
     window.onerror = function(message, source, lineno, colno, error) {
       console.error('[ShipyardCat Error Shield]', message, source, lineno, error);
+      reportToDevLogger('ERROR', String(message), { source, lineno, colno, stack: error ? error.stack : undefined });
       showErrorFallback(message + (source ? ' (' + source + ':' + lineno + ')' : ''));
       return false;
     };
 
     window.onunhandledrejection = function(event) {
       console.error('[ShipyardCat Promise Rejection]', event.reason);
+      reportToDevLogger('UNHANDLED_REJECTION', event.reason ? (event.reason.message || String(event.reason)) : 'Unhandled promise rejection', { stack: event.reason ? event.reason.stack : undefined });
       showErrorFallback(event.reason ? (event.reason.message || event.reason) : 'Unhandled promise rejection');
     };
 

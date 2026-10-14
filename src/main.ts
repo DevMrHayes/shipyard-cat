@@ -7,16 +7,26 @@ import { TestRunner, TestResult } from './tests/TestRunner';
 import { CatVitals } from './core/VitalsSystem';
 import { ShipbuildingAssistEvent } from './core/AssistanceEngine';
 import { soundEngine } from './core/SoundEngine';
+import { RemoteLogger } from './core/RemoteLogger';
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize automated local error logging bridge
+  RemoteLogger.init();
+
   const container = document.getElementById('game-container');
   if (!container) return;
 
-  // Register High-Performance Asset Cache Service Worker
-  if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('/sw.js').catch(err => {
-      console.warn('[SW Registration Note]', err);
-    });
+  // In development, ensure all service workers are unregistered so Vite dev HMR & requests are never intercepted
+  if ('serviceWorker' in navigator) {
+    if (import.meta.env.DEV) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        for (const reg of regs) reg.unregister();
+      });
+    } else if (window.location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        console.warn('[SW Registration Note]', err);
+      });
+    }
   }
 
   // Loading Screen Elements
@@ -33,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let game: GameEngine;
   try {
     game = new GameEngine(container);
+    RemoteLogger.bindCanvas(game.renderer.domElement);
     game.onFrameUpdate = () => {
       updatePerformanceProfiler();
       updateSonarDistanceBadge();

@@ -5,3 +5,5 @@ dist/
 .DS_Store
 .system_generated/
 scratch/
+.agents/logs/
+logs/
