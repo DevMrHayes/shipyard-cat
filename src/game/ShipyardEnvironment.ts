@@ -19,6 +19,7 @@ export class ShipyardEnvironment {
   public spatialGrid: SpatialHashGrid = new SpatialHashGrid(8.0);
   public seagullFlock: SeagullFlock | null = null;
   public stylizedWater: StylizedWater | null = null;
+  public stylizedWaterDD12: StylizedWater | null = null;
   public dorothyCapstanMesh: THREE.Mesh | null = null;
   public craneTrolley: THREE.Group | null = null;
   public weldingSparkParticles: THREE.Points | null = null;
@@ -2523,17 +2524,17 @@ export class ShipyardEnvironment {
     this.platforms.push({ minX: -33.4, maxX: -30.6, minZ: -15.4, maxZ: -12.6, height: 1.2 });
     this.registerObstacle(new THREE.Vector3(-33.2, 0.0, -15.2), new THREE.Vector3(-30.8, 1.2, -12.8), 'Sarah Jenkins Pallet Crate');
 
-    const waterGeo = new THREE.PlaneGeometry(30, 80);
-    waterGeo.rotateX(-Math.PI / 2);
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x0284c7,
-      roughness: 0.1,
-      metalness: 0.8,
-      transparent: true,
-      opacity: 0.75
+    const dd12Water = new StylizedWater({
+      width: 30,
+      depth: 80,
+      position: new THREE.Vector3(20, 0.05, 30),
+      segmentsX: 4,
+      segmentsZ: 4,
+      isEnclosedBasin: true,
+      waveScale: 0.35
     });
-    this.dryDockWater = new THREE.Mesh(waterGeo, waterMat);
-    this.dryDockWater.position.set(20, 0.05, 30);
+    this.stylizedWaterDD12 = dd12Water;
+    this.dryDockWater = dd12Water.mesh;
     this.group.add(this.dryDockWater);
 
     const palletPositions = [
@@ -2634,9 +2635,14 @@ export class ShipyardEnvironment {
       }
     }
 
+    this.waterTime += deltaTime;
+
     // Dynamic Stylized Water Update
     if (this.stylizedWater) {
-      this.stylizedWater.update(deltaTime);
+      this.stylizedWater.update(this.waterTime, catPosition);
+    }
+    if (this.stylizedWaterDD12) {
+      this.stylizedWaterDD12.update(this.waterTime, catPosition);
     }
 
     // Ambient Maritime Seagull Flock Update

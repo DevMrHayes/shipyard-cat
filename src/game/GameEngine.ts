@@ -289,6 +289,17 @@ export class GameEngine {
     this.renderSystem.events.onLocationChange = (location, isIndoors) => {
       this.showNotification(`Entering: ${location}`, isIndoors ? 'Indoor stealth area active. Clustered machinery & conduits overhead.' : 'Open shipyard staging yard.', 'info');
       this.eventBus.emit('location:change', { location, isIndoors });
+
+      // Dynamic Acoustic Zone Transitions with convolution reverb
+      if (location.includes('Machine Shop')) {
+        soundEngine.setAcousticZone('MACHINE_SHOP');
+      } else if (location.includes('Dry Dock 1') || location.includes('Dry Dock 12')) {
+        soundEngine.setAcousticZone('DRY_DOCK_BASIN');
+      } else if (location.includes('Vault')) {
+        soundEngine.setAcousticZone('RADIATION_VAULT');
+      } else {
+        soundEngine.setAcousticZone('OUTDOOR_YARD');
+      }
     };
   }
 
@@ -1542,6 +1553,17 @@ export class GameEngine {
       frameDelta,
       this.cat.mesh.position,
       this.rats.map((r) => ({ mesh: r.mesh, type: (r.isKingpin ? 'kingpin' : 'prey') as 'kingpin' | 'prey' }))
+    );
+
+    // Update Web Audio 3D Positional Listener coordinates & forward heading (Zero-allocation)
+    const camDirX = -Math.sin(renderYaw);
+    const camDirZ = -Math.cos(renderYaw);
+    soundEngine.updateListener(
+      this.cat.mesh.position.x,
+      this.cat.mesh.position.y,
+      this.cat.mesh.position.z,
+      camDirX,
+      camDirZ
     );
     this.flightRecorder.endSection('camera_spring');
 

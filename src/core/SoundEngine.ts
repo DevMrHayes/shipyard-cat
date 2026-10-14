@@ -1,3 +1,15 @@
+export type AcousticZone =
+  | 'OUTDOOR_YARD'
+  | 'MACHINE_SHOP'
+  | 'DRY_DOCK_BASIN'
+  | 'RADIATION_VAULT';
+
+export type SpatialSoundType =
+  | 'WELDING_SIZZLE'
+  | 'RAT_SQUEAK'
+  | 'WATER_LAP'
+  | 'MACHINE_HUM';
+
 // Procedural Web Audio Sound Engine for Industrial Atmosphere, Feline Vocalizations & Combat FX
 // Zero-Allocation, Non-Blocking, Pre-rendered AudioBuffer Architecture
 export class SoundEngine {
@@ -5,11 +17,27 @@ export class SoundEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
+  private dryGain: GainNode | null = null;
+  private wetGain: GainNode | null = null;
+  private convolver: ConvolverNode | null = null;
   private isMuted: boolean = false;
   private currentRadiation: number = 0;
   private geigerAccumulator: number = 0;
   private nextGeigerInterval: number = 0.5;
   private lastGeigerTimestamp: number = 0;
+
+  // Spatial audio & environmental convolution reverb state
+  private impulseCache: Map<AcousticZone, AudioBuffer> = new Map();
+  private spatialBufferCache: Map<SpatialSoundType, AudioBuffer> = new Map();
+  private currentZone: AcousticZone = 'OUTDOOR_YARD';
+
+  // Zone Wet/Dry mix profiles
+  private static readonly ZONE_MIX: Record<AcousticZone, { dry: number; wet: number }> = {
+    OUTDOOR_YARD: { dry: 0.92, wet: 0.14 },
+    MACHINE_SHOP: { dry: 0.72, wet: 0.48 },
+    DRY_DOCK_BASIN: { dry: 0.65, wet: 0.60 },
+    RADIATION_VAULT: { dry: 0.85, wet: 0.22 },
+  };
 
   // Cached pre-rendered procedural AudioBuffers (Zero per-frame / per-trigger allocation)
   private geigerBuffer: AudioBuffer | null = null;
@@ -55,10 +83,31 @@ export class SoundEngine {
       this.masterGain.gain.value = this.isMuted ? 0 : 1.0;
       this.masterGain.connect(this.ctx.destination);
     }
+    if (!this.dryGain) {
+      this.dryGain = this.ctx.createGain();
+      this.dryGain.gain.value = SoundEngine.ZONE_MIX.OUTDOOR_YARD.dry;
+      this.dryGain.connect(this.masterGain);
+    }
+    if (!this.convolver) {
+      this.convolver = this.ctx.createConvolver();
+    }
+    if (!this.wetGain) {
+      this.wetGain = this.ctx.createGain();
+      this.wetGain.gain.value = SoundEngine.ZONE_MIX.OUTDOOR_YARD.wet;
+      this.convolver.connect(this.wetGain);
+      this.wetGain.connect(this.masterGain);
+    }
     if (!this.sfxGain) {
       this.sfxGain = this.ctx.createGain();
       this.sfxGain.gain.value = 1.0;
-      this.sfxGain.connect(this.masterGain);
+      this.sfxGain.connect(this.dryGain);
+      this.sfxGain.connect(this.convolver);
+    }
+
+    this.bakeImpulseResponses();
+    this.bakeSpatialSoundBuffers();
+    if (this.convolver) {
+      this.convolver.buffer = this.impulseCache.get(this.currentZone) || null;
     }
 
     this.prewarmAudioBuffers();
@@ -78,6 +127,11 @@ export class SoundEngine {
     this.ctx = null;
     this.masterGain = null;
     this.sfxGain = null;
+    this.dryGain = null;
+    this.wetGain = null;
+    this.convolver = null;
+    this.impulseCache.clear();
+    this.spatialBufferCache.clear();
     this.clearBuffers();
   }
 
@@ -476,6 +530,232 @@ export class SoundEngine {
         }
       });
     }
+  }
+
+  /**
+   * Generates zero-network procedural Impulse Responses for the 4 Shipyard acoustic zones.
+   */
+  private bakeImpulseResponses(): void {
+    if (!this.ctx) return;
+
+    const configs: Record<AcousticZone, { duration: number; decay: number; metallic: boolean; muffled: boolean }> = {
+      OUTDOOR_YARD: { duration: 0.4, decay: 6.5, metallic: false, muffled: false },
+      MACHINE_SHOP: { duration: 1.8, decay: 2.6, metallic: true, muffled: false },
+      DRY_DOCK_BASIN: { duration: 2.4, decay: 1.8, metallic: false, muffled: false },
+      RADIATION_VAULT: { duration: 0.2, decay: 14.0, metallic: false, muffled: true },
+    };
+
+    (Object.keys(configs) as AcousticZone[]).forEach((zone) => {
+      const cfg = configs[zone];
+      const sampleRate = this.ctx!.sampleRate;
+      const length = Math.floor(sampleRate * cfg.duration);
+      const buffer = this.ctx!.createBuffer(2, length, sampleRate);
+
+      for (let ch = 0; ch < 2; ch++) {
+        const data = buffer.getChannelData(ch);
+        let prevSample = 0;
+        for (let i = 0; i < length; i++) {
+          const t = i / sampleRate;
+          let env = Math.exp(-cfg.decay * t);
+
+          let sample = (Math.random() * 2 - 1) * env;
+
+          // Machine Shop: High-frequency metallic flutter echo
+          if (cfg.metallic) {
+            const flutter = Math.sin(2 * Math.PI * 38 * t) > 0.7 ? 1.65 : 0.6;
+            const ring = Math.sin(2 * Math.PI * (1420 + ch * 110) * t) * 0.35;
+            sample = (sample * flutter + ring * env) * 0.75;
+          }
+
+          // Dry Dock Basin: Low-end cavernous concrete resonance
+          if (zone === 'DRY_DOCK_BASIN') {
+            const concreteBoom = Math.sin(2 * Math.PI * 92 * t) * Math.exp(-1.5 * t) * 0.4;
+            sample = sample * 0.7 + concreteBoom;
+          }
+
+          // Radiation Vault: Heavily dampened lead-shielded low-pass smoothing
+          if (cfg.muffled) {
+            sample = prevSample * 0.88 + sample * 0.12;
+            prevSample = sample;
+          }
+
+          data[i] = sample;
+        }
+      }
+      this.impulseCache.set(zone, buffer);
+    });
+  }
+
+  /**
+   * Pre-renders procedural audio buffers for 3D spatial industrial/ambient emitters.
+   */
+  private bakeSpatialSoundBuffers(): void {
+    if (!this.ctx) return;
+    const sr = this.ctx.sampleRate;
+
+    // 1. WELDING_SIZZLE (0.45s high-frequency arc crackle)
+    {
+      const len = Math.floor(sr * 0.45);
+      const buf = this.ctx.createBuffer(1, len, sr);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const env = Math.sin((t / 0.45) * Math.PI);
+        const crackle = Math.random() > 0.25 ? (Math.random() * 2 - 1) : 0;
+        const buzz = Math.sin(2 * Math.PI * 120 * t) * 0.3;
+        data[i] = (crackle * 0.75 + buzz) * env * 0.5;
+      }
+      this.spatialBufferCache.set('WELDING_SIZZLE', buf);
+    }
+
+    // 2. RAT_SQUEAK (0.18s FM high-pitched rodent chirp)
+    {
+      const len = Math.floor(sr * 0.18);
+      const buf = this.ctx.createBuffer(1, len, sr);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const env = Math.sin((t / 0.18) * Math.PI);
+        const freq = 2400 + Math.sin(t * 95) * 650;
+        data[i] = Math.sin(2 * Math.PI * freq * t) * env * 0.45;
+      }
+      this.spatialBufferCache.set('RAT_SQUEAK', buf);
+    }
+
+    // 3. WATER_LAP (0.65s filtered shoreline slosh)
+    {
+      const len = Math.floor(sr * 0.65);
+      const buf = this.ctx.createBuffer(1, len, sr);
+      const data = buf.getChannelData(0);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const env = Math.sin((t / 0.65) * Math.PI);
+        const raw = (Math.random() * 2 - 1) * env;
+        lp = lp * 0.92 + raw * 0.08;
+        data[i] = lp * 1.8;
+      }
+      this.spatialBufferCache.set('WATER_LAP', buf);
+    }
+
+    // 4. MACHINE_HUM (0.8s 60Hz/120Hz transformer drone pulse)
+    {
+      const len = Math.floor(sr * 0.8);
+      const buf = this.ctx.createBuffer(1, len, sr);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const env = Math.sin((t / 0.8) * Math.PI);
+        const hum = Math.sin(2 * Math.PI * 60 * t) * 0.5 + Math.sin(2 * Math.PI * 120 * t) * 0.3;
+        data[i] = hum * env * 0.4;
+      }
+      this.spatialBufferCache.set('MACHINE_HUM', buf);
+    }
+  }
+
+  /**
+   * Updates the 3D Web Audio API Listener to match Alba's world position and camera heading.
+   * Zero object allocations per frame.
+   */
+  public updateListener(x: number, y: number, z: number, forwardX: number, forwardZ: number): void {
+    if (!this.ctx || this.isMuted) return;
+    const listener = this.ctx.listener;
+    const now = this.ctx.currentTime;
+
+    if (listener.positionX) {
+      listener.positionX.setValueAtTime(x, now);
+      listener.positionY.setValueAtTime(y, now);
+      listener.positionZ.setValueAtTime(z, now);
+      listener.forwardX.setValueAtTime(forwardX, now);
+      listener.forwardY.setValueAtTime(0, now);
+      listener.forwardZ.setValueAtTime(forwardZ, now);
+      listener.upX.setValueAtTime(0, now);
+      listener.upY.setValueAtTime(1, now);
+      listener.upZ.setValueAtTime(0, now);
+    } else {
+      listener.setPosition(x, y, z);
+      listener.setOrientation(forwardX, 0, forwardZ, 0, 1, 0);
+    }
+  }
+
+  /**
+   * Transitions the environmental convolution reverb to the target Shipyard acoustic zone
+   * with smooth wet/dry gain crossfading.
+   */
+  public setAcousticZone(zone: AcousticZone): void {
+    if (this.currentZone === zone) return;
+    this.currentZone = zone;
+
+    if (!this.ctx || !this.convolver || !this.dryGain || !this.wetGain) return;
+
+    const irBuffer = this.impulseCache.get(zone);
+    if (irBuffer) {
+      this.convolver.buffer = irBuffer;
+    }
+
+    const mix = SoundEngine.ZONE_MIX[zone];
+    const now = this.ctx.currentTime;
+    this.dryGain.gain.setTargetAtTime(mix.dry, now, 0.18);
+    this.wetGain.gain.setTargetAtTime(mix.wet, now, 0.18);
+  }
+
+  public getAcousticZone(): AcousticZone {
+    return this.currentZone;
+  }
+
+  /**
+   * Plays a 3D spatialized sound at world coordinates (x, y, z) using an inverse-distance PannerNode.
+   * Self-disconnects on completion for zero memory leaks.
+   */
+  public playSpatialSound(
+    soundType: SpatialSoundType | string,
+    x: number,
+    y: number,
+    z: number,
+    volume: number = 1.0
+  ): void {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx || !this.dryGain || !this.convolver) return;
+
+    const buffer = this.spatialBufferCache.get(soundType as SpatialSoundType);
+    if (!buffer) return;
+
+    const now = this.ctx.currentTime;
+
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(Math.max(0.01, Math.min(2.0, volume)), now);
+
+    const panner = this.ctx.createPanner();
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 2.0;
+    panner.maxDistance = 45.0;
+    panner.rolloffFactor = 1.2;
+
+    if (panner.positionX) {
+      panner.positionX.setValueAtTime(x, now);
+      panner.positionY.setValueAtTime(y, now);
+      panner.positionZ.setValueAtTime(z, now);
+    } else {
+      panner.setPosition(x, y, z);
+    }
+
+    source.connect(gain);
+    gain.connect(panner);
+    panner.connect(this.dryGain);
+    panner.connect(this.convolver);
+
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+      panner.disconnect();
+    };
+
+    source.start(now);
   }
 
   private playBuffer(buffer: AudioBuffer | null, eventName: string = 'SFX'): void {
