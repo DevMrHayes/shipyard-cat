@@ -107,10 +107,10 @@ export class RenderSubsystem {
     // 2. Setup WebGL Renderer (AAA Grade Pipeline)
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.shadowMap.autoUpdate = true;
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -147,18 +147,18 @@ export class RenderSubsystem {
     this.fillLight.position.set(-60, 45, -45);
     scene.add(this.fillLight);
 
-    // High-mast floodlights
-    this.southYardFlood = new THREE.SpotLight(0xff9922, 3.8, 85, Math.PI / 3, 0.45, 1.2);
+    // High-mast floodlights (Tightly scoped cones & distances to prevent full-scene fragment shading overlap)
+    this.southYardFlood = new THREE.SpotLight(0xff9922, 2.4, 42, Math.PI / 4, 0.45, 1.2);
     this.southYardFlood.position.set(-20, 18, -15);
     this.southYardFlood.target.position.set(-20, 0, -25);
     scene.add(this.southYardFlood, this.southYardFlood.target);
 
-    this.dryDockFlood = new THREE.SpotLight(0x60a5fa, 4.2, 115, Math.PI / 3.5, 0.35, 1.0);
+    this.dryDockFlood = new THREE.SpotLight(0x60a5fa, 2.8, 48, Math.PI / 4.5, 0.35, 1.0);
     this.dryDockFlood.position.set(20, 36, 25);
     this.dryDockFlood.target.position.set(20, 0, 30);
     scene.add(this.dryDockFlood, this.dryDockFlood.target);
 
-    this.subShopFlood = new THREE.SpotLight(0xfde047, 3.4, 75, Math.PI / 3, 0.3, 1.1);
+    this.subShopFlood = new THREE.SpotLight(0xfde047, 2.4, 38, Math.PI / 4, 0.3, 1.1);
     this.subShopFlood.position.set(-30, 18, 45);
     this.subShopFlood.target.position.set(-30, 0, 45);
     scene.add(this.subShopFlood, this.subShopFlood.target);
@@ -531,13 +531,19 @@ export class RenderSubsystem {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
   }
+
+  private shadowFrameCounter: number = 0;
 
   /**
    * Render frame pass
    */
   public render(scene: THREE.Scene): void {
+    // Throttle shadow map re-renders to every 2nd frame (cuts shadow pass draw calls by 50%)
+    if (this.shadowFrameCounter++ % 2 === 0) {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     this.renderer.render(scene, this.camera);
   }
 

@@ -98,10 +98,10 @@ export class MutantCatEntity {
       this.buildProceduralMutant(proceduralGroup);
     }
 
-    // Eye PointLight
+    // Eye PointLight (kept allocated for API compatibility but detached from scene to eliminate forward PBR light loop)
     this.eyeLight = new THREE.PointLight(0xa855f7, 1.2, 5);
     this.eyeLight.position.set(0.5, 0.5, 0);
-    this.mesh.add(this.eyeLight);
+    // this.mesh.add(this.eyeLight);
 
     // Radioactive Whiskers Aura (Visible in Whiskers Mode with Tier 2+)
     const auraGeo = new THREE.SphereGeometry(0.7, 12, 12);

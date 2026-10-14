@@ -73,14 +73,30 @@ document.addEventListener('DOMContentLoaded', () => {
         setProgress(100, 'Pre-Flight Complete (Fallback Mode Ready)');
       }
 
-      // Soundtrack preferences
+      // Soundtrack & Volume preferences
       const btnToggleMusicLoading = document.getElementById('btn-toggle-music-loading') as HTMLButtonElement | null;
+      const btnVolumeMusicLoading = document.getElementById('btn-volume-music-loading') as HTMLButtonElement | null;
+      const btnMusicToggle = document.getElementById('btn-music-toggle') as HTMLButtonElement | null;
+      const btnVolumeToggle = document.getElementById('btn-volume-toggle') as HTMLButtonElement | null;
       const hudMusicLabel = document.getElementById('hud-music-label');
+      const hudVolumeLabel = document.getElementById('hud-volume-label');
+
       let musicPref = true;
       try {
         const stored = localStorage.getItem('shipyard_cat_music_enabled');
         if (stored !== null) musicPref = stored === 'true';
       } catch {}
+
+      const syncVolumeUI = (pct: number) => {
+        const volText = pct > 0 ? `VOL: ${pct}%` : 'MUTE';
+        if (btnVolumeMusicLoading) {
+          btnVolumeMusicLoading.textContent = volText;
+          btnVolumeMusicLoading.style.background = pct > 0 ? '#0284c7' : '#64748b';
+        }
+        if (hudVolumeLabel) {
+          hudVolumeLabel.textContent = pct > 0 ? `🔉 Vol: ${pct}%` : '🔇 Vol: OFF';
+        }
+      };
 
       const syncMusicButtons = (enabled: boolean) => {
         musicPref = enabled;
@@ -92,23 +108,46 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hudMusicLabel) {
           hudMusicLabel.textContent = enabled ? '🎵 Music: ON' : '🔇 Music: OFF';
         }
+        syncVolumeUI(enabled ? soundEngine.getVolumePercentage() : 0);
       };
-      syncMusicButtons(musicPref);
 
+      // Initial UI sync
+      syncMusicButtons(musicPref);
+      syncVolumeUI(musicPref ? soundEngine.getVolumePercentage() : 0);
+
+      // Loading Screen Music Toggle
       if (btnToggleMusicLoading) {
         btnToggleMusicLoading.onclick = (e) => {
           e.stopPropagation();
-          syncMusicButtons(!musicPref);
-          soundEngine.setMusicEnabled(musicPref);
+          const nextState = !musicPref;
+          soundEngine.setMusicEnabled(nextState);
+          syncMusicButtons(nextState);
         };
       }
 
-      const btnMusicToggle = document.getElementById('btn-music-toggle') as HTMLButtonElement | null;
+      // Loading Screen Volume Cycle
+      if (btnVolumeMusicLoading) {
+        btnVolumeMusicLoading.onclick = (e) => {
+          e.stopPropagation();
+          soundEngine.cycleVolume();
+          syncMusicButtons(soundEngine.isMusicEnabled());
+        };
+      }
+
+      // HUD Music Toggle
       if (btnMusicToggle) {
         btnMusicToggle.onclick = () => {
           const nextState = !soundEngine.isMusicEnabled();
           soundEngine.setMusicEnabled(nextState);
           syncMusicButtons(nextState);
+        };
+      }
+
+      // HUD Volume Cycle
+      if (btnVolumeToggle) {
+        btnVolumeToggle.onclick = () => {
+          soundEngine.cycleVolume();
+          syncMusicButtons(soundEngine.isMusicEnabled());
         };
       }
 

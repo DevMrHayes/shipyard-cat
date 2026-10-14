@@ -815,6 +815,16 @@ export class SoundEngine {
       } catch {}
     }
 
+    try {
+      const storedVol = localStorage.getItem('shipyard_cat_music_volume');
+      if (storedVol !== null) {
+        const parsed = parseFloat(storedVol);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1.0) {
+          this.musicVolume = parsed;
+        }
+      }
+    } catch {}
+
     if (!this.bgmExploration) {
       try {
         this.bgmExploration = new Audio('/src/music/Paws_at_the_Pier.mp3');
@@ -843,6 +853,9 @@ export class SoundEngine {
     } catch {}
 
     if (this.musicEnabled) {
+      if (this.musicVolume === 0) {
+        this.musicVolume = 0.22;
+      }
       this.playCurrentMusic();
     } else {
       this.pauseAllMusic();
@@ -855,11 +868,50 @@ export class SoundEngine {
 
   public setMusicVolume(volume: number): void {
     this.musicVolume = Math.max(0.0, Math.min(1.0, volume));
+    try {
+      localStorage.setItem('shipyard_cat_music_volume', this.musicVolume.toString());
+    } catch {}
     this.updateBGMVolumes();
   }
 
   public getMusicVolume(): number {
     return this.musicVolume;
+  }
+
+  public getVolumePercentage(): number {
+    return Math.round(this.musicVolume * 100);
+  }
+
+  /**
+   * Cycles background music volume level: 25% -> 15% -> 5% -> 0% (OFF) -> 25%
+   */
+  public cycleVolume(): number {
+    const levels = [0.25, 0.15, 0.05, 0.0];
+    const currentIndex = levels.findIndex((lvl) => Math.abs(lvl - this.musicVolume) < 0.03);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % levels.length;
+    const nextVolume = levels[nextIndex];
+
+    this.musicVolume = nextVolume;
+    try {
+      localStorage.setItem('shipyard_cat_music_volume', nextVolume.toString());
+    } catch {}
+
+    if (nextVolume === 0) {
+      this.musicEnabled = false;
+      try {
+        localStorage.setItem('shipyard_cat_music_enabled', 'false');
+      } catch {}
+      this.pauseAllMusic();
+    } else {
+      this.musicEnabled = true;
+      try {
+        localStorage.setItem('shipyard_cat_music_enabled', 'true');
+      } catch {}
+      this.updateBGMVolumes();
+      this.playCurrentMusic();
+    }
+
+    return nextVolume;
   }
 
   /**

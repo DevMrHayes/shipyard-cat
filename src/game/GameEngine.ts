@@ -1626,8 +1626,17 @@ export class GameEngine {
     this.updateRatsAndHunting(frameDelta);
     if (this.frameTick % 20 === 0) {
       const kingpin = this.rats.find((r) => r.isKingpin && r.state !== 'CAUGHT');
-      const isBossNear = !!(kingpin && this.cat && this.cat.mesh.position.distanceTo(kingpin.mesh.position) < 32.0);
-      soundEngine.updateBGM(isBossNear);
+      const isBattlingBoss = !!(
+        kingpin &&
+        this.cat &&
+        (
+          kingpin.bossPhase > 1 ||
+          kingpin.health < kingpin.maxHealth ||
+          kingpin.isStunned ||
+          (this.cat.mesh.position.y < -0.8 && this.cat.mesh.position.distanceTo(kingpin.mesh.position) < 8.0)
+        )
+      );
+      soundEngine.updateBGM(isBattlingBoss);
     }
     this.flightRecorder.endSection('rats_ai');
 

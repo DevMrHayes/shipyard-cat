@@ -246,7 +246,8 @@ export class RatEntity {
 
     this.thermalLight = new THREE.PointLight(isKingpin ? 0xff0055 : 0xff8800, 0, 10);
     this.thermalLight.position.y = 0.5;
-    this.mesh.add(this.thermalLight);
+    // Detached from mesh: rats use thermalAura mesh and emissive eyes to eliminate GPU forward light pass overhead
+    // this.mesh.add(this.thermalLight);
 
     // --- SCENT FOOTSTEP TRAIL PARTICLES ---
     const scentCount = 30;

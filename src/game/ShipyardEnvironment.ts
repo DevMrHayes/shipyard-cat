@@ -603,12 +603,7 @@ export class ShipyardEnvironment {
     instancedHousings.castShadow = true;
     this.group.add(instancedPoles, instancedHousings);
 
-    // Active Sodium Luminescence PointLights on key stanchions
-    [lightPositions[0], lightPositions[1], lightPositions[2], lightPositions[3]].forEach(pos => {
-      const sodiumLamp = new THREE.PointLight(0xff9922, 1.8, 22);
-      sodiumLamp.position.set(pos.x, pos.y + 6.7, pos.z);
-      this.group.add(sodiumLamp);
-    });
+    // Sodium lamp stanchion housings use emissive materials for zero-overhead illumination (point lights eliminated for GPU performance)
 
     this.registerObstacle(new THREE.Vector3(-106.0, 0, -110.0), new THREE.Vector3(-104.0, 10.0, 110.0), 'West Yard Security Fence');
     this.registerObstacle(new THREE.Vector3(-106.0, 0, 104.0), new THREE.Vector3(56.5, 10.0, 106.0), 'North Yard Security Fence');
