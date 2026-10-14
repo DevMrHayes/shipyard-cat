@@ -73,6 +73,45 @@ document.addEventListener('DOMContentLoaded', () => {
         setProgress(100, 'Pre-Flight Complete (Fallback Mode Ready)');
       }
 
+      // Soundtrack preferences
+      const btnToggleMusicLoading = document.getElementById('btn-toggle-music-loading') as HTMLButtonElement | null;
+      const hudMusicLabel = document.getElementById('hud-music-label');
+      let musicPref = true;
+      try {
+        const stored = localStorage.getItem('shipyard_cat_music_enabled');
+        if (stored !== null) musicPref = stored === 'true';
+      } catch {}
+
+      const syncMusicButtons = (enabled: boolean) => {
+        musicPref = enabled;
+        if (btnToggleMusicLoading) {
+          btnToggleMusicLoading.textContent = enabled ? 'ON' : 'OFF';
+          btnToggleMusicLoading.style.background = enabled ? '#10b981' : '#64748b';
+          btnToggleMusicLoading.style.color = enabled ? '#022c22' : '#f8fafc';
+        }
+        if (hudMusicLabel) {
+          hudMusicLabel.textContent = enabled ? '🎵 Music: ON' : '🔇 Music: OFF';
+        }
+      };
+      syncMusicButtons(musicPref);
+
+      if (btnToggleMusicLoading) {
+        btnToggleMusicLoading.onclick = (e) => {
+          e.stopPropagation();
+          syncMusicButtons(!musicPref);
+          soundEngine.setMusicEnabled(musicPref);
+        };
+      }
+
+      const btnMusicToggle = document.getElementById('btn-music-toggle') as HTMLButtonElement | null;
+      if (btnMusicToggle) {
+        btnMusicToggle.onclick = () => {
+          const nextState = !soundEngine.isMusicEnabled();
+          soundEngine.setMusicEnabled(nextState);
+          syncMusicButtons(nextState);
+        };
+      }
+
       if (btnEnterGame) {
         btnEnterGame.disabled = false;
         btnEnterGame.style.display = 'inline-block';
@@ -81,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
           try {
             soundEngine.init();
             soundEngine.prewarmAudioBuffers();
+            soundEngine.initMusic(musicPref);
             soundEngine.playPurr();
           } catch (audioErr) {
             console.warn('[Audio Subsystem Non-Critical Note]', audioErr);

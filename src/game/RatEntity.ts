@@ -50,6 +50,9 @@ export class RatEntity {
     forcedMagenta: false
   };
 
+  private static lastGlobalSqueakTime: number = -100;
+  private static readonly MIN_GLOBAL_SQUEAK_INTERVAL: number = 3.5;
+
   public proceduralGroup: THREE.Group;
   public readyPromise: Promise<void> = Promise.resolve();
 
@@ -444,7 +447,7 @@ export class RatEntity {
       if (this.state !== 'FLEEING') {
         this.state = 'FLEEING';
         this.panicBurstSpeed = 1.75;
-        this.panicSqueakTimer = 0;
+        this.panicSqueakTimer = 1.0 + Math.random() * 2.0;
       }
     } else if (perception === 'SUSPICIOUS') {
       if (this.state === 'FORAGING') {
@@ -471,8 +474,14 @@ export class RatEntity {
 
       this.panicSqueakTimer -= deltaTime;
       if (this.panicSqueakTimer <= 0) {
-        soundEngine.playRatPanic();
-        this.panicSqueakTimer = 1.4 + Math.random() * 1.6;
+        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+        if (distToCat < 12.0 && (now - RatEntity.lastGlobalSqueakTime) >= RatEntity.MIN_GLOBAL_SQUEAK_INTERVAL) {
+          RatEntity.lastGlobalSqueakTime = now;
+          soundEngine.playSpatialSound('RAT_SQUEAK', this.mesh.position.x, this.mesh.position.y, this.mesh.position.z, 0.35);
+          this.panicSqueakTimer = 4.5 + Math.random() * 4.0;
+        } else {
+          this.panicSqueakTimer = 1.5 + Math.random() * 2.0;
+        }
       }
 
       const fleeDir = RatEntity.scratchFleeDir.subVectors(this.mesh.position, catPosition).normalize();

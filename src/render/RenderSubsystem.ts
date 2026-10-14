@@ -61,6 +61,7 @@ export class RenderSubsystem {
   public sonarWaveElapsed: number = 0;
   public static readonly SONAR_WAVE_DURATION = 1.2; // 1.2s expansion to 35m
   public static readonly SONAR_WAVE_MAX_RADIUS = 35.0;
+  private lastPreyWhiskersMode: boolean = false;
 
   public static readonly THERMAL_COLORS = {
     PREY_AMBER: new THREE.Color(0xff9500),       // Warm high-contrast amber/orange for mice & rats
@@ -108,7 +109,7 @@ export class RenderSubsystem {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.shadowMap.autoUpdate = true;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -125,12 +126,12 @@ export class RenderSubsystem {
     this.hemiLight = new THREE.HemisphereLight(0xcbd5e1, 0x1e293b, 1.35);
     scene.add(this.hemiLight);
 
-    // Calibrated golden sunset sun with soft shadow cascade tracking
+    // Calibrated golden sunset sun with crisp shadow cascade tracking
     this.sunLight = new THREE.DirectionalLight(0xfff4e0, 2.45);
     this.sunLight.position.set(45, 48, 25);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 2048;
-    this.sunLight.shadow.mapSize.height = 2048;
+    this.sunLight.shadow.mapSize.width = 1024;
+    this.sunLight.shadow.mapSize.height = 1024;
     this.sunLight.shadow.bias = -0.00035;
     this.sunLight.shadow.normalBias = 0.02;
     this.sunLight.shadow.camera.near = 5;
@@ -291,7 +292,8 @@ export class RenderSubsystem {
       }
     }
 
-    if (preyEntities) {
+    if (preyEntities && (this.isWhiskersMode || this.isWhiskersMode !== this.lastPreyWhiskersMode)) {
+      this.lastPreyWhiskersMode = this.isWhiskersMode;
       for (let i = 0; i < preyEntities.length; i++) {
         const entity = preyEntities[i];
         const targetColor =

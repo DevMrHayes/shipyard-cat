@@ -220,7 +220,7 @@ export class StylizedWater {
     this.mesh = new THREE.Mesh(geometry, this.material);
     this.mesh.position.copy(config.position);
     this.mesh.name = config.isEnclosedBasin ? 'DryDockStylizedWater' : 'JamesRiverStylizedWater';
-    this.mesh.receiveShadow = true;
+    this.mesh.receiveShadow = false;
   }
 
   public update(elapsedTime: number, cameraPosition?: THREE.Vector3): void {

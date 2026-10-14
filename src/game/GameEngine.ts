@@ -1624,6 +1624,11 @@ export class GameEngine {
     // 8. AI & Entity Updates — once per render frame
     this.flightRecorder.startSection('rats_ai');
     this.updateRatsAndHunting(frameDelta);
+    if (this.frameTick % 20 === 0) {
+      const kingpin = this.rats.find((r) => r.isKingpin && r.state !== 'CAUGHT');
+      const isBossNear = !!(kingpin && this.cat && this.cat.mesh.position.distanceTo(kingpin.mesh.position) < 32.0);
+      soundEngine.updateBGM(isBossNear);
+    }
     this.flightRecorder.endSection('rats_ai');
 
     this.flightRecorder.startSection('mutants_ai');

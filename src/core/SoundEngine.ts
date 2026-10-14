@@ -31,6 +31,14 @@ export class SoundEngine {
   private spatialBufferCache: Map<SpatialSoundType, AudioBuffer> = new Map();
   private currentZone: AcousticZone = 'OUTDOOR_YARD';
 
+  // Dynamic Background Music (BGM) Subsystem
+  private musicEnabled: boolean = true;
+  private musicVolume: number = 0.22; // Gentle, ambient, non-intrusive
+  private bgmExploration: HTMLAudioElement | null = null;
+  private bgmBoss: HTMLAudioElement | null = null;
+  private isBossMusicActive: boolean = false;
+  private musicFadeInterval: any = null;
+
   // Zone Wet/Dry mix profiles
   private static readonly ZONE_MIX: Record<AcousticZone, { dry: number; wet: number }> = {
     OUTDOOR_YARD: { dry: 0.92, wet: 0.14 },
@@ -121,6 +129,14 @@ export class SoundEngine {
   }
 
   public dispose(): void {
+    if (this.musicFadeInterval) {
+      clearInterval(this.musicFadeInterval);
+      this.musicFadeInterval = null;
+    }
+    this.pauseAllMusic();
+    this.bgmExploration = null;
+    this.bgmBoss = null;
+
     if (this.ctx && this.ctx.state !== 'closed') {
       this.ctx.close().catch(() => {});
     }
@@ -768,9 +784,166 @@ export class SoundEngine {
       const source = this.ctx.createBufferSource();
       source.buffer = buffer;
       source.connect(this.sfxGain || this.ctx.destination);
+      source.onended = () => {
+        try {
+          source.disconnect();
+        } catch {}
+      };
       source.start(0);
     } catch {
       // Audio playback is completely non-blocking
+    }
+  }
+
+  /**
+   * Initializes HTML5 streaming audio background music for exploration & boss encounter.
+   */
+  public initMusic(enabled?: boolean): void {
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
+
+    if (enabled !== undefined) {
+      this.musicEnabled = enabled;
+      try {
+        localStorage.setItem('shipyard_cat_music_enabled', enabled ? 'true' : 'false');
+      } catch {}
+    } else {
+      try {
+        const stored = localStorage.getItem('shipyard_cat_music_enabled');
+        if (stored !== null) {
+          this.musicEnabled = stored === 'true';
+        }
+      } catch {}
+    }
+
+    if (!this.bgmExploration) {
+      try {
+        this.bgmExploration = new Audio('/src/music/Paws_at_the_Pier.mp3');
+        this.bgmExploration.loop = true;
+        this.bgmExploration.volume = this.musicEnabled ? this.musicVolume : 0;
+      } catch {}
+    }
+
+    if (!this.bgmBoss) {
+      try {
+        this.bgmBoss = new Audio('/src/music/Titan_s_Gantry.mp3');
+        this.bgmBoss.loop = true;
+        this.bgmBoss.volume = 0;
+      } catch {}
+    }
+
+    if (this.musicEnabled) {
+      this.playCurrentMusic();
+    }
+  }
+
+  public setMusicEnabled(enabled: boolean): void {
+    this.musicEnabled = enabled;
+    try {
+      localStorage.setItem('shipyard_cat_music_enabled', enabled ? 'true' : 'false');
+    } catch {}
+
+    if (this.musicEnabled) {
+      this.playCurrentMusic();
+    } else {
+      this.pauseAllMusic();
+    }
+  }
+
+  public isMusicEnabled(): boolean {
+    return this.musicEnabled;
+  }
+
+  public setMusicVolume(volume: number): void {
+    this.musicVolume = Math.max(0.0, Math.min(1.0, volume));
+    this.updateBGMVolumes();
+  }
+
+  public getMusicVolume(): number {
+    return this.musicVolume;
+  }
+
+  /**
+   * Smoothly crossfades between standard yard ambient music ('Paws at the Pier')
+   * and Kingpin boss combat music ('Titan's Gantry').
+   */
+  public updateBGM(isBossActive: boolean): void {
+    if (!this.musicEnabled || isBossActive === this.isBossMusicActive) return;
+    this.isBossMusicActive = isBossActive;
+
+    if (!this.bgmExploration || !this.bgmBoss) {
+      this.initMusic(this.musicEnabled);
+    }
+
+    this.playCurrentMusic();
+
+    // Smooth 1.8s crossfade
+    if (this.musicFadeInterval) clearInterval(this.musicFadeInterval);
+    const steps = 18;
+    let step = 0;
+    const startExpVol = this.bgmExploration?.volume ?? 0;
+    const startBossVol = this.bgmBoss?.volume ?? 0;
+    const targetExpVol = isBossActive ? 0 : this.musicVolume;
+    const targetBossVol = isBossActive ? this.musicVolume : 0;
+
+    this.musicFadeInterval = setInterval(() => {
+      step++;
+      const t = Math.min(1.0, step / steps);
+      if (this.bgmExploration) {
+        this.bgmExploration.volume = Math.max(0, Math.min(1, startExpVol + (targetExpVol - startExpVol) * t));
+      }
+      if (this.bgmBoss) {
+        this.bgmBoss.volume = Math.max(0, Math.min(1, startBossVol + (targetBossVol - startBossVol) * t));
+      }
+      if (t >= 1.0) {
+        clearInterval(this.musicFadeInterval);
+        this.musicFadeInterval = null;
+        if (isBossActive && this.bgmExploration) {
+          this.bgmExploration.pause();
+        } else if (!isBossActive && this.bgmBoss) {
+          this.bgmBoss.pause();
+        }
+      }
+    }, 100);
+  }
+
+  private playCurrentMusic(): void {
+    if (!this.musicEnabled) return;
+    try {
+      if (this.isBossMusicActive) {
+        if (this.bgmBoss) {
+          this.bgmBoss.volume = this.musicVolume;
+          this.bgmBoss.play().catch(() => {});
+        }
+        if (this.bgmExploration) this.bgmExploration.pause();
+      } else {
+        if (this.bgmExploration) {
+          this.bgmExploration.volume = this.musicVolume;
+          this.bgmExploration.play().catch(() => {});
+        }
+        if (this.bgmBoss) this.bgmBoss.pause();
+      }
+    } catch {}
+  }
+
+  private pauseAllMusic(): void {
+    try {
+      if (this.bgmExploration) this.bgmExploration.pause();
+      if (this.bgmBoss) this.bgmBoss.pause();
+    } catch {}
+  }
+
+  private updateBGMVolumes(): void {
+    if (!this.musicEnabled) {
+      if (this.bgmExploration) this.bgmExploration.volume = 0;
+      if (this.bgmBoss) this.bgmBoss.volume = 0;
+      return;
+    }
+    if (this.isBossMusicActive) {
+      if (this.bgmBoss) this.bgmBoss.volume = this.musicVolume;
+      if (this.bgmExploration) this.bgmExploration.volume = 0;
+    } else {
+      if (this.bgmExploration) this.bgmExploration.volume = this.musicVolume;
+      if (this.bgmBoss) this.bgmBoss.volume = 0;
     }
   }
 

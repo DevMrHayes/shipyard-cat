@@ -215,7 +215,7 @@ export class PhysicsSubsystem {
           this.isPouncing = false;
           this.pounceTimer = 0;
         }
-      } else if (heightDiff > 0.18 && heightDiff <= 0.58) {
+      } else if (heightDiff > 0.18 && heightDiff <= 0.75) {
         // Smooth upward step-up (stairs, curbs, pallets, escape crates)
         const stepSpeed = Math.max(9.5, this.currentSpeed * 2.8);
         this.position.y = Math.min(currentFloor, this.position.y + stepSpeed * dt);
@@ -224,13 +224,13 @@ export class PhysicsSubsystem {
           this.isPouncing = false;
           this.pounceTimer = 0;
         }
-      } else if (heightDiff < -0.18 && heightDiff >= -0.65) {
+      } else if (heightDiff < -0.18 && heightDiff >= -0.75) {
         // Continuous downward slope & stair adherence without ungrounding
         const stepDownSpeed = Math.max(10.0, this.currentSpeed * 2.8);
         this.position.y = Math.max(currentFloor, this.position.y - stepDownSpeed * dt);
         this.velocity.y = 0;
-      } else if (heightDiff < -0.65) {
-        // True ledge drop-off (> 0.65m drop)
+      } else if (heightDiff < -0.75) {
+        // True ledge drop-off (> 0.75m drop)
         this.isGrounded = false;
         this.velocity.y = Math.min(0, this.velocity.y);
       } else {

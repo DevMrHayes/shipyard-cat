@@ -528,11 +528,12 @@ export class ShipyardEnvironment {
       height: 1.4
     });
 
-    // Register Pier boardwalk solid obstacle walls (X in [45.0, 56.5], Y in [0, 1.35]) along west side leaving open entry gaps where ramps connect (Z in [rz - 4.0, rz + 4.0])
+    // Register Pier boardwalk solid obstacle walls (X in [45.0, 56.5], Y in [0, 1.35]) along west side leaving open entry gaps where ramps connect (Z in [rz - 4.0, rz + 4.0]) and Dry Dock 1 escape route (Z in [-25.5, -20.5])
     const boardwalkWallSegments: [number, number, string][] = [
       [-140.0, -104.0, 'Pier Boardwalk West Wall (South End)'],
       [-96.0, -64.0, 'Pier Boardwalk West Wall (-96 to -64)'],
-      [-56.0, 16.0, 'Pier Boardwalk West Wall (-56 to 16)'],
+      [-56.0, -25.5, 'Pier Boardwalk West Wall (South Section)'],
+      [-20.5, 16.0, 'Pier Boardwalk West Wall (-56 to 16)'],
       [24.0, 56.0, 'Pier Boardwalk West Wall (24 to 56)'],
       [64.0, 96.0, 'Pier Boardwalk West Wall (64 to 96)'],
       [104.0, 140.0, 'Pier Boardwalk West Wall (North End)']
@@ -1875,8 +1876,8 @@ export class ShipyardEnvironment {
     this.registerObstacle(new THREE.Vector3(14, -3, -36.5), new THREE.Vector3(46, 2, -34.5), 'Dry Dock 1 North Wall');
     this.registerObstacle(new THREE.Vector3(14, -3, -20.5), new THREE.Vector3(46, 2, -18.5), 'Dry Dock 1 South Wall');
     this.registerObstacle(new THREE.Vector3(13.5, -3, -36), new THREE.Vector3(15.5, 2, -19), 'Dry Dock 1 West Wall');
-    this.registerObstacle(new THREE.Vector3(44.5, -3, -36), new THREE.Vector3(46.5, 2, -24.2), 'River Caisson Gate (North)');
-    this.registerObstacle(new THREE.Vector3(44.5, -3, -21.4), new THREE.Vector3(46.5, 2, -19), 'River Caisson Gate (South)');
+    this.registerObstacle(new THREE.Vector3(44.5, -3, -36), new THREE.Vector3(46.5, 2, -24.6), 'River Caisson Gate (North)');
+    this.registerObstacle(new THREE.Vector3(44.5, -3, -21.0), new THREE.Vector3(46.5, 2, -19), 'River Caisson Gate (South)');
 
     // Dry Dock 12 Solid Sunken Basin Floor (Y = -2.5m, X: 5 to 36, Z: 10 to 80) with textured stone/concrete
     const dd12BasinGeo = new THREE.PlaneGeometry(31.0, 70.0);
@@ -2017,18 +2018,18 @@ export class ShipyardEnvironment {
       metalness: 0.15
     });
 
-    // West & East Concrete Crane Runway Pads (preventing any visual void under crane legs)
-    const runwayPadGeo = new THREE.BoxGeometry(9.5, 0.24, 18.0);
+    // West & East Concrete Crane Runway Pads (preventing any visual void under crane legs, spanning full 76m Dry Dock 12 length)
+    const runwayPadGeo = new THREE.BoxGeometry(9.5, 0.24, 76.0);
     const westRunwayPad = new THREE.Mesh(runwayPadGeo, foundationMat);
-    westRunwayPad.position.set(-22, 0.02, 0);
+    westRunwayPad.position.set(-22, 0.02, -6.5);
     westRunwayPad.receiveShadow = true;
 
     const eastRunwayPad = new THREE.Mesh(runwayPadGeo, foundationMat);
-    eastRunwayPad.position.set(22, 0.02, 0);
+    eastRunwayPad.position.set(22, 0.02, -6.5);
     eastRunwayPad.receiveShadow = true;
 
     // Cross-Dock Heavy Service Grating Deck at Z = 52.5 across gantry span
-    const crossDeckGeo = new THREE.BoxGeometry(48.0, 0.28, 7.5);
+    const crossDeckGeo = new THREE.BoxGeometry(48.0, 0.28, 8.0);
     const crossDeckMat = new THREE.MeshStandardMaterial({
       color: 0x334155,
       roughness: 0.65,
@@ -2039,6 +2040,9 @@ export class ShipyardEnvironment {
     crossDeck.receiveShadow = true;
 
     gantryGroup.add(westRunwayPad, eastRunwayPad, crossDeck);
+
+    // Register cross-dock walkway across Dry Dock 12 basin at flush ground elevation (height: 0.0)
+    this.platforms.push({ minX: 4.8, maxX: 35.2, minZ: 48.75, maxZ: 56.25, height: 0.0 });
 
     const legGeo = new THREE.BoxGeometry(3.2, 38, 4.0);
     const leftLeg = new THREE.Mesh(legGeo, bigBlueMat);
