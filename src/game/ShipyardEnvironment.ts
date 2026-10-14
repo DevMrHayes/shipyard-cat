@@ -253,11 +253,17 @@ export class ShipyardEnvironment {
         normalMap: asphaltNor,
         roughnessMap: asphaltRough,
         aoMap: asphaltAO,
-        roughness: 0.8,
-        metalness: 0.15
+        aoMapIntensity: 0.65,
+        roughness: 0.78,
+        metalness: 0.15,
+        side: THREE.DoubleSide
       });
     } else {
-      groundMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+      groundMat = new THREE.MeshStandardMaterial({
+        color: 0x334155,
+        roughness: 0.8,
+        side: THREE.DoubleSide
+      });
     }
     const groundShape = new THREE.Shape();
     // Yard bounds: X in [-140, 51], Z in [-140, 140] (in 2D shape with y = -Z)
@@ -287,10 +293,8 @@ export class ShipyardEnvironment {
 
     const groundGeo = new THREE.ShapeGeometry(groundShape);
     groundGeo.rotateX(-Math.PI / 2);
-    groundGeo.computeBoundingBox();
-    groundGeo.computeBoundingSphere();
 
-    // Dynamic UV Coordinates for seamless asphalt texture tiling
+    // Dynamic UV & UV2 Coordinates for seamless asphalt texture tiling and AO map support
     const posAttr = groundGeo.attributes.position;
     const uvs = new Float32Array(posAttr.count * 2);
     for (let i = 0; i < posAttr.count; i++) {
@@ -299,8 +303,12 @@ export class ShipyardEnvironment {
       uvs[i * 2] = (vx + 140) * 0.1;
       uvs[i * 2 + 1] = (vz + 140) * 0.1;
     }
-    groundGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    const uvBuffer = new THREE.BufferAttribute(uvs, 2);
+    groundGeo.setAttribute('uv', uvBuffer);
+    groundGeo.setAttribute('uv2', uvBuffer.clone());
     groundGeo.computeVertexNormals();
+    groundGeo.computeBoundingBox();
+    groundGeo.computeBoundingSphere();
 
     this.groundMesh = new THREE.Mesh(groundGeo, groundMat);
     this.groundMesh.position.set(0, 0, 0);
@@ -1793,39 +1801,35 @@ export class ShipyardEnvironment {
     });
 
     // Historic Dry Dock 1 Escape Crate Stack (Tightly stacked, touching boxes flush against East Dock Rim)
-    // Crate 1 (bottom): Y = -1.5m (top platform height = -1.4m, step up 0.6m from Y = -2.0m basin floor)
-    const cr1 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.0, 1.6), crateMat);
-    cr1.position.set(40.6, -1.5, -22.5);
+    // Crate 1 (bottom): Y = -1.7m (top platform height = -1.4m, step up 0.6m from Y = -2.0m basin floor)
+    const cr1 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 2.4), crateMat);
+    cr1.position.set(40.6, -1.7, -22.8);
     cr1.castShadow = true;
     cr1.receiveShadow = true;
     this.group.add(cr1);
-    this.platforms.push({ minX: 39.9, maxX: 41.3, minZ: -23.3, maxZ: -21.7, height: -1.4 });
+    this.platforms.push({ minX: 39.5, maxX: 41.5, minZ: -24.1, maxZ: -21.4, height: -1.4 });
 
-    // Crate 2 (middle): Y = -1.0m (top platform height = -0.7m, step up 0.7m from -1.4m)
-    const cr2 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.6), crateMat);
-    cr2.position.set(42.0, -1.0, -22.5);
+    // Crate 2 (middle): Y = -1.05m (top platform height = -0.7m, step up 0.7m from -1.4m)
+    const cr2 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 2.4), crateMat);
+    cr2.position.set(42.0, -1.05, -22.8);
     cr2.castShadow = true;
     cr2.receiveShadow = true;
     this.group.add(cr2);
-    this.platforms.push({ minX: 41.3, maxX: 42.7, minZ: -23.3, maxZ: -21.7, height: -0.7 });
+    this.platforms.push({ minX: 41.3, maxX: 42.9, minZ: -24.1, maxZ: -21.4, height: -0.7 });
 
-    // Crate 3 (top): Y = -0.3m (top platform height = 0.0m, flush with dock ground rim at Y = 0.0m)
-    const cr3 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.6), crateMat);
-    cr3.position.set(43.4, -0.3, -22.5);
+    // Crate 3 (top bridge): Y = -0.3m (top platform height = 0.0m, bridges directly across X=44.5 basin lip onto dock rim)
+    const cr3 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.0, 2.4), crateMat);
+    cr3.position.set(44.0, -1.0, -22.8);
     cr3.castShadow = true;
     cr3.receiveShadow = true;
     this.group.add(cr3);
-    this.platforms.push({ minX: 42.7, maxX: 44.8, minZ: -23.3, maxZ: -21.7, height: 0.0 });
-    this.registerObstacle(new THREE.Vector3(39.9, -2.0, -23.3), new THREE.Vector3(41.3, -1.4, -21.7), 'Dry Dock 1 Escape Crate Step 1');
-    this.registerObstacle(new THREE.Vector3(41.3, -2.0, -23.3), new THREE.Vector3(42.7, -0.7, -21.7), 'Dry Dock 1 Escape Crate Step 2');
-    this.registerObstacle(new THREE.Vector3(42.7, -2.0, -23.3), new THREE.Vector3(44.8, 0.0, -21.7), 'Dry Dock 1 Escape Crate Step 3');
+    this.platforms.push({ minX: 42.7, maxX: 46.5, minZ: -24.1, maxZ: -21.4, height: 0.0 });
 
     this.registerObstacle(new THREE.Vector3(14, -3, -36.5), new THREE.Vector3(46, 2, -34.5), 'Dry Dock 1 North Wall');
     this.registerObstacle(new THREE.Vector3(14, -3, -20.5), new THREE.Vector3(46, 2, -18.5), 'Dry Dock 1 South Wall');
     this.registerObstacle(new THREE.Vector3(13.5, -3, -36), new THREE.Vector3(15.5, 2, -19), 'Dry Dock 1 West Wall');
-    this.registerObstacle(new THREE.Vector3(44.5, -3, -36), new THREE.Vector3(46.5, 2, -23.5), 'River Caisson Gate');
-    this.registerObstacle(new THREE.Vector3(44.5, -3, -21.5), new THREE.Vector3(46.5, 2, -19), 'River Caisson Gate (South)');
-    this.registerObstacle(new THREE.Vector3(44.5, -3, -23.5), new THREE.Vector3(46.5, -0.05, -21.5), 'River Caisson Gate Underpass Block');
+    this.registerObstacle(new THREE.Vector3(44.5, -3, -36), new THREE.Vector3(46.5, 2, -24.2), 'River Caisson Gate (North)');
+    this.registerObstacle(new THREE.Vector3(44.5, -3, -21.4), new THREE.Vector3(46.5, 2, -19), 'River Caisson Gate (South)');
 
     // Dry Dock 12 Solid Sunken Basin Floor (Y = -2.5m, X: 5 to 36, Z: 10 to 80) with textured stone/concrete
     const dd12BasinGeo = new THREE.PlaneGeometry(31.0, 70.0);
@@ -1958,6 +1962,36 @@ export class ShipyardEnvironment {
 
     const gantryGroup = new THREE.Group();
     gantryGroup.position.set(20, 0, 52.5);
+
+    // Reinforced Concrete Crane Runway Pads & Cross-Dock Apron
+    const foundationMat = new THREE.MeshStandardMaterial({
+      color: 0x475569,
+      roughness: 0.85,
+      metalness: 0.15
+    });
+
+    // West & East Concrete Crane Runway Pads (preventing any visual void under crane legs)
+    const runwayPadGeo = new THREE.BoxGeometry(9.5, 0.24, 18.0);
+    const westRunwayPad = new THREE.Mesh(runwayPadGeo, foundationMat);
+    westRunwayPad.position.set(-22, 0.02, 0);
+    westRunwayPad.receiveShadow = true;
+
+    const eastRunwayPad = new THREE.Mesh(runwayPadGeo, foundationMat);
+    eastRunwayPad.position.set(22, 0.02, 0);
+    eastRunwayPad.receiveShadow = true;
+
+    // Cross-Dock Heavy Service Grating Deck at Z = 52.5 across gantry span
+    const crossDeckGeo = new THREE.BoxGeometry(48.0, 0.28, 7.5);
+    const crossDeckMat = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      roughness: 0.65,
+      metalness: 0.45
+    });
+    const crossDeck = new THREE.Mesh(crossDeckGeo, crossDeckMat);
+    crossDeck.position.set(0, 0.02, 0);
+    crossDeck.receiveShadow = true;
+
+    gantryGroup.add(westRunwayPad, eastRunwayPad, crossDeck);
 
     const legGeo = new THREE.BoxGeometry(3.2, 38, 4.0);
     const leftLeg = new THREE.Mesh(legGeo, bigBlueMat);

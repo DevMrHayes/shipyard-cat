@@ -85,10 +85,10 @@ export class RenderSubsystem {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.shadowMap.autoUpdate = true;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.25;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     container.appendChild(this.renderer.domElement);
@@ -99,17 +99,18 @@ export class RenderSubsystem {
 
     // 4. Setup Lighting
     // Golden-hour sky & Slate navy ground bounce
-    this.hemiLight = new THREE.HemisphereLight(0xfde68a, 0x1e293b, 2.2);
+    this.hemiLight = new THREE.HemisphereLight(0xcbd5e1, 0x1e293b, 1.35);
     scene.add(this.hemiLight);
 
-    // Raking golden sunset sun with shadow cascade tracking
-    this.sunLight = new THREE.DirectionalLight(0xfbbf24, 3.6);
-    this.sunLight.position.set(45, 38, 25);
+    // Calibrated golden sunset sun with soft shadow cascade tracking
+    this.sunLight = new THREE.DirectionalLight(0xfff4e0, 2.45);
+    this.sunLight.position.set(45, 48, 25);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 1024;
-    this.sunLight.shadow.mapSize.height = 1024;
-    this.sunLight.shadow.bias = -0.0005;
-    this.sunLight.shadow.camera.near = 10;
+    this.sunLight.shadow.mapSize.width = 2048;
+    this.sunLight.shadow.mapSize.height = 2048;
+    this.sunLight.shadow.bias = -0.00035;
+    this.sunLight.shadow.normalBias = 0.02;
+    this.sunLight.shadow.camera.near = 5;
     this.sunLight.shadow.camera.far = 240;
     this.sunLight.shadow.camera.left = -80;
     this.sunLight.shadow.camera.right = 80;

@@ -198,13 +198,14 @@ export class PhysicsSubsystem {
     const resolvedPos = env.resolveCollision(scratchNewPos, 0.35, PhysicsSubsystem.scratchPrevPos);
     this.position.copy(resolvedPos);
 
-    // 6. Vertical Platform Floor Evaluation, Damping, Step-Up & Landing
+    // 6. Vertical Platform Floor Evaluation, Damping, Step-Up & Downward Slope Tracking
     const currentFloor = env.getPlatformFloor(this.position.x, this.position.z, this.position.y);
 
     if (this.isGrounded) {
       const heightDiff = currentFloor - this.position.y;
-      if (Math.abs(heightDiff) <= 0.15) {
-        const dampFactor = 1.0 - Math.exp(-22.0 * dt);
+      if (Math.abs(heightDiff) <= 0.18) {
+        // Micro-terrain & shallow ramp damping
+        const dampFactor = 1.0 - Math.exp(-26.0 * dt);
         this.position.y = THREE.MathUtils.lerp(this.position.y, currentFloor, dampFactor);
         if (Math.abs(this.position.y - currentFloor) < 0.001) {
           this.position.y = currentFloor;
@@ -214,18 +215,24 @@ export class PhysicsSubsystem {
           this.isPouncing = false;
           this.pounceTimer = 0;
         }
-      } else if (heightDiff > 0 && heightDiff <= 0.55) {
-        // Step-up smooth tolerance (stairs, curbs, pallets)
-        const stepSpeed = Math.max(8.0, this.currentSpeed * 2.5);
+      } else if (heightDiff > 0.18 && heightDiff <= 0.58) {
+        // Smooth upward step-up (stairs, curbs, pallets, escape crates)
+        const stepSpeed = Math.max(9.5, this.currentSpeed * 2.8);
         this.position.y = Math.min(currentFloor, this.position.y + stepSpeed * dt);
         this.velocity.y = 0;
         if (this.isPouncing) {
           this.isPouncing = false;
           this.pounceTimer = 0;
         }
-      } else if (this.position.y > currentFloor + 0.15) {
-        this.isGrounded = false;
+      } else if (heightDiff < -0.18 && heightDiff >= -0.65) {
+        // Continuous downward slope & stair adherence without ungrounding
+        const stepDownSpeed = Math.max(10.0, this.currentSpeed * 2.8);
+        this.position.y = Math.max(currentFloor, this.position.y - stepDownSpeed * dt);
         this.velocity.y = 0;
+      } else if (heightDiff < -0.65) {
+        // True ledge drop-off (> 0.65m drop)
+        this.isGrounded = false;
+        this.velocity.y = Math.min(0, this.velocity.y);
       } else {
         this.position.y = currentFloor;
         this.velocity.y = 0;

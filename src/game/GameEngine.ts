@@ -1115,9 +1115,12 @@ export class GameEngine {
       rat.update(deltaTime, catPos, this.cat.isCrouching, skipMixer);
       
       if ((rat.state as string) !== 'CAUGHT') {
-        const prevRatPos = GameEngine.scratchRatPrevPos.copy(rat.mesh.position);
-        const resolvedRatPos = this.environment.resolveCollision(rat.mesh.position, 0.25, prevRatPos);
-        rat.mesh.position.copy(resolvedRatPos);
+        // Resolve full physical collisions every frame for nearby rats (<= 15m), or staggered every 4th frame
+        if (dSq <= 225 || (i + this.frameTick) % 4 === 0) {
+          const prevRatPos = GameEngine.scratchRatPrevPos.copy(rat.mesh.position);
+          const resolvedRatPos = this.environment.resolveCollision(rat.mesh.position, 0.25, prevRatPos);
+          rat.mesh.position.copy(resolvedRatPos);
+        }
       }
 
       if ((rat.state as string) !== 'CAUGHT') {
