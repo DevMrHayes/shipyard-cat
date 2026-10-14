@@ -928,19 +928,56 @@ export class GameEngine {
       if (rat.state !== 'CAUGHT') {
         const dist = rat.mesh.position.distanceTo(catPos);
         if (dist < 1.8) {
-          this.triggerHitFeedback(rat.mesh.position, this.comboStep === 3 || rat.isKingpin);
-          rat.state = 'CAUGHT';
-          rat.mesh.visible = false;
-          rat.scentTrailParticles.visible = false;
-          this.cat.triggerEat();
-          soundEngine.playRatCatch();
-          this.vitals.feed(rat.nutritionValue);
-          this.progression.addXP(rat.nutritionValue * 3);
-          this.showNotification('Swipe KO!', `Struck down ${rat.name} with a claw combo!`, 'success');
-          this.missionManager.updateCountObjective('hunt_mice', 1);
-          this.onMissionObjectiveUpdated?.();
-          this.eventBus.emit('mission:objectiveUpdated', undefined);
-          this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: rat.nutritionValue * 3, isBoss: rat.isKingpin });
+          if (rat.isKingpin) {
+            const killed = rat.takeDamage(1, (newPhase) => {
+              if (newPhase === 2) {
+                this.showNotification('👑 KINGPIN RETREATS!', 'Dockyard Kingpin retreats atop the Dry Dock 1 crate stack! Flank from high ground!', 'warn');
+                soundEngine.playRatPanic();
+              } else if (newPhase === 3) {
+                this.showNotification('👑 KINGPIN FRENZY!', 'Dockyard Kingpin enters Berserk Frenzy! Dodging serpentine charges required!', 'warn');
+                soundEngine.playRatPanic();
+              }
+            });
+            this.triggerHitFeedback(rat.mesh.position, this.comboStep === 3 || rat.isKingpin);
+            rat.isStunned = true;
+            rat.stunTimer = 1.2;
+            rat.attackCooldown = 2.0;
+            soundEngine.playRatCatch();
+
+            if (killed || rat.health <= 0) {
+              rat.state = 'CAUGHT';
+              rat.mesh.visible = false;
+              rat.scentTrailParticles.visible = false;
+              this.cat.triggerEat();
+              soundEngine.playSuccess();
+              this.vitals.feed(100);
+              this.vitals.currentStamina = this.vitals.maxStamina;
+              this.vitals.currentHealth = this.vitals.maxHealth;
+              this.progression.skillPoints += 1;
+              this.progression.addXP(150);
+
+              this.showNotification('👑 KINGPIN DEFEATED!', 'You defeated the Dockyard Kingpin! +1 Skill Point awarded & Vitals fully restored!', 'success');
+              this.missionManager.completeObjective('hunt_kingpin');
+              this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
+              this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: 150, isBoss: true });
+            } else {
+              this.showNotification('Boss Hit!', `Dockyard Kingpin stunned! (${rat.health}/${rat.maxHealth} HP remaining)`, 'warn');
+            }
+          } else {
+            this.triggerHitFeedback(rat.mesh.position, this.comboStep === 3);
+            rat.state = 'CAUGHT';
+            rat.mesh.visible = false;
+            rat.scentTrailParticles.visible = false;
+            this.cat.triggerEat();
+            soundEngine.playRatCatch();
+            this.vitals.feed(rat.nutritionValue);
+            this.progression.addXP(rat.nutritionValue * 3);
+            this.showNotification('Swipe KO!', `Struck down ${rat.name} with a claw combo!`, 'success');
+            this.missionManager.updateCountObjective('hunt_mice', 1);
+            this.onMissionObjectiveUpdated?.();
+            this.eventBus.emit('mission:objectiveUpdated', undefined);
+            this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: rat.nutritionValue * 3, isBoss: false });
+          }
         }
       }
     }
@@ -1123,7 +1160,10 @@ export class GameEngine {
       }
 
       const skipMixer = (dSq > throttleDistanceSq && this.frameTick % 2 !== 0);
-      rat.update(deltaTime, catPos, this.cat.isCrouching, skipMixer);
+      const isSprinting = this.physicsInput.isSprinting;
+      const isPouncing = this.physics.isPouncing;
+      const inShadowZone = this.cat.isCrouching;
+      rat.update(deltaTime, catPos, this.cat.isCrouching, skipMixer, isSprinting, isPouncing, inShadowZone);
       
       if ((rat.state as string) !== 'CAUGHT') {
         // Resolve full physical collisions every frame for nearby rats (<= 15m), or staggered every 4th frame
@@ -1142,13 +1182,21 @@ export class GameEngine {
           this.triggerHitFeedback(rat.mesh.position, rat.isKingpin);
 
           if (rat.isKingpin) {
-            rat.health -= 1;
+            const killed = rat.takeDamage(1, (newPhase) => {
+              if (newPhase === 2) {
+                this.showNotification('👑 KINGPIN RETREATS!', 'Dockyard Kingpin retreats atop the Dry Dock 1 crate stack! Flank from high ground!', 'warn');
+                soundEngine.playRatPanic();
+              } else if (newPhase === 3) {
+                this.showNotification('👑 KINGPIN FRENZY!', 'Dockyard Kingpin enters Berserk Frenzy! Dodging serpentine charges required!', 'warn');
+                soundEngine.playRatPanic();
+              }
+            });
             rat.isStunned = true;
             rat.stunTimer = 1.2;
             rat.attackCooldown = 2.0;
             soundEngine.playRatCatch();
 
-            if (rat.health <= 0) {
+            if (killed || rat.health <= 0) {
               rat.state = 'CAUGHT';
               rat.mesh.visible = false;
               rat.scentTrailParticles.visible = false;
@@ -1163,6 +1211,7 @@ export class GameEngine {
               this.showNotification('👑 KINGPIN DEFEATED!', 'You defeated the Dockyard Kingpin! +1 Skill Point awarded & Vitals fully restored!', 'success');
               this.missionManager.completeObjective('hunt_kingpin');
               this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
+              this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: 150, isBoss: true });
             } else {
               this.showNotification('Boss Hit!', `Dockyard Kingpin stunned! (${rat.health}/${rat.maxHealth} HP remaining)`, 'warn');
             }
@@ -1570,7 +1619,7 @@ export class GameEngine {
     this.flightRecorder.startSection('hazards_story');
     this.updateRadiationAndHazards(frameDelta);
     this.updateStoryProgression(frameDelta);
-    this.environment.update(frameDelta, this.cat.mesh.position, this.isDoubleTapSprint || this.physics.isPouncing);
+    this.environment.update(frameDelta, this.cat.mesh.position, this.physicsInput.isSprinting || this.physics.isPouncing);
 
     // Update Stylized Pounce Trajectory Arc Visualizer
     const pounceCandidate = this.findBestPounceTarget();

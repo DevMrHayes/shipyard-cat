@@ -8,6 +8,8 @@ export class RatEntity {
   public mesh: THREE.Group;
   public state: RatAIState = 'FORAGING';
   public isKingpin: boolean = false;
+  public bossPhase: 1 | 2 | 3 = 1;
+  public invulnerableTimer: number = 0;
   public nutritionValue: number = 30;
   public name: string = 'Shipyard Rat';
   public health: number = 1;
@@ -275,8 +277,68 @@ export class RatEntity {
   private static readonly scratchFleeDir = new THREE.Vector3();
   private static readonly scratchPatrolOffset = new THREE.Vector3();
   private static readonly scratchDir = new THREE.Vector3();
+  private static readonly scratchToCat = new THREE.Vector3();
+  private static readonly scratchRatForward = new THREE.Vector3();
+  private static readonly DRY_DOCK_CRATE_PERCH = new THREE.Vector3(42.5, -0.7, -22.5);
 
-  public update(deltaTime: number, catPosition: THREE.Vector3, catIsCrouching: boolean, skipMixer: boolean = false) {
+  /**
+   * Evaluates 90-degree forward vision cone and auditory stealth radius based on Alba's posture.
+   */
+  public evaluateSensoryInput(
+    catPosition: THREE.Vector3,
+    catCrouching: boolean,
+    catSprinting: boolean = false,
+    catPouncing: boolean = false,
+    inShadowZone: boolean = false
+  ): 'NONE' | 'SUSPICIOUS' | 'DETECTED' {
+    RatEntity.scratchToCat.subVectors(catPosition, this.mesh.position);
+    const verticalDelta = Math.abs(RatEntity.scratchToCat.y);
+    RatEntity.scratchToCat.y = 0;
+    const dist = RatEntity.scratchToCat.length();
+
+    if (dist > 22.0 || verticalDelta > 4.5) return 'NONE';
+
+    // 1. Auditory Hearing Detection Radius
+    let hearingRadius = 6.0; // Normal walking footsteps
+    if (catSprinting || catPouncing) {
+      hearingRadius = 14.0; // Loud sprint / pounce alerts vermin around corners
+    } else if (catCrouching) {
+      hearingRadius = 2.5; // Whisper-quiet stealth prowl
+    }
+
+    if (dist <= hearingRadius) {
+      return (catSprinting || catPouncing || dist < 3.2) ? 'DETECTED' : 'SUSPICIOUS';
+    }
+
+    // 2. 90-Degree Forward Vision Cone (dot > 0.7071)
+    const visionRange = inShadowZone ? 4.5 : 12.0;
+    if (dist <= visionRange && dist > 0.001) {
+      RatEntity.scratchToCat.multiplyScalar(1 / dist);
+      RatEntity.scratchRatForward.set(0, 0, 1).applyQuaternion(this.mesh.quaternion);
+      RatEntity.scratchRatForward.y = 0;
+      RatEntity.scratchRatForward.normalize();
+
+      const dot = RatEntity.scratchRatForward.dot(RatEntity.scratchToCat);
+      if (dot > 0.7071) {
+        if (dist < visionRange * 0.55 || !catCrouching) {
+          return 'DETECTED';
+        }
+        return 'SUSPICIOUS';
+      }
+    }
+
+    return 'NONE';
+  }
+
+  public update(
+    deltaTime: number,
+    catPosition: THREE.Vector3,
+    catIsCrouching: boolean,
+    skipMixer: boolean = false,
+    catIsSprinting: boolean = false,
+    catIsPouncing: boolean = false,
+    inShadowZone: boolean = false
+  ) {
     if (this.mixer && !skipMixer) {
       this.mixer.update(deltaTime);
       const isMoving = this.state === 'FLEEING' || this.state === 'FORAGING' || this.isKingpin;
@@ -296,8 +358,9 @@ export class RatEntity {
       return;
     }
 
-    const distToCat = this.mesh.position.distanceTo(catPosition);
-    const detectionRadius = catIsCrouching ? 4.5 : 9.5;
+    if (this.invulnerableTimer > 0) {
+      this.invulnerableTimer = Math.max(0, this.invulnerableTimer - deltaTime);
+    }
 
     // Handle Stun
     if (this.isStunned) {
@@ -312,16 +375,59 @@ export class RatEntity {
       this.attackCooldown -= deltaTime;
     }
 
-    // Kingpin Boss Combat AI
+    const distToCat = this.mesh.position.distanceTo(catPosition);
+
+    // Dockyard Kingpin Multi-Phase Combat AI
     if (this.isKingpin) {
+      // Phase 2: High Ground Overwatch Retreat atop Dry Dock 1 Crate Stack
+      if (this.bossPhase === 2) {
+        const distToPerch = this.mesh.position.distanceTo(RatEntity.DRY_DOCK_CRATE_PERCH);
+        if (distToPerch > 0.4) {
+          const retreatDir = RatEntity.scratchDir.subVectors(RatEntity.DRY_DOCK_CRATE_PERCH, this.mesh.position).normalize();
+          this.mesh.position.addScaledVector(retreatDir, this.moveSpeed * 2.0 * deltaTime);
+          this.mesh.rotation.y = Math.atan2(retreatDir.x, retreatDir.z);
+        } else {
+          // Perched atop crates: menace Alba below
+          this.mesh.position.copy(RatEntity.DRY_DOCK_CRATE_PERCH);
+          RatEntity.scratchToCat.subVectors(catPosition, this.mesh.position);
+          this.mesh.rotation.y = Math.atan2(RatEntity.scratchToCat.x, RatEntity.scratchToCat.z);
+          // Lunge if Alba leaps up onto the crates within 3.5m
+          if (distToCat < 3.5 && this.attackCooldown <= 0) {
+            this.attackCooldown = 2.0;
+            const lungeDir = RatEntity.scratchLungeDir.subVectors(catPosition, this.mesh.position).normalize();
+            lungeDir.y = 0;
+            this.mesh.position.addScaledVector(lungeDir, this.moveSpeed * 1.5 * deltaTime);
+          }
+        }
+        return;
+      }
+
+      // Phase 3: Berserk Frenzied Charge (1.6x speed, serpentine weave, relentless pursuit)
+      if (this.bossPhase === 3) {
+        if (distToCat > 0.2) {
+          const lungeDir = RatEntity.scratchLungeDir.subVectors(catPosition, this.mesh.position).normalize();
+          lungeDir.y = 0;
+          // Aggressive serpentine charge weave
+          const weave = Math.sin(this.runCycle * 2.2) * 0.35;
+          const perpX = -lungeDir.z * weave;
+          const perpZ = lungeDir.x * weave;
+          lungeDir.x += perpX;
+          lungeDir.z += perpZ;
+          lungeDir.normalize();
+
+          this.mesh.position.addScaledVector(lungeDir, this.moveSpeed * 1.6 * deltaTime);
+          this.mesh.rotation.y = Math.atan2(lungeDir.x, lungeDir.z);
+        }
+        return;
+      }
+
+      // Phase 1: Heavy Lunge Attacks & Dry Dock 1 Basin Patrol
       if (distToCat < 4.5 && this.attackCooldown <= 0) {
-        // Lunge attack toward Alba
         const lungeDir = RatEntity.scratchLungeDir.subVectors(catPosition, this.mesh.position).normalize();
         lungeDir.y = 0;
         this.mesh.position.addScaledVector(lungeDir, this.moveSpeed * 1.8 * deltaTime);
         this.mesh.rotation.y = Math.atan2(lungeDir.x, lungeDir.z);
       } else {
-        // Patrol around the Dorothy capstan housing
         const time = Date.now() * 0.001;
         const radius = 1.6;
         this.mesh.position.x = this.spawnOrigin.x + Math.sin(time * 0.8) * radius;
@@ -331,40 +437,47 @@ export class RatEntity {
       return;
     }
 
-    // Standard Rat AI State Transitions & Panic Mechanics
-    const prevState = this.state;
-    if (distToCat < 3.2) {
+    // Standard Vermin AI with Vision Cone & Auditory Senses
+    const perception = this.evaluateSensoryInput(catPosition, catIsCrouching, catIsSprinting, catIsPouncing, inShadowZone);
+
+    if (distToCat < 3.2 || perception === 'DETECTED') {
       if (this.state !== 'FLEEING') {
         this.state = 'FLEEING';
-        this.panicBurstSpeed = 1.75; // Initial adrenaline panic burst
-        this.panicSqueakTimer = 0; // Trigger squeak immediately
+        this.panicBurstSpeed = 1.75;
+        this.panicSqueakTimer = 0;
       }
-    } else if (distToCat < detectionRadius) {
+    } else if (perception === 'SUSPICIOUS') {
       if (this.state === 'FORAGING') {
         this.state = 'SUSPICIOUS';
-        this.alertTimer = 1.2;
+        this.alertTimer = 1.25;
       }
     } else if (this.state === 'FLEEING' && distToCat > 14) {
       this.state = 'FORAGING';
       this.panicBurstSpeed = 1.0;
     }
 
-    // Execute state behavior
+    // Suspicious scanning state (sniff air, pause)
+    if (this.state === 'SUSPICIOUS') {
+      this.alertTimer -= deltaTime;
+      if (this.alertTimer <= 0) {
+        this.state = 'FORAGING';
+      }
+      return;
+    }
+
+    // Fleeing state
     if (this.state === 'FLEEING') {
-      // Decay panic burst speed back toward base run speed
       this.panicBurstSpeed = Math.max(1.0, this.panicBurstSpeed - deltaTime * 0.45);
 
-      // Periodic panic squeaks when being pursued closely
       this.panicSqueakTimer -= deltaTime;
       if (this.panicSqueakTimer <= 0) {
         soundEngine.playRatPanic();
         this.panicSqueakTimer = 1.4 + Math.random() * 1.6;
       }
 
-      // Compute panic flee direction with evasive scampering zigzag
       const fleeDir = RatEntity.scratchFleeDir.subVectors(this.mesh.position, catPosition).normalize();
       fleeDir.y = 0;
-      
+
       const perpX = -fleeDir.z;
       const perpZ = fleeDir.x;
       const zigzag = Math.sin(this.runCycle * 1.8) * 0.3;
@@ -420,13 +533,35 @@ export class RatEntity {
     }
   }
 
-  public takeDamage(damage: number = 1): boolean {
-    this.health -= damage;
+  public takeDamage(damage: number = 1, onPhaseChange?: (newPhase: 1 | 2 | 3) => void): boolean {
+    if (this.state === 'CAUGHT' || this.invulnerableTimer > 0) return false;
+
+    this.health = Math.max(0, this.health - damage);
     if (this.health <= 0) {
       this.state = 'CAUGHT';
       this.mesh.visible = false;
       return true;
     }
+
+    // Kingpin Boss Multi-Phase Transitions
+    if (this.isKingpin) {
+      this.invulnerableTimer = 1.2;
+
+      if (this.health === 2) {
+        this.bossPhase = 2;
+        this.patrolTarget.copy(RatEntity.DRY_DOCK_CRATE_PERCH);
+      } else if (this.health === 1) {
+        this.bossPhase = 3;
+        this.moveSpeed = 3.8;
+        if (this.thermalLight) {
+          this.thermalLight.color.setHex(0xff0022);
+          this.thermalLight.intensity = 4.0;
+        }
+      }
+
+      onPhaseChange?.(this.bossPhase);
+    }
+
     return false;
   }
 

@@ -90,50 +90,111 @@ export class SeagullFlock {
     });
   }
 
+  // Pre-allocated static scratch vectors for zero-allocation Boids flocking
+  private static readonly scratchSep = new THREE.Vector3();
+  private static readonly scratchAli = new THREE.Vector3();
+  private static readonly scratchCoh = new THREE.Vector3();
+  private static readonly scratchDiff = new THREE.Vector3();
+  private static readonly scratchCenter = new THREE.Vector3();
+  private static readonly scratchAvgVel = new THREE.Vector3();
+
   public update(deltaTime: number, catPosition: THREE.Vector3, isCatSprintingOrPouncing: boolean): void {
-    for (let i = 0; i < this.seagulls.length; i++) {
+    const birdCount = this.seagulls.length;
+
+    // 1. Check for scatter trigger when Alba sprints or pounces nearby
+    for (let i = 0; i < birdCount; i++) {
       const bird = this.seagulls[i];
       const distToCat = bird.mesh.position.distanceTo(catPosition);
 
-      // Trigger Flight when Cat approaches rapidly
       if (!bird.isAirborne && distToCat < 8.5 && isCatSprintingOrPouncing) {
         bird.isAirborne = true;
         bird.flightTimer = 6.0 + Math.random() * 4.0;
         const fleeDir = new THREE.Vector3()
           .subVectors(bird.mesh.position, catPosition)
           .normalize();
-        fleeDir.y = 0.6; // Take off into sky
+        fleeDir.y = 0.55 + Math.random() * 0.25; // Take off into sky
         bird.velocity.copy(fleeDir).multiplyScalar(7.5);
       }
+    }
 
-      if (bird.isAirborne) {
-        bird.flightTimer -= deltaTime;
-        bird.flapPhase += deltaTime * 12.0;
+    // 2. Compute Craig Reynolds Boids Flocking Forces for Airborne Birds
+    let airborneCount = 0;
+    SeagullFlock.scratchCenter.set(0, 0, 0);
+    SeagullFlock.scratchAvgVel.set(0, 0, 0);
 
-        // Wing flapping
-        const flapAngle = Math.sin(bird.flapPhase) * 0.45;
-        bird.wingLeft.rotation.z = flapAngle;
-        bird.wingRight.rotation.z = -flapAngle;
+    for (let i = 0; i < birdCount; i++) {
+      if (this.seagulls[i].isAirborne) {
+        airborneCount++;
+        SeagullFlock.scratchCenter.add(this.seagulls[i].mesh.position);
+        SeagullFlock.scratchAvgVel.add(this.seagulls[i].velocity);
+      }
+    }
 
-        // Kinematic Flight
-        bird.mesh.position.addScaledVector(bird.velocity, deltaTime);
+    if (airborneCount > 1) {
+      SeagullFlock.scratchCenter.multiplyScalar(1 / airborneCount);
+      SeagullFlock.scratchAvgVel.multiplyScalar(1 / airborneCount);
+    }
 
-        // Turn gently towards river (+X direction)
-        bird.velocity.x += (8.0 - bird.velocity.x) * deltaTime * 0.5;
-        bird.mesh.lookAt(
-          bird.mesh.position.x + bird.velocity.x,
-          bird.mesh.position.y + bird.velocity.y,
-          bird.mesh.position.z + bird.velocity.z
-        );
+    // 3. Update Individual Kinematics & Wing Flapping
+    for (let i = 0; i < birdCount; i++) {
+      const bird = this.seagulls[i];
+      if (!bird.isAirborne) continue;
 
-        // Return to perch after flight
-        if (bird.flightTimer <= 0) {
-          bird.isAirborne = false;
-          bird.mesh.position.copy(bird.perchOrigin);
-          bird.mesh.rotation.set(0, Math.random() * Math.PI * 2, 0);
-          bird.wingLeft.rotation.z = 0;
-          bird.wingRight.rotation.z = 0;
+      bird.flightTimer -= deltaTime;
+      bird.flapPhase += deltaTime * 12.0;
+
+      // Wing flapping
+      const flapAngle = Math.sin(bird.flapPhase) * 0.45;
+      bird.wingLeft.rotation.z = flapAngle;
+      bird.wingRight.rotation.z = -flapAngle;
+
+      if (airborneCount > 1) {
+        // Separation (avoid crowding flock mates within 3.5m)
+        SeagullFlock.scratchSep.set(0, 0, 0);
+        let sepCount = 0;
+        for (let j = 0; j < birdCount; j++) {
+          if (i === j || !this.seagulls[j].isAirborne) continue;
+          const d = bird.mesh.position.distanceTo(this.seagulls[j].mesh.position);
+          if (d > 0.001 && d < 3.5) {
+            SeagullFlock.scratchDiff.subVectors(bird.mesh.position, this.seagulls[j].mesh.position).normalize();
+            SeagullFlock.scratchDiff.multiplyScalar(1.0 / d);
+            SeagullFlock.scratchSep.add(SeagullFlock.scratchDiff);
+            sepCount++;
+          }
         }
+        if (sepCount > 0) {
+          SeagullFlock.scratchSep.multiplyScalar(1.0 / sepCount);
+          bird.velocity.addScaledVector(SeagullFlock.scratchSep, deltaTime * 5.0);
+        }
+
+        // Alignment (steer towards average flock velocity)
+        SeagullFlock.scratchAli.subVectors(SeagullFlock.scratchAvgVel, bird.velocity);
+        bird.velocity.addScaledVector(SeagullFlock.scratchAli, deltaTime * 2.0);
+
+        // Cohesion (steer towards center of mass)
+        SeagullFlock.scratchCoh.subVectors(SeagullFlock.scratchCenter, bird.mesh.position);
+        bird.velocity.addScaledVector(SeagullFlock.scratchCoh, deltaTime * 1.5);
+      }
+
+      // Gentle maritime river bias (+X direction toward James River)
+      bird.velocity.x += (8.0 - bird.velocity.x) * deltaTime * 0.6;
+      bird.velocity.clampLength(4.0, 9.5);
+
+      // Apply velocity
+      bird.mesh.position.addScaledVector(bird.velocity, deltaTime);
+      bird.mesh.lookAt(
+        bird.mesh.position.x + bird.velocity.x,
+        bird.mesh.position.y + bird.velocity.y,
+        bird.mesh.position.z + bird.velocity.z
+      );
+
+      // Return to perch after flight timer expires
+      if (bird.flightTimer <= 0) {
+        bird.isAirborne = false;
+        bird.mesh.position.copy(bird.perchOrigin);
+        bird.mesh.rotation.set(0, Math.random() * Math.PI * 2, 0);
+        bird.wingLeft.rotation.z = 0;
+        bird.wingRight.rotation.z = 0;
       }
     }
   }
