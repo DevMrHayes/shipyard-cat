@@ -14,6 +14,7 @@
  */
 
 import * as THREE from 'three';
+import { CarrierSuperstructure } from './CarrierSuperstructure';
 
 export interface PlatformSurface {
   minX: number;
@@ -432,6 +433,17 @@ export class IndustrialExpansion {
       }
 
       cvnGroup.add(tower);
+    });
+
+    // 5. Modular CVN-80 Enterprise Superstructure Integration (Island Tower, Mast Spire, Decals, & Gangway)
+    new CarrierSuperstructure({
+      parentGroup: cvnGroup,
+      origin: new THREE.Vector3(20.5, -2.5, 32.0),
+      hullMaterial: carrierHullMat,
+      flightDeckMaterial: flightDeckMat,
+      registerPlatform: (platform: PlatformSurface) => {
+        this.platforms.push(platform);
+      }
     });
 
     this.group.add(cvnGroup);

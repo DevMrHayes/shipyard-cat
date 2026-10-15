@@ -644,16 +644,16 @@ export class ShipyardEnvironment {
         this.group.add(bottomPost, topPost);
       }
 
-      // Solid side barriers outside stair envelope (Z in [rz - 4.7, rz - 4.2] and [rz + 4.2, rz + 4.7]) to preserve 8m open walkway
+      // Solid side barriers aligned with handrails (Z in [rz - 4.4, rz - 3.8] and [rz + 3.8, rz + 4.4])
       this.registerObstacle(
-        new THREE.Vector3(39.0, 0.0, rz - 4.7),
-        new THREE.Vector3(45.5, 1.4, rz - 4.2),
-        `Boarding Stairs South Barrier (Z=${rz})`
+        new THREE.Vector3(39.0, 0.0, rz - 4.4),
+        new THREE.Vector3(45.5, 1.4, rz - 3.8),
+        `Boarding Ramp South Barrier (Z=${rz})`
       );
       this.registerObstacle(
-        new THREE.Vector3(39.0, 0.0, rz + 4.2),
-        new THREE.Vector3(45.5, 1.4, rz + 4.7),
-        `Boarding Stairs North Barrier (Z=${rz})`
+        new THREE.Vector3(39.0, 0.0, rz + 3.8),
+        new THREE.Vector3(45.5, 1.4, rz + 4.4),
+        `Boarding Ramp North Barrier (Z=${rz})`
       );
     }
 
@@ -2358,7 +2358,7 @@ export class ShipyardEnvironment {
 
     // 7. Dual Virginia/Columbia Submarine Hull Cylinders in Parallel Outfitting Bays
     const subHulls = [
-      { x: -31.5, radius: 2.2, len: 28, name: 'Virginia-Class Fast Attack Hull Section', hasSail: false },
+      { x: -31.5, radius: 2.2, len: 28, name: 'Submarine Hull Module', hasSail: false },
       { x: -24.5, radius: 2.3, len: 28, name: 'Columbia-Class Ballistic Missile Hull Section', hasSail: true }
     ];
 
@@ -2417,29 +2417,6 @@ export class ShipyardEnvironment {
     manifoldPipe.position.set(centerX, wallHeight - 1.2, centerZ);
     manifoldPipe.rotateX(Math.PI / 2);
     smofGroup.add(manifoldPipe);
-
-      this.platforms.push({
-        minX: subInfo.x - 1.0,
-        maxX: subInfo.x + 1.0,
-        minZ: centerZ - hullLen / 2 + 2,
-        maxZ: centerZ + hullLen / 2 - 2,
-        height: hullRadius * 2 + 0.8
-      });
-
-      if (subInfo.hasSail) {
-        const sailMesh = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.6, 5.5), hullMat);
-        sailMesh.position.set(subInfo.x, hullRadius * 2 + 2.5, centerZ + 2);
-        sailMesh.castShadow = true;
-        smofGroup.add(sailMesh);
-
-        const periMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
-        const peri1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2, 8), periMat);
-        peri1.position.set(subInfo.x + 0.4, hullRadius * 2 + 4.8, centerZ + 2);
-        const peri2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.8, 8), periMat);
-        peri2.position.set(subInfo.x - 0.4, hullRadius * 2 + 5.2, centerZ + 3);
-        smofGroup.add(peri1, peri2);
-      }
-    }
 
     // 8. High-Bay 360-Degree Perimeter Inspection Catwalk & Interior Access Staircase (Elevation Y = 4.5m)
     const gratingMat = new THREE.MeshStandardMaterial({
