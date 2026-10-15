@@ -64,6 +64,7 @@ export class CatVitals {
     // 3. Starvation damage if hunger hits zero
     if (this.currentHunger <= 0) {
       this.currentHealth = Math.max(0, this.currentHealth - 2.0 * deltaTime);
+      if (this.currentHealth <= 0) this.isFainted = true;
     }
   }
 
@@ -90,12 +91,16 @@ export class CatVitals {
     this.totalPestControlScore += Math.round(nutrition * 10);
   }
 
+  public isFainted: boolean = false;
+
   public takeHazardDamage(amount: number) {
     this.currentHealth = Math.max(0, this.currentHealth - amount);
+    if (this.currentHealth <= 0) this.isFainted = true;
   }
 
   public takeDamage(amount: number) {
     this.currentHealth = Math.max(0, this.currentHealth - amount);
+    if (this.currentHealth <= 0) this.isFainted = true;
   }
 
   public getSpeedMultiplier(): number {
@@ -108,5 +113,6 @@ export class CatVitals {
     this.currentHealth = this.maxHealth;
     this.currentStamina = this.maxStamina;
     this.currentHunger = this.maxHunger;
+    this.isFainted = false;
   }
 }

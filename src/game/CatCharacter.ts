@@ -114,8 +114,8 @@ export class CatCharacter {
           if ((child as THREE.Bone).isBone) {
             boneCnt++;
             const name = child.name;
-            if (name === 'RigNeck2_014' || name === 'RigNeck1_00' || name.toLowerCase().includes('neck')) {
-              if (!this.neckBone || name === 'RigNeck2_014') {
+            if (name === 'RigNeck1_00' || name === 'RigNeck2_014' || name.toLowerCase().includes('neck')) {
+              if (!this.neckBone || name === 'RigNeck1_00') {
                 this.neckBone = child as THREE.Bone;
               }
             }
@@ -230,7 +230,7 @@ export class CatCharacter {
 
           // Attach Alba's signature fitted Safety-Orange Collar and OLED Dosimeter Tag to GLTF rig
           if (this.collarGroup) {
-            this.collarGroup.scale.set(1.0, 1.0, 1.0);
+            this.collarGroup.scale.set(1.85, 1.85, 1.85);
             this.mesh.add(this.collarGroup);
           }
         }
@@ -397,7 +397,7 @@ export class CatCharacter {
     this.collarGroup = new THREE.Group();
 
     // Snug Collar Ring (Fitted around cat neck vertebrae)
-    const collarGeo = new THREE.CylinderGeometry(0.046, 0.048, 0.022, 24, 1, true);
+    const collarGeo = new THREE.CylinderGeometry(0.052, 0.055, 0.024, 24, 1, true);
     this.collar = new THREE.Mesh(collarGeo, orangeCollarMat);
     this.collar.castShadow = true;
     this.collarGroup.add(this.collar);

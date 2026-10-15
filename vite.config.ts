@@ -11,9 +11,6 @@ export default defineConfig({
     port: 5173,
     watch: {
       ignored: [
-        '**/*.mp3',
-        '**/*.wav',
-        '**/*.ogg',
         '**/*.glb',
         '**/*.hdr',
         '**/*.jpg',

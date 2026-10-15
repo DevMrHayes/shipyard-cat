@@ -69,6 +69,10 @@ export class GameEngine {
   public minimapSystem: MinimapSystem;
   public flightRecorder: EngineFlightRecorder;
   public onFreezeDetected?: (incident: FreezeIncident) => void;
+  public onFaintStart?: () => void;
+  public onFaintRecover?: () => void;
+  public isFaintSequenceActive: boolean = false;
+  public isFaintLocked: boolean = false;
   public isDisposed: boolean = false;
 
   private keys: { [key: string]: boolean } = {};
@@ -1761,9 +1765,14 @@ export class GameEngine {
       turnInput = -touchMove.x * 1.5;
     }
 
-    const isMoving = Math.abs(driveInput) > 0.05 || Math.abs(touchMove.x) > 0.05;
-    const isSprinting = ((this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.isDoubleTapSprint || this.touchController.isSprinting) && this.vitals.canSprint());
-    const isCrouching = this.isSneakToggle || this.keys['ControlLeft'] || this.keys['KeyC'];
+    if (this.isFaintLocked) {
+      driveInput = 0;
+      turnInput = 0;
+    }
+
+    const isMoving = !this.isFaintLocked && (Math.abs(driveInput) > 0.05 || Math.abs(touchMove.x) > 0.05);
+    const isSprinting = !this.isFaintLocked && ((this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.isDoubleTapSprint || this.touchController.isSprinting) && this.vitals.canSprint());
+    const isCrouching = !this.isFaintLocked && (this.isSneakToggle || this.keys['ControlLeft'] || this.keys['KeyC']);
     this.cat.isCrouching = isCrouching;
 
     // Auto-disable Whiskers Mode if exhausted
@@ -1775,12 +1784,17 @@ export class GameEngine {
     // Update vitals
     this.vitals.update(frameDelta, isSprinting, isMoving, this.renderSystem.isWhiskersMode);
 
+    // Check Faint / Collapse on 0 HP
+    if (this.vitals.isFainted && !this.isFaintSequenceActive) {
+      this.triggerFaintSequence();
+    }
+
     this.physicsInput.driveInput = driveInput;
     this.physicsInput.turnInput = turnInput;
     this.physicsInput.isSprinting = isSprinting;
     this.physicsInput.isCrouching = isCrouching;
     this.physicsInput.isMoving = isMoving;
-    this.physicsInput.jumpRequested = !!this.keys['Space'];
+    this.physicsInput.jumpRequested = !this.isFaintLocked && !!this.keys['Space'];
 
     // 3. Fixed-Timestep Physics Sub-stepping
     this.flightRecorder.startSection('physics_kinematics');
@@ -2029,6 +2043,46 @@ export class GameEngine {
   /**
    * Cleanly dispose of all WebGL renderer, textures, materials, and scene graphs
    */
+  /**
+   * Sequence when Alba reaches 0 HP:
+   * Collapses, fades to black, tradesmen & Dr. Vance rescue Alba to Cat Haven heated bed, 100% restored.
+   */
+  public triggerFaintSequence(): void {
+    if (this.isFaintSequenceActive) return;
+    this.isFaintSequenceActive = true;
+    this.isFaintLocked = true;
+
+    // 1. Audio and animation
+    soundEngine.playCatHiss();
+    this.cat.triggerRest(5.0);
+    this.showNotification('Alba Collapsed', 'Alba has passed out from injuries and exhaustion...', 'warn');
+    this.onFaintStart?.();
+
+    // 2. Blackout transition
+    setTimeout(() => {
+      // 3. Teleport to Cat Haven heated orthopedic bed (height: 0.33)
+      this.physics.teleport(new THREE.Vector3(-55.0, 0.33, -66.5), 0.0);
+      this.cat.mesh.position.set(-55.0, 0.33, -66.5);
+      this.cat.mesh.rotation.y = 0.0;
+      this.cat.triggerRest(4.0);
+
+      // Restore vitals 100%
+      this.vitals.healAtSanctuary();
+      this.cat.updateDosimeterRadiation(0.0);
+      this.cat.wellRestedTimer = 60.0; // 60s buff
+
+      soundEngine.playPurr();
+      this.showNotification('Cat Haven Sanctuary', 'Dr. Elena Vance: "Easy there, little rigger. Rest up on the heated pad before heading back out."', 'success');
+      this.onFaintRecover?.();
+
+      setTimeout(() => {
+        this.isFaintLocked = false;
+        this.isFaintSequenceActive = false;
+        this.cat.resetToStand();
+      }, 1200);
+    }, 2500);
+  }
+
   public dispose(): void {
     this.isDisposed = true;
 

@@ -217,6 +217,9 @@ export class RenderSubsystem {
 
     // 5. Impact Sparks Particle System
     this.sparkPositions = new Float32Array(RenderSubsystem.MAX_SPARKS * 3);
+    for (let i = 0; i < RenderSubsystem.MAX_SPARKS; i++) {
+      this.sparkPositions[i * 3 + 1] = -999;
+    }
     this.sparkVelocities = new Float32Array(RenderSubsystem.MAX_SPARKS * 3);
     this.sparkLifetimes = new Float32Array(RenderSubsystem.MAX_SPARKS);
     const sparkGeo = new THREE.BufferGeometry();
@@ -358,7 +361,7 @@ export class RenderSubsystem {
               if (this.isWhiskersMode) {
                 mat.emissive.copy(targetColor);
                 mat.emissiveIntensity = entity.type === 'kingpin' ? 2.4 : 1.85;
-              } else if (entity.type === 'prey') {
+              } else {
                 mat.emissiveIntensity = 0.0;
               }
             }
@@ -414,6 +417,12 @@ export class RenderSubsystem {
           this.sparkPositions[pIdx + 2] += this.sparkVelocities[pIdx + 2] * deltaTime;
           this.sparkVelocities[pIdx + 1] -= 12.0 * deltaTime; // Gravity
           activeSparks = true;
+        } else {
+          const pIdx = i * 3;
+          if (this.sparkPositions[pIdx + 1] !== -999) {
+            this.sparkPositions[pIdx + 1] = -999;
+            activeSparks = true;
+          }
         }
       }
       if (activeSparks) posAttr.needsUpdate = true;

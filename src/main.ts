@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let game: GameEngine;
   try {
     game = new GameEngine(container);
+    (window as any).game = game;
+    (window as any).soundEngine = soundEngine;
     RemoteLogger.bindCanvas(game.renderer.domElement);
     game.onFrameUpdate = () => {
       updatePerformanceProfiler();
@@ -289,6 +291,38 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   game.onNotification = showToast;
+
+  // 1B. Faint & Sanctuary Rescue Transition
+  const faintOverlay = document.getElementById('faint-blackout-overlay');
+  const faintCard = document.getElementById('faint-rescue-card');
+  game.onFaintStart = () => {
+    if (faintOverlay) {
+      faintOverlay.style.display = 'flex';
+      requestAnimationFrame(() => {
+        faintOverlay.style.opacity = '1';
+        faintOverlay.style.pointerEvents = 'auto';
+        if (faintCard) {
+          faintCard.style.opacity = '1';
+          faintCard.style.transform = 'translateY(0)';
+        }
+      });
+    }
+  };
+  game.onFaintRecover = () => {
+    if (faintOverlay) {
+      if (faintCard) {
+        faintCard.style.opacity = '0';
+        faintCard.style.transform = 'translateY(20px)';
+      }
+      setTimeout(() => {
+        faintOverlay.style.opacity = '0';
+        faintOverlay.style.pointerEvents = 'none';
+        setTimeout(() => {
+          faintOverlay.style.display = 'none';
+        }, 1200);
+      }, 800);
+    }
+  };
 
   // 2. Interactive RPG NPC Dialogue Modal & Proximity Prompt
   const dialogueOverlay = document.createElement('div');

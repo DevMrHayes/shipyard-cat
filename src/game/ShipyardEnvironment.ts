@@ -1365,14 +1365,17 @@ export class ShipyardEnvironment {
     }
 
     // Sloped Stair Stringer & Outer Handrail
-    const stringerGeo = new THREE.BoxGeometry(0.12, 0.35, 16.5);
-    stringerGeo.rotateX(-Math.atan2(3.5, Math.abs(stairZEnd - stairZStart)));
+    const stairDist = Math.hypot(3.5, stairZEnd - stairZStart);
+    const stairDir = new THREE.Vector3(0, 3.5, stairZEnd - stairZStart).normalize();
+
+    const stringerGeo = new THREE.BoxGeometry(0.12, 0.35, stairDist);
     const stringer = new THREE.Mesh(stringerGeo, steelBeamMat);
+    stringer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), stairDir);
     stringer.position.set(-37.8, 1.75, (stairZStart + stairZEnd) / 2);
     shopGroup.add(stringer);
 
-    const stairRailBar = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 16.5, 8), catwalkYellowMat);
-    stairRailBar.rotateX(-Math.atan2(3.5, Math.abs(stairZEnd - stairZStart)));
+    const stairRailBar = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, stairDist, 8), catwalkYellowMat);
+    stairRailBar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), stairDir);
     stairRailBar.position.set(-37.8, 1.75 + 0.9, (stairZStart + stairZEnd) / 2);
     shopGroup.add(stairRailBar);
 
@@ -2483,8 +2486,10 @@ export class ShipyardEnvironment {
     }
 
     // Sloped Safety Handrail along staircase
-    const stairHandrail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 10.2, 8), catwalkYellowMat);
-    stairHandrail.rotateX(-Math.atan2(catwalkH, stairZEnd - stairZStart));
+    const smofStairDist = Math.hypot(catwalkH, stairZEnd - stairZStart);
+    const smofStairDir = new THREE.Vector3(0, catwalkH, stairZEnd - stairZStart).normalize();
+    const stairHandrail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, smofStairDist, 8), catwalkYellowMat);
+    stairHandrail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), smofStairDir);
     stairHandrail.position.set(-36.2, catwalkH / 2 + 0.85, (stairZStart + stairZEnd) / 2);
     smofGroup.add(stairHandrail);
 
@@ -2810,6 +2815,22 @@ export class ShipyardEnvironment {
     cushionTop.position.set(0, 0.28, -1.5);
     cushionTop.receiveShadow = true;
     motelGroup.add(cushionBase, cushionTop);
+
+    // Register interior floor & heated cushion bed platforms so Alba walks & rests on top without clipping
+    this.platforms.push({
+      minX: -61.5,
+      maxX: -48.5,
+      minZ: -70.5,
+      maxZ: -59.5,
+      height: 0.10
+    });
+    this.platforms.push({
+      minX: -56.5,
+      maxX: -53.5,
+      minZ: -68.0,
+      maxZ: -65.0,
+      height: 0.33
+    });
 
     // Warm Haven Glow Light
     const havenGlow = new THREE.PointLight(0xfde047, 2.2, 12, 1.2);
