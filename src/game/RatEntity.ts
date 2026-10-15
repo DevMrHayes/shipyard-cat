@@ -115,8 +115,8 @@ export class RatEntity {
         const finalScale = baseScale * RatEntity.diagnosticFlags.scaleMultiplier;
         this.gltfModel.scale.set(finalScale, finalScale, finalScale);
 
-        // Rotate 180 degrees so rat head points forward along +Z movement direction
-        this.gltfModel.rotation.y = Math.PI;
+        // Align rat model head forward along movement direction
+        this.gltfModel.rotation.y = 0;
 
         const box = new THREE.Box3().setFromObject(this.gltfModel);
         const center = box.getCenter(new THREE.Vector3());

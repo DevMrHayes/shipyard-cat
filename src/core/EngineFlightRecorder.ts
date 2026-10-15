@@ -251,8 +251,9 @@ export class EngineFlightRecorder {
     this.bufferHeadIndex = (this.bufferHeadIndex + 1) % EngineFlightRecorder.SAMPLE_CAPACITY;
     this.totalFramesRecorded++;
 
-    // Check if total frame exceeded dropped frame threshold (ignore frameTick <= startupGraceFrames)
-    if (this.frameTick > this.startupGraceFrames && totalFrameMs >= EngineFlightRecorder.FRAME_STALL_THRESHOLD_MS) {
+    // Check if total frame exceeded dropped frame threshold (ignore frameTick <= startupGraceFrames or external CDP capture)
+    const isCapturePaused = typeof window !== 'undefined' && !!(window as any).__PLAYTEST_CAPTURE_PAUSED__;
+    if (!isCapturePaused && this.frameTick > this.startupGraceFrames && totalFrameMs >= EngineFlightRecorder.FRAME_STALL_THRESHOLD_MS) {
       if (this.lastRecordedSpikeFrameTick !== this.frameTick) {
         this.lastRecordedSpikeFrameTick = this.frameTick;
         let maxSectionName = 'frame_overload';

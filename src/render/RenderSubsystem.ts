@@ -120,7 +120,7 @@ export class RenderSubsystem {
 
   public static readonly THERMAL_COLORS = {
     PREY_AMBER: new THREE.Color(0xff9500),       // Warm high-contrast amber/orange for mice & rats
-    KINGPIN_GOLD: new THREE.Color(0xffd700),     // Vivid gold silhouette for Rat Kingpin
+    KINGPIN_CRIMSON: new THREE.Color(0x991b1b),  // Deep menacing crimson silhouette for Rat Kingpin (replaces bright yellow)
     MUTANT_VIOLET: new THREE.Color(0xc026d3),    // Radioactive vibrant violet for mutants
     NEUTRAL_CYAN: new THREE.Color(0x06b6d4)      // Cool blueprint cyan
   };
@@ -367,7 +367,7 @@ export class RenderSubsystem {
         const entity = preyEntities[i];
         const targetColor =
           entity.type === 'kingpin'
-            ? RenderSubsystem.THERMAL_COLORS.KINGPIN_GOLD
+            ? RenderSubsystem.THERMAL_COLORS.KINGPIN_CRIMSON
             : entity.type === 'mutant'
             ? RenderSubsystem.THERMAL_COLORS.MUTANT_VIOLET
             : RenderSubsystem.THERMAL_COLORS.PREY_AMBER;
@@ -379,7 +379,7 @@ export class RenderSubsystem {
             if ('emissive' in mat) {
               if (this.isWhiskersMode) {
                 mat.emissive.copy(targetColor);
-                mat.emissiveIntensity = entity.type === 'kingpin' ? 2.4 : 1.85;
+                mat.emissiveIntensity = entity.type === 'kingpin' ? 0.8 : 1.85;
               } else {
                 mat.emissiveIntensity = 0.0;
               }
