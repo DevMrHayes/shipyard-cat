@@ -2054,10 +2054,62 @@ export class ShipyardEnvironment {
     crossDeck.position.set(0, 0.02, 0);
     crossDeck.receiveShadow = true;
 
+    // Cross-dock OSHA Safety Yellow Handrails across Dry Dock 12 open basin (local X in [-15.0, 15.0] -> world X in [5.0, 35.0])
+    const railYellowMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      metalness: 0.8,
+      roughness: 0.3
+    });
+    const railTopGeo = new THREE.CylinderGeometry(0.04, 0.04, 30.0, 8);
+    railTopGeo.rotateZ(Math.PI / 2);
+    const railMidGeo = new THREE.CylinderGeometry(0.03, 0.03, 30.0, 8);
+    railMidGeo.rotateZ(Math.PI / 2);
+    const toeBoardGeo = new THREE.BoxGeometry(30.0, 0.15, 0.06);
+    const postGeo = new THREE.CylinderGeometry(0.035, 0.035, 1.05, 8);
+
+    // South Railing (local Z = -3.85, world Z = 48.65)
+    const southTopRail = new THREE.Mesh(railTopGeo, railYellowMat);
+    southTopRail.position.set(0, 1.05, -3.85);
+    const southMidRail = new THREE.Mesh(railMidGeo, railYellowMat);
+    southMidRail.position.set(0, 0.55, -3.85);
+    const southToeBoard = new THREE.Mesh(toeBoardGeo, railYellowMat);
+    southToeBoard.position.set(0, 0.1, -3.85);
+    gantryGroup.add(southTopRail, southMidRail, southToeBoard);
+
+    // North Railing (local Z = 3.85, world Z = 56.35)
+    const northTopRail = new THREE.Mesh(railTopGeo, railYellowMat);
+    northTopRail.position.set(0, 1.05, 3.85);
+    const northMidRail = new THREE.Mesh(railMidGeo, railYellowMat);
+    northMidRail.position.set(0, 0.55, 3.85);
+    const northToeBoard = new THREE.Mesh(toeBoardGeo, railYellowMat);
+    northToeBoard.position.set(0, 0.1, 3.85);
+    gantryGroup.add(northTopRail, northMidRail, northToeBoard);
+
+    // Stanchion posts every 3 meters across the span
+    for (let rx = -15.0; rx <= 15.0; rx += 3.0) {
+      const sPost = new THREE.Mesh(postGeo, railYellowMat);
+      sPost.position.set(rx, 0.53, -3.85);
+      const nPost = new THREE.Mesh(postGeo, railYellowMat);
+      nPost.position.set(rx, 0.53, 3.85);
+      gantryGroup.add(sPost, nPost);
+    }
+
     gantryGroup.add(westRunwayPad, eastRunwayPad, crossDeck);
 
     // Register cross-dock walkway across Dry Dock 12 basin at flush ground elevation (height: 0.0)
     this.platforms.push({ minX: 4.8, maxX: 35.2, minZ: 48.75, maxZ: 56.25, height: 0.0 });
+
+    // Register solid railing obstacles along cross-dock walkway edges to prevent stepping into the -2.5m basin
+    this.registerObstacle(
+      new THREE.Vector3(5.0, 0.0, 48.35),
+      new THREE.Vector3(35.0, 1.15, 48.95),
+      'Dry Dock 12 Cross-Dock South Safety Railing'
+    );
+    this.registerObstacle(
+      new THREE.Vector3(5.0, 0.0, 56.05),
+      new THREE.Vector3(35.0, 1.15, 56.65),
+      'Dry Dock 12 Cross-Dock North Safety Railing'
+    );
 
     const legGeo = new THREE.BoxGeometry(3.2, 38, 4.0);
     const leftLeg = new THREE.Mesh(legGeo, bigBlueMat);
@@ -2397,22 +2449,32 @@ export class ShipyardEnvironment {
 
     for (const dir of [-1, 1]) {
       const zBase = centerZ + dir * 18;
+      // 5 Progressive 0.7m Step Tiers for effortless feline climbing and mantling
       const crateSteps = [
-        { y: 1.0, dy: 1.0, offsetZ: dir * 3.0 },
-        { y: 2.2, dy: 1.2, offsetZ: dir * 1.5 },
-        { y: 3.5, dy: 1.3, offsetZ: 0 }
+        { y: 0.7, dy: 0.7, offsetZ: dir * 5.6 },
+        { y: 1.4, dy: 1.4, offsetZ: dir * 4.2 },
+        { y: 2.1, dy: 2.1, offsetZ: dir * 2.8 },
+        { y: 2.8, dy: 2.8, offsetZ: dir * 1.4 },
+        { y: 3.5, dy: 3.5, offsetZ: 0 }
       ];
       for (let cIdx = 0; cIdx < crateSteps.length; cIdx++) {
         const step = crateSteps[cIdx];
-        const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(2.4, step.dy, 1.4), yellowMat);
+        const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, step.dy, 1.5), yellowMat);
         stepMesh.position.set(centerX, step.y - step.dy / 2, zBase + step.offsetZ);
         stepMesh.castShadow = true;
+        stepMesh.receiveShadow = true;
         smofGroup.add(stepMesh);
+
+        const sMinX = centerX - 1.3;
+        const sMaxX = centerX + 1.3;
+        const sMinZ = zBase + step.offsetZ - 0.75;
+        const sMaxZ = zBase + step.offsetZ + 0.75;
+
         this.platforms.push({
-          minX: centerX - 1.2,
-          maxX: centerX + 1.2,
-          minZ: zBase + step.offsetZ - 0.7,
-          maxZ: zBase + step.offsetZ + 0.7,
+          minX: sMinX,
+          maxX: sMaxX,
+          minZ: sMinZ,
+          maxZ: sMaxZ,
           height: step.y
         });
       }

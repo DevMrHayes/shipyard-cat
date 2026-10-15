@@ -637,7 +637,7 @@ export class GameEngine {
         assistTip: "Watch out for crane tag lines and 480V third rails on high catwalks."
       }
     ];
-    const frank = new ShipbuilderEntity('Frank Miller', 'Rigging Dept.', 'RIGGER', new THREE.Vector3(14, 0, 18), -Math.PI / 3, frankDialogues);
+    const frank = new ShipbuilderEntity('Frank Miller', 'Rigging Dept.', 'RIGGER', new THREE.Vector3(1.5, 0, 18), -Math.PI / 3, frankDialogues);
     this.shipbuilders.push(frank);
     this.scene.add(frank.mesh);
 
@@ -658,7 +658,7 @@ export class GameEngine {
 
   private spawnMutantCats() {
     const mutant1 = new MutantCatEntity('Mutant Scout Fang', new THREE.Vector3(-28, 0, 12));
-    const mutant2 = new MutantCatEntity('Mutant Prowler Slag', new THREE.Vector3(10, 0, 18));
+    const mutant2 = new MutantCatEntity('Mutant Prowler Slag', new THREE.Vector3(1.0, 0, 26));
     const mutant3 = new MutantCatEntity('Lieutenant Cobalt', new THREE.Vector3(34, 0, -50));
 
     this.mutantCats.push(mutant1, mutant2, mutant3);
@@ -960,7 +960,7 @@ export class GameEngine {
           if (rat.isKingpin) {
             const killed = rat.takeDamage(1, (newPhase) => {
               if (newPhase === 2) {
-                this.showNotification('👑 KINGPIN RETREATS!', 'Dockyard Kingpin retreats atop the Dry Dock 1 crate stack! Flank from high ground!', 'warn');
+                this.showNotification('👑 KINGPIN SKIRMISH!', 'Dockyard Kingpin sprints across the dry dock basin! Intercept his flanking charge with Paw Swipe [J]!', 'warn');
                 soundEngine.playRatPanic();
               } else if (newPhase === 3) {
                 this.showNotification('👑 KINGPIN FRENZY!', 'Dockyard Kingpin enters Berserk Frenzy! Dodging serpentine charges required!', 'warn');
@@ -1070,7 +1070,7 @@ export class GameEngine {
           if (rat.isKingpin) {
             const killed = rat.takeDamage(1, (newPhase) => {
               if (newPhase === 2) {
-                this.showNotification('👑 KINGPIN RETREATS!', 'Dockyard Kingpin retreats atop the Dry Dock 1 crate stack! Flank from high ground!', 'warn');
+                this.showNotification('👑 KINGPIN SKIRMISH!', 'Dockyard Kingpin sprints across the dry dock basin! Intercept his flanking charge with Paw Swipe [J]!', 'warn');
                 soundEngine.playRatPanic();
               } else if (newPhase === 3) {
                 this.showNotification('👑 KINGPIN FRENZY!', 'Dockyard Kingpin enters Berserk Frenzy! Dodging serpentine charges required!', 'warn');
@@ -1271,7 +1271,7 @@ export class GameEngine {
             this.triggerHitFeedback(rat.mesh.position, true);
             const killed = rat.takeDamage(1, (newPhase) => {
               if (newPhase === 2) {
-                this.showNotification('👑 KINGPIN RETREATS!', 'Dockyard Kingpin retreats atop the Dry Dock 1 crate stack! Flank from high ground!', 'warn');
+                this.showNotification('👑 KINGPIN SKIRMISH!', 'Dockyard Kingpin sprints across the dry dock basin! Intercept his flanking charge with Paw Swipe [J]!', 'warn');
                 soundEngine.playRatPanic();
               } else if (newPhase === 3) {
                 this.showNotification('👑 KINGPIN FRENZY!', 'Dockyard Kingpin enters Berserk Frenzy! Dodging serpentine charges required!', 'warn');

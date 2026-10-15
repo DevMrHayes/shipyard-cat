@@ -1667,6 +1667,25 @@ export class TestRunner {
       throw new Error(`Expected Kingpin phase 2 transition with 2 HP, got HP=${kingpin.health}, phase=${kingpin.bossPhase}`);
     }
 
+    // Phase 2 Skirmish Verification: Kingpin must be patrolling Dry Dock 1 basin floor (Y = -2.0m) along BASIN_WAYPOINTS
+    if (RatEntity.BASIN_WAYPOINTS.length !== 4) {
+      throw new Error(`Expected 4 basin waypoints for Kingpin skirmish, got ${RatEntity.BASIN_WAYPOINTS.length}`);
+    }
+    for (const wp of RatEntity.BASIN_WAYPOINTS) {
+      if (wp.y !== -2.0) {
+        throw new Error(`Basin waypoint ${wp.x}, ${wp.y}, ${wp.z} must be on basin floor at Y=-2.0m`);
+      }
+      if (wp.x < 15.0 || wp.x > 44.5 || wp.z < -36.0 || wp.z > -19.0) {
+        throw new Error(`Basin waypoint ${wp.x}, ${wp.z} outside Dry Dock 1 basin boundary!`);
+      }
+    }
+
+    // Kingpin updates in Phase 2 toward waypoints at Y = -2.0m
+    kingpin.update(0.1, new THREE.Vector3(0, 0, 0), false, true);
+    if (Math.abs(kingpin.mesh.position.y - (-2.0)) > 0.1) {
+      throw new Error(`Kingpin Phase 2 Y position (${kingpin.mesh.position.y}) must stay on basin floor (-2.0m), not clip into crate perch!`);
+    }
+
     // Clear invulnerable timer for testing next hit
     kingpin.invulnerableTimer = 0;
     const killed2 = kingpin.takeDamage(1);
@@ -1709,7 +1728,7 @@ export class TestRunner {
       throw new Error(`Expected DD1 Crate 3 bridge platform 0.0m from Crate 2 (-0.7m), got ${ddCrate3}`);
     }
 
-    // 3. SMOF Submarine Outfitting Facility Ground Alignment
+    // 3. SMOF Submarine Outfitting Facility Ground Alignment & 5 Yellow Step Tiers
     // Interior floor must sit flush at Y=0.0 so Dave O'Connor (at Y=0) and ground animals do not clip into a 0.4m pad
     const smofFloor = env.getPlatformFloor(-30.0, 45.0, 0.0);
     if (smofFloor !== 0.0) {
@@ -1720,6 +1739,50 @@ export class TestRunner {
     const daveFloor = env.getPlatformFloor(-23.0, 38.0, 0.0);
     if (daveFloor !== 0.0) {
       throw new Error(`Expected Dave O'Connor floor elevation at Y=0.0, got ${daveFloor}`);
+    }
+
+    // SMOF Yellow Crate Steps (centerX: -30.0, step 1: 0.7m, step 2: 1.4m, step 3: 2.1m, step 4: 2.8m, step 5: 3.5m)
+    // Standing on ground Y=0, step 1 must be detectable within feline mantle range (0.95m)
+    const s1 = env.getPlatformFloor(-30.0, 45.0 + 18 + 5.6, 0.0);
+    if (s1 !== 0.7) {
+      throw new Error(`Expected SMOF Yellow Crate Step 1 platform 0.7m from ground, got ${s1}`);
+    }
+    const s2 = env.getPlatformFloor(-30.0, 45.0 + 18 + 4.2, 0.7);
+    if (s2 !== 1.4) {
+      throw new Error(`Expected SMOF Yellow Crate Step 2 platform 1.4m from Step 1 (0.7m), got ${s2}`);
+    }
+    const s3 = env.getPlatformFloor(-30.0, 45.0 + 18 + 2.8, 1.4);
+    if (s3 !== 2.1) {
+      throw new Error(`Expected SMOF Yellow Crate Step 3 platform 2.1m from Step 2 (1.4m), got ${s3}`);
+    }
+    const s4 = env.getPlatformFloor(-30.0, 45.0 + 18 + 1.4, 2.1);
+    if (s4 !== 2.8) {
+      throw new Error(`Expected SMOF Yellow Crate Step 4 platform 2.8m from Step 3 (2.1m), got ${s4}`);
+    }
+    const s5 = env.getPlatformFloor(-30.0, 45.0 + 18, 2.8);
+    if (s5 !== 3.5) {
+      throw new Error(`Expected SMOF Yellow Crate Step 5 platform 3.5m from Step 4 (2.8m), got ${s5}`);
+    }
+    // Catwalk connection from Step 5
+    const catwalk = env.getPlatformFloor(-30.0, 45.0 + 16, 3.5);
+    if (catwalk !== 4.15) {
+      throw new Error(`Expected SMOF Crane Catwalk platform 4.15m from Step 5 (3.5m), got ${catwalk}`);
+    }
+
+    // 4. Frank Miller and Mutant 2 Solid Staging Apron Elevation Verification
+    const frankFloor = env.getPlatformFloor(1.5, 18.0, 0.0);
+    if (frankFloor !== 0.0) {
+      throw new Error(`Expected Frank Miller floor elevation at Y=0.0 on concrete staging apron, got ${frankFloor}`);
+    }
+    const mutant2Floor = env.getPlatformFloor(1.0, 26.0, 0.0);
+    if (mutant2Floor !== 0.0) {
+      throw new Error(`Expected Mutant 2 floor elevation at Y=0.0 on concrete staging apron, got ${mutant2Floor}`);
+    }
+
+    // 5. Cross-Dock Walkway Across Dry Dock 12 (X in [5.0, 35.0], Z in [48.75, 56.25])
+    const crossDeckFloor = env.getPlatformFloor(20.0, 52.5, 0.0);
+    if (crossDeckFloor !== 0.0) {
+      throw new Error(`Expected Dry Dock 12 cross-dock walkway floor elevation at Y=0.0, got ${crossDeckFloor}`);
     }
 
     env.dispose();

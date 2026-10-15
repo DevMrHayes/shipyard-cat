@@ -17,6 +17,7 @@ export class RatEntity {
   public isStunned: boolean = false;
   public stunTimer: number = 0;
   public attackCooldown: number = 0;
+  public basinWaypointIndex: number = 0;
 
   private moveSpeed: number = 2.4;
   private patrolTarget: THREE.Vector3;
@@ -283,7 +284,12 @@ export class RatEntity {
   private static readonly scratchDir = new THREE.Vector3();
   private static readonly scratchToCat = new THREE.Vector3();
   private static readonly scratchRatForward = new THREE.Vector3();
-  private static readonly DRY_DOCK_CRATE_PERCH = new THREE.Vector3(42.5, -0.7, -22.5);
+  public static readonly BASIN_WAYPOINTS: THREE.Vector3[] = [
+    new THREE.Vector3(20.0, -2.0, -32.0),
+    new THREE.Vector3(38.0, -2.0, -32.0),
+    new THREE.Vector3(38.0, -2.0, -22.5),
+    new THREE.Vector3(20.0, -2.0, -22.5)
+  ];
 
   /**
    * Evaluates 90-degree forward vision cone and auditory stealth radius based on Alba's posture.
@@ -383,25 +389,26 @@ export class RatEntity {
 
     // Dockyard Kingpin Multi-Phase Combat AI
     if (this.isKingpin) {
-      // Phase 2: High Ground Overwatch Retreat atop Dry Dock 1 Crate Stack
+      // Phase 2: Tactical Basin Skirmish Circuit (sprints around Dry Dock 1 basin floor, flanking Alba)
       if (this.bossPhase === 2) {
-        const distToPerch = this.mesh.position.distanceTo(RatEntity.DRY_DOCK_CRATE_PERCH);
-        if (distToPerch > 0.4) {
-          const retreatDir = RatEntity.scratchDir.subVectors(RatEntity.DRY_DOCK_CRATE_PERCH, this.mesh.position).normalize();
-          this.mesh.position.addScaledVector(retreatDir, this.moveSpeed * 2.0 * deltaTime);
-          this.mesh.rotation.y = Math.atan2(retreatDir.x, retreatDir.z);
+        const targetWp = RatEntity.BASIN_WAYPOINTS[this.basinWaypointIndex % RatEntity.BASIN_WAYPOINTS.length];
+        const distToWp = this.mesh.position.distanceTo(targetWp);
+        if (distToWp < 1.4) {
+          this.basinWaypointIndex = (this.basinWaypointIndex + 1) % RatEntity.BASIN_WAYPOINTS.length;
+        }
+
+        // Active Attack: When Alba is within 5.5m and attack cooldown ready, lunge to attack
+        if (distToCat < 5.5 && this.attackCooldown <= 0) {
+          const lungeDir = RatEntity.scratchLungeDir.subVectors(catPosition, this.mesh.position).normalize();
+          lungeDir.y = 0;
+          this.mesh.position.addScaledVector(lungeDir, this.moveSpeed * 1.8 * deltaTime);
+          this.mesh.rotation.y = Math.atan2(lungeDir.x, lungeDir.z);
         } else {
-          // Perched atop crates: menace Alba below
-          this.mesh.position.copy(RatEntity.DRY_DOCK_CRATE_PERCH);
-          RatEntity.scratchToCat.subVectors(catPosition, this.mesh.position);
-          this.mesh.rotation.y = Math.atan2(RatEntity.scratchToCat.x, RatEntity.scratchToCat.z);
-          // Lunge if Alba leaps up onto the crates within 3.5m
-          if (distToCat < 3.5 && this.attackCooldown <= 0) {
-            this.attackCooldown = 2.0;
-            const lungeDir = RatEntity.scratchLungeDir.subVectors(catPosition, this.mesh.position).normalize();
-            lungeDir.y = 0;
-            this.mesh.position.addScaledVector(lungeDir, this.moveSpeed * 1.5 * deltaTime);
-          }
+          // Tactical sprint between waypoints at 4.4 m/s (moveSpeed * 1.83)
+          const runDir = RatEntity.scratchDir.subVectors(targetWp, this.mesh.position).normalize();
+          runDir.y = 0;
+          this.mesh.position.addScaledVector(runDir, 4.4 * deltaTime);
+          this.mesh.rotation.y = Math.atan2(runDir.x, runDir.z);
         }
         return;
       }
@@ -559,7 +566,8 @@ export class RatEntity {
 
       if (this.health === 2) {
         this.bossPhase = 2;
-        this.patrolTarget.copy(RatEntity.DRY_DOCK_CRATE_PERCH);
+        this.basinWaypointIndex = 0;
+        this.patrolTarget.copy(RatEntity.BASIN_WAYPOINTS[0]);
       } else if (this.health === 1) {
         this.bossPhase = 3;
         this.moveSpeed = 3.8;
