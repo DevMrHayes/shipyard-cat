@@ -8,10 +8,51 @@ import { CatVitals } from './core/VitalsSystem';
 import { ShipbuildingAssistEvent } from './core/AssistanceEngine';
 import { soundEngine } from './core/SoundEngine';
 import { RemoteLogger } from './core/RemoteLogger';
+import { SecurityGate } from './security/SecurityGate';
 
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize automated local error logging bridge
   RemoteLogger.init();
+
+  // 0. Security Clearance Protocol Gate
+  const securityBarrier = document.getElementById('nns-security-barrier');
+  const clearanceForm = document.getElementById('clearance-form') as HTMLFormElement | null;
+  const badgeInput = document.getElementById('operator-badge') as HTMLInputElement | null;
+  const codeInput = document.getElementById('clearance-code') as HTMLInputElement | null;
+  const errorMsg = document.getElementById('security-error-msg') as HTMLElement | null;
+  const statusLed = document.getElementById('security-status-led') as HTMLElement | null;
+
+  if (SecurityGate.isAuthorized()) {
+    if (securityBarrier) securityBarrier.style.display = 'none';
+  } else {
+    if (securityBarrier) securityBarrier.style.display = 'flex';
+    if (clearanceForm) {
+      clearanceForm.onsubmit = (e) => {
+        e.preventDefault();
+        const badge = badgeInput?.value || 'YARD-CAT-01';
+        const code = codeInput?.value || '';
+        const res = SecurityGate.authorize(badge, code);
+        if (res.success) {
+          if (statusLed) {
+            statusLed.style.background = '#22c55e';
+            statusLed.style.boxShadow = '0 0 10px #22c55e';
+          }
+          if (errorMsg) {
+            errorMsg.style.color = '#4ade80';
+            errorMsg.textContent = res.message;
+          }
+          setTimeout(() => {
+            if (securityBarrier) securityBarrier.style.display = 'none';
+          }, 350);
+        } else {
+          if (errorMsg) {
+            errorMsg.style.color = '#f87171';
+            errorMsg.textContent = res.message;
+          }
+        }
+      };
+    }
+  }
 
   const container = document.getElementById('game-container');
   if (!container) return;
@@ -45,10 +86,20 @@ document.addEventListener('DOMContentLoaded', () => {
     game = new GameEngine(container);
     (window as any).game = game;
     (window as any).soundEngine = soundEngine;
-    RemoteLogger.bindCanvas(game.renderer.domElement);
+    const chronometerClock = document.getElementById('chronometer-clock');
+    const chronometerShift = document.getElementById('chronometer-shift');
     game.onFrameUpdate = () => {
       updatePerformanceProfiler();
       updateSonarDistanceBadge();
+      if (chronometerClock && chronometerShift && game.renderSystem.diurnalSystem) {
+        const info = game.renderSystem.diurnalSystem.evaluateShift();
+        if (chronometerClock.textContent !== info.timeString) {
+          chronometerClock.textContent = info.timeString;
+        }
+        if (chronometerShift.textContent !== info.label) {
+          chronometerShift.textContent = info.label;
+        }
+      }
     };
     game.onFreezeDetected = (incident) => {
       handleFreezeIncidentDetected(incident);

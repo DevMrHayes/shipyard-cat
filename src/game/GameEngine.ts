@@ -1205,16 +1205,17 @@ export class GameEngine {
 
   public toggleNightMode(): boolean {
     const isNight = !this.renderSystem.isNightMode;
+    const targetHour = isNight ? 21.0 : 9.0;
+    this.renderSystem.diurnalSystem.setTime(targetHour);
     this.renderSystem.setNightMode(isNight, this.scene);
 
     if (this.cat?.dosimeterLight) {
       this.cat.dosimeterLight.intensity = isNight ? 1.6 : 0.4;
     }
 
-    const shiftName = isNight ? '🌙 NIGHT SHIFT (2nd & 3rd Shift Active)' : '☀️ DAY SHIFT (1st Shift Active)';
-    const shiftDesc = isNight
-      ? 'High-mast gantry floodlights and sodium corridor lamps illuminated.'
-      : 'Natural daylight over Newport News Shipbuilding.';
+    const shiftInfo = this.renderSystem.diurnalSystem.evaluateShift();
+    const shiftName = isNight ? `🌙 ${shiftInfo.label}` : `☀️ ${shiftInfo.label}`;
+    const shiftDesc = `${shiftInfo.timeString} — ${shiftInfo.subTitle}`;
     this.showNotification(shiftName, shiftDesc, 'info');
     return isNight;
   }
@@ -1762,9 +1763,10 @@ export class GameEngine {
     this.frameTick++;
     this.flightRecorder.startFrame();
 
-    // 1. Update Spark Particles & Hit Flash Light
+    // 1. Update Spark Particles, Hit Flash Light & Diurnal Celestial Cycle
     this.flightRecorder.startSection('sparks_lights');
     this.renderSystem.updateParticles(frameDelta);
+    this.renderSystem.updateDiurnal(frameDelta);
     this.flightRecorder.endSection('sparks_lights');
 
     // 2. Prepare Physics Inputs

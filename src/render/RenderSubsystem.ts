@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { TextureGenerator } from '../core/TextureGenerator';
 import { ModelManager } from '../core/ModelManager';
+import { DiurnalSystem, ShiftInfo } from '../systems/DiurnalSystem';
 
 export interface ScreenProjection {
   screenX: number;
@@ -53,6 +54,13 @@ export class RenderSubsystem {
   public normalFog = new THREE.FogExp2(0x131d2e, 0.0075);
   public sonarFog = new THREE.Fog(0x021726, 40, 300);
   public isNightMode: boolean = false;
+  public diurnalSystem!: DiurnalSystem;
+
+  public updateDiurnal(deltaTime: number): ShiftInfo {
+    const info = this.diurnalSystem.update(deltaTime);
+    this.isNightMode = info.isNight;
+    return info;
+  }
 
   public setNightMode(isNight: boolean, scene: THREE.Scene): void {
     this.isNightMode = isNight;
@@ -214,6 +222,17 @@ export class RenderSubsystem {
     this.riverFlood.position.set(50, 30, 0);
     this.riverFlood.target.position.set(120, 0, 0);
     scene.add(this.riverFlood, this.riverFlood.target);
+
+    // 4B. Diurnal Celestial & Shift Progression System
+    const ambientFallback = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientFallback);
+    this.diurnalSystem = new DiurnalSystem(
+      scene,
+      this.sunLight,
+      ambientFallback,
+      this.hemiLight,
+      [this.southYardFlood, this.dryDockFlood, this.subShopFlood]
+    );
 
     // 5. Impact Sparks Particle System
     this.sparkPositions = new Float32Array(RenderSubsystem.MAX_SPARKS * 3);

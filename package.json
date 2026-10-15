@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "tsx run-tests.ts"
+    "test": "tsx run-tests.ts",
+    "deploy": "npm run build && npx firebase-tools deploy --only hosting --project shipyard-cat-game"
   },
   "dependencies": {
     "three": "^0.170.0"

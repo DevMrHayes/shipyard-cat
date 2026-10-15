@@ -5,6 +5,7 @@ import { StylizedWater } from '../graphics/StylizedWater';
 import { SeagullFlock } from '../game/SeagullFlock';
 import { ToonMaterialFactory } from '../graphics/ToonMaterialFactory';
 import { RemoteLogger } from '../core/RemoteLogger';
+import { IndustrialExpansion } from './IndustrialExpansion';
 
 export interface SolidObstacle {
   min: THREE.Vector3;
@@ -77,6 +78,8 @@ export class ShipyardEnvironment {
     this.buildWeldingSparks();
     this.buildWhiskersBeacons();
     this.buildPerimeterFencingAndSecurityTurnstiles();
+    const industrialExpansion = new IndustrialExpansion(this.platforms);
+    this.group.add(industrialExpansion.group);
   }
 
   private registerObstacle(min: THREE.Vector3, max: THREE.Vector3, name: string) {

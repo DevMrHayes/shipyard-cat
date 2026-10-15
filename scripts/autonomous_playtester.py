@@ -64,6 +64,18 @@ def run_playtest(url: str = "http://localhost:5173/", eval_argon: bool = True, o
         print(f"[*] Navigating to {url}...")
         page.goto(url, wait_until="networkidle", timeout=30000)
 
+        # Check and handle Security Clearance Barrier if present
+        try:
+            if page.is_visible("#nns-security-barrier"):
+                print("[*] NNS Security Clearance Barrier detected. Entering credentials...")
+                page.fill("#operator-badge", "PLAYTEST-BOT-01")
+                page.fill("#clearance-code", "DRYDOCK-12")
+                page.click("#auth-submit-btn")
+                time.sleep(0.6)
+                print("[+] Security Clearance Confirmed!")
+        except Exception as e:
+            print(f"[!] Security barrier note: {e}")
+
         # 1. Dismiss Onboarding / Enter Game
         print("[*] Waiting for 'Enter Yard' button...")
         try:
