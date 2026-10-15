@@ -1542,11 +1542,29 @@ export class GameEngine {
 
   private updateRadiationAndHazards(deltaTime: number = 0.016) {
     const radData = this.radiationSystem.calculateRadiationAtPoint(this.cat.mesh.position);
-    this.currentRadDose = radData.totalDose;
-    soundEngine.updateRadiationLevel(radData.totalDose, deltaTime);
-    this.cat.updateDosimeterRadiation(radData.totalDose);
 
-    if (radData.totalDose > 4.0) {
+    // Dynamic Mutant Cat Proximity Radiation
+    // Active radioactive mutants emit an isotopic signature (up to 3.5 mSv/hr within 8m)
+    // Friendly Colony Cats (Calico Belle, Tripod Toby, Barnaby, etc.) emit 0.0 mSv/hr
+    let mutantDose = 0;
+    const catPos = this.cat.mesh.position;
+    for (let i = 0; i < this.mutantCats.length; i++) {
+      const mutant = this.mutantCats[i];
+      if (!mutant.isDefeated && mutant.state !== 'DEFEATED') {
+        const dist = catPos.distanceTo(mutant.mesh.position);
+        if (dist < 8.0) {
+          // Inverse linear falloff from 3.5 mSv/hr at contact down to 0 at 8m
+          mutantDose += (1.0 - dist / 8.0) * 3.5;
+        }
+      }
+    }
+
+    const totalDose = radData.totalDose + mutantDose;
+    this.currentRadDose = totalDose;
+    soundEngine.updateRadiationLevel(totalDose, deltaTime);
+    this.cat.updateDosimeterRadiation(totalDose);
+
+    if (totalDose > 4.0) {
       this.vitals.takeHazardDamage(0.04);
       if (this.missionManager.getCurrentMission().id === 4) {
         this.missionManager.completeObjective('activate_whiskers');
@@ -1560,9 +1578,9 @@ export class GameEngine {
       this.vitals.healAtSanctuary();
     }
 
-    this.onVitalsUpdate?.(this.vitals, radData.totalDose);
-    this.eventBus.emit('vitals:update', { vitals: this.vitals, radiation: radData.totalDose });
-    this.eventBus.emit('hazard:radiation', { dose: radData.totalDose, position: this.cat.mesh.position });
+    this.onVitalsUpdate?.(this.vitals, totalDose);
+    this.eventBus.emit('vitals:update', { vitals: this.vitals, radiation: totalDose });
+    this.eventBus.emit('hazard:radiation', { dose: totalDose, position: this.cat.mesh.position });
   }
 
   private updateStoryProgression(deltaTime: number) {

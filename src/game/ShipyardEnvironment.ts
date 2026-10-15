@@ -2059,16 +2059,19 @@ export class ShipyardEnvironment {
     const foundationMat = new THREE.MeshStandardMaterial({
       color: 0x475569,
       roughness: 0.85,
-      metalness: 0.15
+      metalness: 0.15,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
 
-    const runwayPadGeo = new THREE.BoxGeometry(9.5, 0.24, 76.0);
+    const runwayPadGeo = new THREE.BoxGeometry(9.5, 0.02, 76.0);
     const westRunwayPad = new THREE.Mesh(runwayPadGeo, foundationMat);
-    westRunwayPad.position.set(-22, 0.02, -6.5);
+    westRunwayPad.position.set(-22, 0.01, -6.5);
     westRunwayPad.receiveShadow = true;
 
     const eastRunwayPad = new THREE.Mesh(runwayPadGeo, foundationMat);
-    eastRunwayPad.position.set(22, 0.02, -6.5);
+    eastRunwayPad.position.set(22, 0.01, -6.5);
     eastRunwayPad.receiveShadow = true;
 
     // Gantry runway pads support crane legs on the solid banks; the dock itself remains 100% open to the basin floor
@@ -3474,11 +3477,18 @@ export class ShipyardEnvironment {
     });
 
     // 6. GATE 4 MAIN SECURITY CHECKPOINT & REVOLVING TURNSTILE FACILITY
+    const gatePlazaMat = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      roughness: 0.85,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
     const gatePlaza = new THREE.Mesh(
-      new THREE.BoxGeometry(9.0, 0.12, 15.0),
-      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 })
+      new THREE.BoxGeometry(9.0, 0.02, 15.0),
+      gatePlazaMat
     );
-    gatePlaza.position.set(-105.0, 0.06, 0.0);
+    gatePlaza.position.set(-105.0, 0.01, 0.0);
     gatePlaza.receiveShadow = true;
     fenceGroup.add(gatePlaza);
 
@@ -3488,7 +3498,7 @@ export class ShipyardEnvironment {
     const stripeMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.5 });
     [-5.8, -3.8, 1.8, 6.2].forEach(sz => {
       const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-      stripe.position.set(-105.0, 0.13, sz);
+      stripe.position.set(-105.0, 0.022, sz);
       fenceGroup.add(stripe);
     });
 
