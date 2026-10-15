@@ -77,7 +77,7 @@ export class GameEngine {
   private isSneakToggle: boolean = false;
   private comboStep: number = 0;
   private lastAttackTime: number = 0;
-  private waterLevel: number = 0.05;
+  private waterLevel: number = -2.48;
   private isFloodingActive: boolean = false;
 
   private timer: Timer;
@@ -1213,9 +1213,10 @@ export class GameEngine {
   }
 
   private updateFloodingSimulation(deltaTime: number) {
-    if (this.missionManager.getCurrentMission().id === 2 && this.environment.dryDockWater) {
-      if (this.waterLevel < 3.0) {
-        this.waterLevel += deltaTime * 0.12;
+    if (this.missionManager.getCurrentMission().id === 3 && this.environment.dryDockWater) {
+      this.environment.dryDockWater.visible = true;
+      if (this.waterLevel < 0.2) {
+        this.waterLevel += deltaTime * 0.08;
         this.environment.dryDockWater.position.y = this.waterLevel;
       }
     }

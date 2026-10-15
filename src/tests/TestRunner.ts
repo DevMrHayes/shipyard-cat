@@ -1779,10 +1779,17 @@ export class TestRunner {
       throw new Error(`Expected Mutant 2 floor elevation at Y=0.0 on concrete staging apron, got ${mutant2Floor}`);
     }
 
-    // 5. Cross-Dock Walkway Across Dry Dock 12 (X in [5.0, 35.0], Z in [48.75, 56.25])
-    const crossDeckFloor = env.getPlatformFloor(20.0, 52.5, 0.0);
-    if (crossDeckFloor !== 0.0) {
-      throw new Error(`Expected Dry Dock 12 cross-dock walkway floor elevation at Y=0.0, got ${crossDeckFloor}`);
+    // 5. Open Dry Dock 12 Basin Floor at Y = -2.5m (Unobstructed by any fake cross decks or water at Y = 0)
+    const dd12BasinFloor = env.getPlatformFloor(20.0, 18.0, 0.0);
+    if (dd12BasinFloor !== -2.5) {
+      throw new Error(`Expected Dry Dock 12 basin floor elevation at Y=-2.5m, got ${dd12BasinFloor}`);
+    }
+    // Verify dry dock water is hidden and positioned at the bottom of the basin (-2.48m)
+    if (env.dryDockWater && env.dryDockWater.visible) {
+      throw new Error('Dry Dock 12 water must be hidden (visible = false) during normal dry dock operation');
+    }
+    if (env.dryDockWater && Math.abs(env.dryDockWater.position.y - (-2.48)) > 0.05) {
+      throw new Error(`Expected Dry Dock 12 water to start at basin bottom (-2.48m), got ${env.dryDockWater.position.y}`);
     }
 
     env.dispose();

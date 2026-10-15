@@ -2001,22 +2001,40 @@ export class ShipyardEnvironment {
       metalness: 0.7,
       roughness: 0.35
     });
+    // Dry Dock 12 Heavy Timber Keel Blocks supporting carrier hull on basin floor (Y = -2.5m)
+    const dd12KeelMat = new THREE.MeshStandardMaterial({
+      map: TextureGenerator.createPierWoodTexture(),
+      roughness: 0.85,
+      metalness: 0.1
+    });
+    for (let kz = 32.0; kz <= 72.0; kz += 5.0) {
+      const block = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.8, 2.0), dd12KeelMat);
+      block.position.set(20.5, -2.1, kz);
+      block.castShadow = true;
+      block.receiveShadow = true;
+      this.group.add(block);
+    }
+
     const carrierGeo = new THREE.BoxGeometry(20, 10, 45);
     const carrierHull = new THREE.Mesh(carrierGeo, carrierMat);
-    carrierHull.position.set(20, 5, 52.5);
+    // Resting on keel blocks at bottom of basin (keel blocks top Y=-1.7m, hull center Y=3.3m, flight deck Y=8.3m)
+    carrierHull.position.set(20.5, 3.3, 52.5);
     carrierHull.castShadow = true;
     carrierHull.receiveShadow = true;
     this.group.add(carrierHull);
 
     const islandMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6, roughness: 0.35 });
     const island = new THREE.Mesh(new THREE.BoxGeometry(4, 7, 12), islandMat);
-    island.position.set(28, 13.5, 52.5);
+    island.position.set(28.5, 11.8, 52.5);
     island.castShadow = true;
+    island.receiveShadow = true;
     this.group.add(island);
 
-    this.registerObstacle(new THREE.Vector3(9.0, 0, 30.0), new THREE.Vector3(31.0, 17.0, 75.0), 'CVN-80 Carrier Hull Module');
+    this.registerObstacle(new THREE.Vector3(10.0, -2.5, 30.0), new THREE.Vector3(31.0, 8.5, 75.0), 'CVN-80 Carrier Hull Module');
+    this.platforms.push({ minX: 10.0, maxX: 31.0, minZ: 30.0, maxZ: 75.0, height: 8.3 });
 
     // 5. BIG BLUE CRANE WITH DETAILED LATTICE CROSS-BRACING
+    // Straddles over the open Dry Dock 12 basin, casting dynamic shadows down to the basin floor
     const bigBlueMat = new THREE.MeshStandardMaterial({
       color: 0x1d4ed8,
       metalness: 0.55,
@@ -2026,14 +2044,13 @@ export class ShipyardEnvironment {
     const gantryGroup = new THREE.Group();
     gantryGroup.position.set(20, 0, 52.5);
 
-    // Reinforced Concrete Crane Runway Pads & Cross-Dock Apron
+    // Reinforced Concrete Crane Runway Pads (spanning full 76m Dry Dock 12 length on the solid ground banks outside basin)
     const foundationMat = new THREE.MeshStandardMaterial({
       color: 0x475569,
       roughness: 0.85,
       metalness: 0.15
     });
 
-    // West & East Concrete Crane Runway Pads (preventing any visual void under crane legs, spanning full 76m Dry Dock 12 length)
     const runwayPadGeo = new THREE.BoxGeometry(9.5, 0.24, 76.0);
     const westRunwayPad = new THREE.Mesh(runwayPadGeo, foundationMat);
     westRunwayPad.position.set(-22, 0.02, -6.5);
@@ -2043,73 +2060,8 @@ export class ShipyardEnvironment {
     eastRunwayPad.position.set(22, 0.02, -6.5);
     eastRunwayPad.receiveShadow = true;
 
-    // Cross-Dock Heavy Service Grating Deck at Z = 52.5 across gantry span
-    const crossDeckGeo = new THREE.BoxGeometry(48.0, 0.28, 8.0);
-    const crossDeckMat = new THREE.MeshStandardMaterial({
-      color: 0x334155,
-      roughness: 0.65,
-      metalness: 0.45
-    });
-    const crossDeck = new THREE.Mesh(crossDeckGeo, crossDeckMat);
-    crossDeck.position.set(0, 0.02, 0);
-    crossDeck.receiveShadow = true;
-
-    // Cross-dock OSHA Safety Yellow Handrails across Dry Dock 12 open basin (local X in [-15.0, 15.0] -> world X in [5.0, 35.0])
-    const railYellowMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15,
-      metalness: 0.8,
-      roughness: 0.3
-    });
-    const railTopGeo = new THREE.CylinderGeometry(0.04, 0.04, 30.0, 8);
-    railTopGeo.rotateZ(Math.PI / 2);
-    const railMidGeo = new THREE.CylinderGeometry(0.03, 0.03, 30.0, 8);
-    railMidGeo.rotateZ(Math.PI / 2);
-    const toeBoardGeo = new THREE.BoxGeometry(30.0, 0.15, 0.06);
-    const postGeo = new THREE.CylinderGeometry(0.035, 0.035, 1.05, 8);
-
-    // South Railing (local Z = -3.85, world Z = 48.65)
-    const southTopRail = new THREE.Mesh(railTopGeo, railYellowMat);
-    southTopRail.position.set(0, 1.05, -3.85);
-    const southMidRail = new THREE.Mesh(railMidGeo, railYellowMat);
-    southMidRail.position.set(0, 0.55, -3.85);
-    const southToeBoard = new THREE.Mesh(toeBoardGeo, railYellowMat);
-    southToeBoard.position.set(0, 0.1, -3.85);
-    gantryGroup.add(southTopRail, southMidRail, southToeBoard);
-
-    // North Railing (local Z = 3.85, world Z = 56.35)
-    const northTopRail = new THREE.Mesh(railTopGeo, railYellowMat);
-    northTopRail.position.set(0, 1.05, 3.85);
-    const northMidRail = new THREE.Mesh(railMidGeo, railYellowMat);
-    northMidRail.position.set(0, 0.55, 3.85);
-    const northToeBoard = new THREE.Mesh(toeBoardGeo, railYellowMat);
-    northToeBoard.position.set(0, 0.1, 3.85);
-    gantryGroup.add(northTopRail, northMidRail, northToeBoard);
-
-    // Stanchion posts every 3 meters across the span
-    for (let rx = -15.0; rx <= 15.0; rx += 3.0) {
-      const sPost = new THREE.Mesh(postGeo, railYellowMat);
-      sPost.position.set(rx, 0.53, -3.85);
-      const nPost = new THREE.Mesh(postGeo, railYellowMat);
-      nPost.position.set(rx, 0.53, 3.85);
-      gantryGroup.add(sPost, nPost);
-    }
-
-    gantryGroup.add(westRunwayPad, eastRunwayPad, crossDeck);
-
-    // Register cross-dock walkway across Dry Dock 12 basin at flush ground elevation (height: 0.0)
-    this.platforms.push({ minX: 4.8, maxX: 35.2, minZ: 48.75, maxZ: 56.25, height: 0.0 });
-
-    // Register solid railing obstacles along cross-dock walkway edges to prevent stepping into the -2.5m basin
-    this.registerObstacle(
-      new THREE.Vector3(5.0, 0.0, 48.35),
-      new THREE.Vector3(35.0, 1.15, 48.95),
-      'Dry Dock 12 Cross-Dock South Safety Railing'
-    );
-    this.registerObstacle(
-      new THREE.Vector3(5.0, 0.0, 56.05),
-      new THREE.Vector3(35.0, 1.15, 56.65),
-      'Dry Dock 12 Cross-Dock North Safety Railing'
-    );
+    // Gantry runway pads support crane legs on the solid banks; the dock itself remains 100% open to the basin floor
+    gantryGroup.add(westRunwayPad, eastRunwayPad);
 
     const legGeo = new THREE.BoxGeometry(3.2, 38, 4.0);
     const leftLeg = new THREE.Mesh(legGeo, bigBlueMat);
@@ -2922,24 +2874,27 @@ export class ShipyardEnvironment {
     this.platforms.push({ minX: -33.4, maxX: -30.6, minZ: -15.4, maxZ: -12.6, height: 1.2 });
     this.registerObstacle(new THREE.Vector3(-33.2, 0.0, -15.2), new THREE.Vector3(-30.8, 1.2, -12.8), 'Sarah Jenkins Pallet Crate');
 
+    // Dry Dock 12 flood water simulation starts lowered at basin floor (-2.48m) and hidden during normal dry dock operation
     const dd12Water = new StylizedWater({
       width: 30,
-      depth: 80,
-      position: new THREE.Vector3(20, 0.05, 30),
+      depth: 70,
+      position: new THREE.Vector3(20.5, -2.48, 45.0),
       segmentsX: 4,
       segmentsZ: 4,
       isEnclosedBasin: true,
-      waveScale: 0.35
+      waveScale: 0.15
     });
     this.stylizedWaterDD12 = dd12Water;
     this.dryDockWater = dd12Water.mesh;
+    this.dryDockWater.visible = false; // Hidden until flooding mission (Mission 3)
     this.group.add(this.dryDockWater);
 
+    // Staging pallets resting on Dry Dock 12 basin floor (Y = -2.5m)
     const palletPositions = [
       { x: 12, y: 0.8, z: 12 },
-      { x: 16, y: 1.6, z: 22 },
-      { x: 22, y: 2.5, z: 32 },
-      { x: 28, y: 3.4, z: 42 }
+      { x: 16, y: -2.3, z: 35 },
+      { x: 22, y: -2.3, z: 45 },
+      { x: 28, y: -2.3, z: 55 }
     ];
 
     palletPositions.forEach(p => {
@@ -2952,7 +2907,7 @@ export class ShipyardEnvironment {
       this.registerObstacle(
         new THREE.Vector3(p.x - 1.25, p.y - 0.2, p.z - 1.25),
         new THREE.Vector3(p.x + 1.25, p.y + 0.2, p.z + 1.25),
-        `Dry Dock 12 Floating Pallet (${p.x}, ${p.z})`
+        `Dry Dock 12 Staging Pallet (${p.x}, ${p.z})`
       );
     });
   }
