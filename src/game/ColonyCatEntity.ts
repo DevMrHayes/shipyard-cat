@@ -190,31 +190,154 @@ export class ColonyCatEntity {
   }
 
   private buildHumanMesh() {
-    const coatMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5 }); // Hi-vis safety coat
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xfbcfe8, roughness: 0.8 });
-    const vestMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.4 }); // Neon yellow vest
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xfcd34d, roughness: 0.7 });
+    const hairMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.8 });
+    const scrubsMat = new THREE.MeshStandardMaterial({ color: 0x0d9488, roughness: 0.6 }); // Marine Teal scrubs
+    const labCoatMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.45 }); // Clean white lab coat
+    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 }); // Navy shipyard work trousers
+    const bootMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5 }); // Black safety boots
+    const hardhatMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.1 });
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, metalness: 0.85, roughness: 0.2 });
+    const stethMat = new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.5 });
+    const gloveMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.4 }); // Nitrile medical gloves
 
-    // Body / Coat
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 1.4, 12), coatMat);
-    body.position.y = 1.1;
-    body.castShadow = true;
-    this.mesh.add(body);
+    const humanGroup = new THREE.Group();
 
-    // Vest
-    const vest = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.41, 0.8, 12), vestMat);
-    vest.position.y = 1.3;
-    this.mesh.add(vest);
+    // 1. Boots & Legs (Articulated Left and Right)
+    for (const dx of [-0.14, 0.14]) {
+      // Boot
+      const boot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.28), bootMat);
+      boot.position.set(dx, 0.07, 0.03);
+      boot.castShadow = true;
+      humanGroup.add(boot);
 
-    // Head & Hardhat
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), headMat);
-    head.position.y = 2.0;
-    this.mesh.add(head);
+      // Trouser Leg
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.76, 10), pantsMat);
+      leg.position.set(dx, 0.48, 0);
+      leg.castShadow = true;
+      humanGroup.add(leg);
+    }
 
-    const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.16, 12), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }));
-    hat.position.y = 2.22;
-    this.mesh.add(hat);
+    // 2. Hips & Pelvis
+    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.2, 0.26), pantsMat);
+    pelvis.position.set(0, 0.92, 0);
+    pelvis.castShadow = true;
+    humanGroup.add(pelvis);
 
-    this.createNametagSprite(2.7);
+    // 3. Torso (Teal Scrubs under Lab Coat)
+    const scrubsTorso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.52, 0.24), scrubsMat);
+    scrubsTorso.position.set(0, 1.25, 0);
+    scrubsTorso.castShadow = true;
+    humanGroup.add(scrubsTorso);
+
+    // White Lab Coat (Body and Lower Skirt / Flaps)
+    const coatSides = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.54, 0.26), labCoatMat);
+    coatSides.position.set(0, 1.25, -0.01);
+    coatSides.castShadow = true;
+    humanGroup.add(coatSides);
+
+    const coatSkirt = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.42, 0.28), labCoatMat);
+    coatSkirt.position.set(0, 0.86, -0.01);
+    coatSkirt.castShadow = true;
+    humanGroup.add(coatSkirt);
+
+    // Lab Coat Open Lapels (Revealing scrubs neckline)
+    const lapelL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.36, 0.04), labCoatMat);
+    lapelL.position.set(-0.12, 1.34, 0.13);
+    lapelL.rotation.z = -0.15;
+    const lapelR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.36, 0.04), labCoatMat);
+    lapelR.position.set(0.12, 1.34, 0.13);
+    lapelR.rotation.z = 0.15;
+    humanGroup.add(lapelL, lapelR);
+
+    // Shipyard ID Badge & Dosimeter clipped to coat pocket
+    const idBadge = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.02), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
+    idBadge.position.set(-0.15, 1.35, 0.14);
+    humanGroup.add(idBadge);
+
+    // 4. Stethoscope (Curved around neck, chest piece resting on scrubs)
+    const stethLoop = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.018, 8, 16, Math.PI * 1.2), stethMat);
+    stethLoop.position.set(0, 1.48, 0.04);
+    stethLoop.rotation.x = Math.PI / 2.3;
+    const stethBell = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.015, 12), chromeMat);
+    stethBell.position.set(0.05, 1.30, 0.14);
+    stethBell.rotation.x = Math.PI / 2;
+    humanGroup.add(stethLoop, stethBell);
+
+    // 5. Left Arm with Veterinary Clipboard
+    const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.065, 0.45, 8), labCoatMat);
+    armL.position.set(-0.28, 1.22, 0.08);
+    armL.rotation.x = -Math.PI / 3.8;
+    armL.castShadow = true;
+    const handL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), gloveMat);
+    handL.position.set(-0.28, 1.05, 0.22);
+    humanGroup.add(armL, handL);
+
+    // Diagnostic Clipboard
+    const clipboardBoard = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.32, 0.02), new THREE.MeshStandardMaterial({ color: 0xb45309 }));
+    clipboardBoard.position.set(-0.22, 1.14, 0.26);
+    clipboardBoard.rotation.x = -Math.PI / 4;
+    clipboardBoard.rotation.y = 0.2;
+    const clipboardPaper = new THREE.Mesh(new THREE.PlaneGeometry(0.20, 0.26), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }));
+    clipboardPaper.position.set(0, 0, 0.012);
+    clipboardBoard.add(clipboardPaper);
+    humanGroup.add(clipboardBoard);
+
+    // 6. Right Arm (Gesturing / resting gently)
+    const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.065, 0.52, 8), labCoatMat);
+    armR.position.set(0.28, 1.22, 0.02);
+    armR.rotation.z = -0.12;
+    armR.castShadow = true;
+    const handR = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), gloveMat);
+    handR.position.set(0.32, 0.94, 0.04);
+    humanGroup.add(armR, handR);
+
+    // 7. Head, Hair, Safety Glasses & Hardhat
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.14, 8), skinMat);
+    neck.position.set(0, 1.58, 0);
+    humanGroup.add(neck);
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 14), skinMat);
+    head.position.set(0, 1.76, 0);
+    head.scale.set(0.9, 1.05, 0.95);
+    head.castShadow = true;
+    humanGroup.add(head);
+
+    // Stylized swept hair
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), hairMat);
+    hair.position.set(0, 1.80, -0.04);
+    hair.scale.set(0.95, 0.95, 1.05);
+    humanGroup.add(hair);
+
+    // Turquoise Tinted Safety Glasses
+    const glasses = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.08), new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.75,
+      metalness: 0.8
+    }));
+    glasses.position.set(0, 1.77, 0.14);
+    humanGroup.add(glasses);
+
+    // White Veterinary Hardhat with Green Cross
+    const hardhatDome = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 14, 0, Math.PI * 2, 0, Math.PI * 0.55), hardhatMat);
+    hardhatDome.position.set(0, 1.84, 0);
+    hardhatDome.castShadow = true;
+    const hardhatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 16), hardhatMat);
+    hardhatBrim.position.set(0, 1.84, 0.02);
+    hardhatDome.add(hardhatBrim);
+
+    // Green Medical Cross Emblem on front of hardhat
+    const crossMat = new THREE.MeshBasicMaterial({ color: 0x22c55e });
+    const crossH = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.026), crossMat);
+    crossH.position.set(0, 0.08, 0.22);
+    const crossV = new THREE.Mesh(new THREE.PlaneGeometry(0.026, 0.08), crossMat);
+    crossV.position.set(0, 0.08, 0.22);
+    hardhatDome.add(crossH, crossV);
+    humanGroup.add(hardhatDome);
+
+    this.mesh.add(humanGroup);
+    this.createNametagSprite(2.3);
   }
 
   private createNametagSprite(yPos: number): void {

@@ -44,5 +44,7 @@ console.log('================================================================\n'
 
 if (failed > 0 || playtestSessions.some(s => !s.passed)) {
   process.exit(1);
+} else {
+  process.exit(0);
 }
 

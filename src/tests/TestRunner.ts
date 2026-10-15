@@ -59,7 +59,7 @@ export class TestRunner {
       { name: 'Unit: Feline Animation Fidelity & Skeletal Mixer Weights (run, walk, stand, pounce, attack)', cat: 'UNIT' as const, fn: TestRunner.testFelineAnimationActionWeights },
       { name: 'Unit: Dry Dock 1 & Dry Dock 12 Terrain Mesh Cutout & Basin Elevation Visibility', cat: 'UNIT' as const, fn: TestRunner.testDryDockBasinVisibilityAndCutouts },
       { name: 'Unit: 1,000-Cycle Compound Motion State Recovery & Freeze Immunity', cat: 'UNIT' as const, fn: TestRunner.test1000CycleCompoundMotionAndFreezeImmunity },
-      { name: 'Unit: Initial Spawn Clearance & Industrial Fuel Tank Isolation (≥ 3.0m clearance)', cat: 'UNIT' as const, fn: TestRunner.testInitialSpawnClearanceAndTankIsolation },
+      { name: 'Unit: Initial Spawn Clearance & Historic Tugboat Dorothy Isolation (≥ 3.0m clearance)', cat: 'UNIT' as const, fn: TestRunner.testInitialSpawnClearanceAndDorothyIsolation },
       { name: 'Unit: Pier Boardwalk Wall Collision & Boarding Ramp Traversal Elevation (Y=0.0m to Y=1.4m)', cat: 'UNIT' as const, fn: TestRunner.testBoardwalkWallCollisionAndRampElevation },
       { name: 'Unit: Sprint & Pounce Glitch Elimination & Zero-Freeze Benchmark', cat: 'UNIT' as const, fn: TestRunner.testSprintPounceGlitchEliminationAndZeroFreeze },
       { name: 'Unit: Enhanced Visual Architecture & Stylized Welder Entity Integrity', cat: 'UNIT' as const, fn: TestRunner.testEnhancedVisualArchitectureAndShipbuilders },
@@ -593,7 +593,8 @@ export class TestRunner {
     // 7. Verify Key Solid Obstacles are Registered
     const requiredObstacles = [
       'Machine Shop - North Wall',
-      'Industrial Fuel Tank',
+      'JMAF Panel Assembly Facility',
+      'The Apprentice School & Yard Administration',
       'Tugboat Dorothy Keel & Hull',
       'Tugboat Dorothy Wheelhouse',
       'Submarine Hull Module',
@@ -1094,7 +1095,7 @@ export class TestRunner {
     }
   }
 
-  private static testInitialSpawnClearanceAndTankIsolation() {
+  private static testInitialSpawnClearanceAndDorothyIsolation() {
     const env = new ShipyardEnvironment();
     const spawnPos = new THREE.Vector3(-10.0, 0.0, -20.0);
     const catRadius = 0.35;
@@ -1110,22 +1111,14 @@ export class TestRunner {
       }
     }
 
-    // 2. Specific Verification for Red Fuel Pressure Vessel & Concrete Saddle Piers
-    const tankObs = env.solidObstacles.find(o => o.name.toLowerCase().includes('fuel tank'));
-    if (!tankObs) throw new Error('Industrial Fuel Tank obstacle missing');
-    const tankDx = Math.max(0, tankObs.min.x - spawnPos.x, spawnPos.x - tankObs.max.x);
-    const tankDz = Math.max(0, tankObs.min.z - spawnPos.z, spawnPos.z - tankObs.max.z);
-    const tankDist = Math.hypot(tankDx, tankDz);
-    if (tankDist < 3.0) {
-      throw new Error(`Fuel Tank clearance insufficient: ${tankDist.toFixed(2)}m`);
-    }
-
-    // Saddle piers check (closest saddle pier at X: -15, Z: -8)
-    const saddleDx = Math.max(0, -15.6 - spawnPos.x, spawnPos.x - (-14.4));
-    const saddleDz = Math.max(0, -10.0 - spawnPos.z, spawnPos.z - (-6.0));
-    const saddleDist = Math.hypot(saddleDx, saddleDz);
-    if (saddleDist < 3.0) {
-      throw new Error(`Concrete saddle pier clearance insufficient: ${saddleDist.toFixed(2)}m`);
+    // 2. Specific Verification for Historic Tugboat Dorothy Exhibit
+    const dorothyObs = env.solidObstacles.find(o => o.name.toLowerCase().includes('dorothy'));
+    if (!dorothyObs) throw new Error('Tugboat Dorothy obstacle missing');
+    const dorothyDx = Math.max(0, dorothyObs.min.x - spawnPos.x, spawnPos.x - dorothyObs.max.x);
+    const dorothyDz = Math.max(0, dorothyObs.min.z - spawnPos.z, spawnPos.z - dorothyObs.max.z);
+    const dorothyDist = Math.hypot(dorothyDx, dorothyDz);
+    if (dorothyDist < 3.0) {
+      throw new Error(`Tugboat Dorothy clearance insufficient: ${dorothyDist.toFixed(2)}m`);
     }
 
     // 3. Collision displacement check at spawn

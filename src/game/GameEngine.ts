@@ -569,7 +569,7 @@ export class GameEngine {
         text: "Once you run the Kingpin rat out of Dry Dock 1, head over to Tugboat Dorothy Hull No. 1. The welders need help clearing the jammed foredeck winch!"
       }
     ];
-    const toby = new ColonyCatEntity('Tripod Toby', 'Colony Elder', new THREE.Vector3(36, 0.5, -16), 0x71717a, tobyDialogue, false);
+    const toby = new ColonyCatEntity('Tripod Toby', 'Colony Elder', new THREE.Vector3(36, 0.0, -16), 0x71717a, tobyDialogue, false);
     this.colonyNPCs.push(toby);
     this.scene.add(toby.mesh);
 

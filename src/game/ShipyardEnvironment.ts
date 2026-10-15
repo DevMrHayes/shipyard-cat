@@ -401,18 +401,65 @@ export class ShipyardEnvironment {
     });
 
     const railGroup = new THREE.Group();
-    const railGeo = new THREE.BoxGeometry(0.16, 0.22, 240);
-    const rail1 = new THREE.Mesh(railGeo, railMat);
-    rail1.position.set(8.2, 0.1, 0);
-    rail1.castShadow = true;
-    const rail2 = new THREE.Mesh(railGeo, railMat);
-    rail2.position.set(10.8, 0.1, 0);
-    rail2.castShadow = true;
-    railGroup.add(rail1, rail2);
+    // South Track Segment (Z: -120 to 8.0m, solid shipyard concrete ground)
+    const railSouthGeo = new THREE.BoxGeometry(0.16, 0.22, 128);
+    const rail1South = new THREE.Mesh(railSouthGeo, railMat);
+    rail1South.position.set(8.2, 0.1, -56.0);
+    rail1South.castShadow = true;
+    const rail2South = new THREE.Mesh(railSouthGeo, railMat);
+    rail2South.position.set(10.8, 0.1, -56.0);
+    rail2South.castShadow = true;
 
+    // North Track Segment (Z: 82.0 to 120m, solid north shipyard apron)
+    const railNorthGeo = new THREE.BoxGeometry(0.16, 0.22, 38);
+    const rail1North = new THREE.Mesh(railNorthGeo, railMat);
+    rail1North.position.set(8.2, 0.1, 101.0);
+    rail1North.castShadow = true;
+    const rail2North = new THREE.Mesh(railNorthGeo, railMat);
+    rail2North.position.set(10.8, 0.1, 101.0);
+    rail2North.castShadow = true;
+
+    railGroup.add(rail1South, rail2South, rail1North, rail2North);
+
+    // Track Bumper Stops (Heavy reinforced concrete buffer stops with hazard stripes at Dry Dock 12 perimeter)
+    const bumperMat = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    const bumperFaceMat = new THREE.MeshStandardMaterial({
+      color: 0xeab308, // Safety yellow warning bumper
+      roughness: 0.4,
+      metalness: 0.3
+    });
+    const bumperGeo = new THREE.BoxGeometry(3.6, 0.7, 0.9);
+    const bumperSouth = new THREE.Mesh(bumperGeo, bumperMat);
+    bumperSouth.position.set(9.5, 0.35, 7.8);
+    bumperSouth.castShadow = true;
+    bumperSouth.receiveShadow = true;
+
+    const bumperSouthFace = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.1), bumperFaceMat);
+    bumperSouthFace.position.set(9.5, 0.35, 8.26);
+    railGroup.add(bumperSouth, bumperSouthFace);
+
+    const bumperNorth = new THREE.Mesh(bumperGeo, bumperMat);
+    bumperNorth.position.set(9.5, 0.35, 82.2);
+    bumperNorth.castShadow = true;
+    bumperNorth.receiveShadow = true;
+
+    const bumperNorthFace = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.1), bumperFaceMat);
+    bumperNorthFace.position.set(9.5, 0.35, 81.74);
+    railGroup.add(bumperNorth, bumperNorthFace);
+
+    this.registerObstacle(new THREE.Vector3(7.5, 0, 7.3), new THREE.Vector3(11.5, 0.8, 8.3), 'Crane Rail Bumper (South DD12)');
+    this.registerObstacle(new THREE.Vector3(7.5, 0, 81.7), new THREE.Vector3(11.5, 0.8, 82.7), 'Crane Rail Bumper (North DD12)');
+
+    // Railway ties strictly on solid terrain, excluding the 74m Dry Dock 12 basin span
     const tieZPositions: number[] = [];
     for (let z = -110; z <= 110; z += 3.0) {
-      tieZPositions.push(z);
+      if (z <= 6.5 || z >= 83.5) {
+        tieZPositions.push(z);
+      }
     }
 
     const tieGeo = new THREE.BoxGeometry(3.6, 0.14, 0.32);
@@ -427,7 +474,7 @@ export class ShipyardEnvironment {
     instancedTies.receiveShadow = true;
     railGroup.add(instancedTies);
 
-    // Track Tie Plates (under each rail at X: 8.2 and X: 10.8 for each tie)
+    // Track Tie Plates (under each rail at X: 8.2 and X: 10.8 for each solid ground tie)
     const tiePlateGeo = new THREE.BoxGeometry(0.36, 0.03, 0.28);
     const instancedTiePlates = new THREE.InstancedMesh(tiePlateGeo, tiePlateMat, tieZPositions.length * 2);
     let plateIdx = 0;
@@ -1136,70 +1183,8 @@ export class ShipyardEnvironment {
 
     shopGroup.add(doorFrameL, doorFrameR, shutterBox, shutterCurtain);
 
-    // 6. UPGRADED FUEL TANK & FLANGED PIPE MANIFOLD WITH DIAL GAUGES
-    const tankGroup = new THREE.Group();
-    tankGroup.position.set(-18, 0, -8);
-
-    const tankMat = new THREE.MeshStandardMaterial({
-      color: 0x991b1b,
-      metalness: 0.65,
-      roughness: 0.55
-    });
-    const tankGeo = new THREE.CylinderGeometry(1.8, 1.8, 10, 24);
-    tankGeo.rotateZ(Math.PI / 2);
-    const tankMesh = new THREE.Mesh(tankGeo, tankMat);
-    tankMesh.position.set(0, 2.4, 0);
-    tankMesh.castShadow = true;
-    tankMesh.receiveShadow = true;
-
-    const domeMat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, metalness: 0.6, roughness: 0.6 });
-    const domeL = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 16), domeMat);
-    domeL.position.set(-5, 2.4, 0);
-    domeL.scale.set(0.5, 1, 1);
-    domeL.castShadow = true;
-
-    const domeR = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 16), domeMat);
-    domeR.position.set(5, 2.4, 0);
-    domeR.scale.set(0.5, 1, 1);
-    domeR.castShadow = true;
-
-    const saddleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 });
-    const saddle1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 4.0), saddleMat);
-    saddle1.position.set(-3, 0.7, 0);
-    saddle1.castShadow = true;
-    const saddle2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 4.0), saddleMat);
-    saddle2.position.set(3, 0.7, 0);
-    saddle2.castShadow = true;
-
-    const pipeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.3 });
-    const flangeMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.25 });
-    const valveMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.5, roughness: 0.3 });
-    
-    // Procedural Industrial Pressure Gauge Dial
-    const gaugeTex = TextureGenerator.createGaugeDialTexture('FUEL PSI', 0.58);
-    const gaugeMat = new THREE.MeshStandardMaterial({
-      map: gaugeTex,
-      metalness: 0.4,
-      roughness: 0.2
-    });
-
-    const pipeOut = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3.5, 12), pipeMat);
-    pipeOut.position.set(-5.3, 1.2, 0.8);
-    
-    const flange = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 12), flangeMat);
-    flange.position.set(-5.3, 2.8, 0.8);
-
-    const handwheel = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.04, 8, 16), valveMat);
-    handwheel.position.set(-5.3, 2.2, 0.8);
-    
-    const gauge = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.08, 16), gaugeMat);
-    gauge.rotateX(Math.PI / 2);
-    gauge.position.set(-5.3, 3.0, 0.8);
-
-    tankGroup.add(tankMesh, domeL, domeR, saddle1, saddle2, pipeOut, flange, handwheel, gauge);
-    this.group.add(tankGroup);
-
-    this.registerObstacle(new THREE.Vector3(-24, 0, -11), new THREE.Vector3(-12, 4.5, -5), 'Industrial Fuel Tank');
+    // 6. HISTORIC SOUTH YARD: Dedicated to Tugboat Dorothy Hull No. 1 and Machine Shop Apron
+    // (Redundant secondary fuel tank removed to keep historical Dorothy display authentic and uncluttered)
 
     // 7. INDUSTRIAL YARD PROPS: ACETYLENE/OXYGEN GAS CYLINDER CARTS
     this.buildAcetyleneCart(-32.0, 0.0, -23.5, Math.PI / 4);
@@ -1872,9 +1857,9 @@ export class ShipyardEnvironment {
     this.group.add(cr1);
     this.platforms.push({ minX: 39.5, maxX: 41.5, minZ: -24.1, maxZ: -21.4, height: -1.4 });
 
-    // Crate 2 (middle): Y = -1.05m (top platform height = -0.7m, step up 0.7m from -1.4m)
+    // Crate 2 (middle): Y = -1.35m (top platform height = -0.7m, step up 0.7m from -1.4m)
     const cr2 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 2.4), crateMat);
-    cr2.position.set(42.0, -1.05, -22.8);
+    cr2.position.set(42.0, -1.35, -22.8);
     cr2.castShadow = true;
     cr2.receiveShadow = true;
     this.group.add(cr2);
@@ -2489,20 +2474,73 @@ export class ShipyardEnvironment {
 
     // 3. Roll-up Bay Door & Canopy Facing West (Alba / Calico Belle patrol yard)
     const doorMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+    const slatMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.4 });
     const bayDoor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 7.5, 8.5), doorMat);
     bayDoor.position.set(posX - width / 2 + 0.1, 3.75, posZ);
     jmafGroup.add(bayDoor);
+
+    // Roll-up door horizontal ribbed panels
+    for (let sy = 1.0; sy <= 7.0; sy += 0.8) {
+      const slat = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.08, 8.4), slatMat);
+      slat.position.set(posX - width / 2 + 0.1, sy, posZ);
+      jmafGroup.add(slat);
+    }
+
+    // Heavy yellow protective bollards flanking the bay door
+    const bollardMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.5, roughness: 0.3 });
+    const bollardGeo = new THREE.CylinderGeometry(0.18, 0.18, 1.2, 12);
+    const bollard1 = new THREE.Mesh(bollardGeo, bollardMat);
+    bollard1.position.set(posX - width / 2 - 0.6, 0.6, posZ - 4.6);
+    const bollard2 = new THREE.Mesh(bollardGeo, bollardMat);
+    bollard2.position.set(posX - width / 2 - 0.6, 0.6, posZ + 4.6);
+    jmafGroup.add(bollard1, bollard2);
 
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.4, 10.0), yellowTrim);
     canopy.position.set(posX - width / 2 - 1.5, 8.0, posZ);
     canopy.castShadow = true;
     jmafGroup.add(canopy);
 
+    // 4. South Personnel Security Entrance (Facing Yard Walkway / Gate 4)
+    const southDoorZ = posZ + length / 2;
+    const persDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(3.2, 4.4, 0.3), yellowTrim);
+    persDoorFrame.position.set(posX, 2.2, southDoorZ + 0.15);
+    jmafGroup.add(persDoorFrame);
+
+    const persDoorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6, roughness: 0.4 });
+    const persDoor = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.8, 0.2), persDoorMat);
+    persDoor.position.set(posX, 2.0, southDoorZ + 0.18);
+    jmafGroup.add(persDoor);
+
+    // Window vision lite on personnel door
+    const visionLiteMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.8 });
+    const visionLite = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.4, 0.24), visionLiteMat);
+    visionLite.position.set(posX, 2.5, southDoorZ + 0.18);
+    jmafGroup.add(visionLite);
+
+    // Stainless steel panic push-bar & door handle
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, metalness: 0.95, roughness: 0.1 });
+    const pushBar = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.12), handleMat);
+    pushBar.position.set(posX, 1.7, southDoorZ + 0.3);
+    jmafGroup.add(pushBar);
+
+    // RFID Badge Reader with green LED indicator
+    const rfidBox = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.35, 0.12), persDoorMat);
+    rfidBox.position.set(posX + 1.9, 1.8, southDoorZ + 0.15);
+    const rfidLed = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), new THREE.MeshBasicMaterial({ color: 0x22c55e }));
+    rfidLed.position.set(posX + 1.9, 1.9, southDoorZ + 0.22);
+    jmafGroup.add(rfidBox, rfidLed);
+
+    // Awning over personnel door
+    const persAwning = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.25, 1.8), yellowTrim);
+    persAwning.position.set(posX, 4.5, southDoorZ + 0.9);
+    persAwning.castShadow = true;
+    jmafGroup.add(persAwning);
+
     this.group.add(jmafGroup);
 
     this.registerObstacle(
-      new THREE.Vector3(posX - width / 2, 0, posZ - length / 2),
-      new THREE.Vector3(posX + width / 2, height, posZ + length / 2),
+      new THREE.Vector3(posX - width / 2 - 1.0, 0, posZ - length / 2),
+      new THREE.Vector3(posX + width / 2, height, posZ + length / 2 + 1.5),
       'JMAF Panel Assembly Facility'
     );
   }
@@ -2555,6 +2593,63 @@ export class ShipyardEnvironment {
     pediment.position.set(posX, 5.25, posZ + length / 2 + 1.5);
     pediment.castShadow = true;
     adminGroup.add(pediment);
+
+    // 4. Stately Double Entrance Doors under Portico
+    const adminDoorZ = posZ + length / 2 + 0.05;
+    // Limestone Arched Door Surround
+    const doorSurround = new THREE.Mesh(new THREE.BoxGeometry(4.8, 5.0, 0.3), stoneMat);
+    doorSurround.position.set(posX, 2.5, adminDoorZ + 0.15);
+    doorSurround.castShadow = true;
+    adminGroup.add(doorSurround);
+
+    // Dark Oak Double Doors
+    const woodDoorMat = new THREE.MeshStandardMaterial({ color: 0x3b1c0a, roughness: 0.65 });
+    const doubleDoors = new THREE.Mesh(new THREE.BoxGeometry(3.6, 4.2, 0.2), woodDoorMat);
+    doubleDoors.position.set(posX, 2.2, adminDoorZ + 0.22);
+    adminGroup.add(doubleDoors);
+
+    // Glazed Door Lites (Dual arched glass window panes)
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2, metalness: 0.8 });
+    const glassL = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.8, 0.24), glassMat);
+    glassL.position.set(posX - 0.8, 2.8, adminDoorZ + 0.22);
+    const glassR = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.8, 0.24), glassMat);
+    glassR.position.set(posX + 0.8, 2.8, adminDoorZ + 0.22);
+    adminGroup.add(glassL, glassR);
+
+    // Polished Brass Push Bars and Kickplates
+    const brassMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.9, roughness: 0.2 });
+    const pushBarL = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.1), brassMat);
+    pushBarL.position.set(posX - 0.8, 1.6, adminDoorZ + 0.35);
+    const pushBarR = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.1), brassMat);
+    pushBarR.position.set(posX + 0.8, 1.6, adminDoorZ + 0.35);
+    const kickplate = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.35, 0.24), brassMat);
+    kickplate.position.set(posX, 0.35, adminDoorZ + 0.22);
+    adminGroup.add(pushBarL, pushBarR, kickplate);
+
+    // Dedicated Bronze Plaque: "THE APPRENTICE SCHOOL - EST. 1919"
+    const plaqueMat = new THREE.MeshStandardMaterial({ color: 0xca8a04, metalness: 0.8, roughness: 0.3 });
+    const plaque = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.6, 0.12), plaqueMat);
+    plaque.position.set(posX, 4.6, adminDoorZ + 0.32);
+    adminGroup.add(plaque);
+
+    // Granite Entrance Steps (Step 1 and Step 2)
+    const stepMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 });
+    const step1 = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.18, 2.2), stepMat);
+    step1.position.set(posX, 0.09, adminDoorZ + 1.2);
+    const step2 = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.18, 1.2), stepMat);
+    step2.position.set(posX, 0.27, adminDoorZ + 0.7);
+    adminGroup.add(step1, step2);
+    this.platforms.push({ minX: posX - 3.0, maxX: posX + 3.0, minZ: adminDoorZ + 0.1, maxZ: adminDoorZ + 2.3, height: 0.27 });
+
+    // Brass Lanterns flanking the entrance
+    const lanternMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 });
+    for (const lx of [-2.8, 2.8]) {
+      const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.6, 0.35), lanternMat);
+      lantern.position.set(posX + lx, 3.2, adminDoorZ + 0.35);
+      const lanternGlow = new THREE.PointLight(0xfef08a, 1.8, 8);
+      lanternGlow.position.set(posX + lx, 3.2, adminDoorZ + 0.6);
+      adminGroup.add(lantern, lanternGlow);
+    }
 
     this.group.add(adminGroup);
 

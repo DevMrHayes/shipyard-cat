@@ -1719,33 +1719,20 @@ export class PlaytestHarness {
       throw new Error(`Spawn coordinate (-10, 0, -20) has insufficient clearance: ${minObstacleDist.toFixed(3)}m < ${requiredClearance}m from "${closestObstacleName}"`);
     }
 
-    // 2. Specific Verification for Red Fuel Pressure Vessel & Concrete Saddle Piers
-    // Industrial Fuel Tank obstacle bounds: [-24, -12] x [0, 4.5] x [-11, -5]
-    // Tank center: (-18, 2.4, -8), Saddle 1: (-21, 0.7, -8), Saddle 2: (-15, 0.7, -8)
-    const tankObs = env.solidObstacles.find(o => o.name.toLowerCase().includes('fuel tank'));
-    if (!tankObs) {
-      throw new Error('Industrial Fuel Tank obstacle not found in environment');
+    // 2. Specific Verification for Historic Tugboat Dorothy Exhibit
+    const dorothyObs = env.solidObstacles.find(o => o.name.toLowerCase().includes('dorothy'));
+    if (!dorothyObs) {
+      throw new Error('Tugboat Dorothy obstacle not found in environment');
     }
 
-    const tankDx = Math.max(0, tankObs.min.x - spawnPos.x, spawnPos.x - tankObs.max.x);
-    const tankDz = Math.max(0, tankObs.min.z - spawnPos.z, spawnPos.z - tankObs.max.z);
-    const tankDist = Math.hypot(tankDx, tankDz);
+    const dorothyDx = Math.max(0, dorothyObs.min.x - spawnPos.x, spawnPos.x - dorothyObs.max.x);
+    const dorothyDz = Math.max(0, dorothyObs.min.z - spawnPos.z, spawnPos.z - dorothyObs.max.z);
+    const dorothyDist = Math.hypot(dorothyDx, dorothyDz);
 
-    // Concrete saddle 2 (closest saddle pier at X: -15, Z: -8, bounds: [-15.6, -14.4] x [-10.0, -6.0])
-    const saddle2Dx = Math.max(0, -15.6 - spawnPos.x, spawnPos.x - (-14.4));
-    const saddle2Dz = Math.max(0, -10.0 - spawnPos.z, spawnPos.z - (-6.0));
-    const saddle2Dist = Math.hypot(saddle2Dx, saddle2Dz);
+    observations.push(`Historic Tugboat Dorothy Exhibit Distance: ${dorothyDist.toFixed(3)}m (Clearance requirement ≥ 3.0m satisfied).`);
 
-    // Red Pressure Vessel cylindrical vessel body (center: -18, radius: 1.8, Z: -8)
-    const vesselCenter = new THREE.Vector3(-18.0, 2.4, -8.0);
-    const vesselDistXZ = Math.hypot(vesselCenter.x - spawnPos.x, vesselCenter.z - spawnPos.z) - 1.8;
-
-    observations.push(`Red Fuel Pressure Vessel Distance: ${vesselDistXZ.toFixed(3)}m (Strict zero overlap confirmed).`);
-    observations.push(`Concrete Saddle Piers Distance: ${saddle2Dist.toFixed(3)}m (Strict zero overlap confirmed).`);
-    observations.push(`Fuel Tank Collision Hull Distance: ${tankDist.toFixed(3)}m (Clearance requirement ≥ 3.0m satisfied).`);
-
-    if (tankDist < requiredClearance || saddle2Dist < requiredClearance || vesselDistXZ < requiredClearance) {
-      throw new Error(`Fuel Tank or Saddle Pier clearance failed: tank=${tankDist.toFixed(2)}m, saddle=${saddle2Dist.toFixed(2)}m, vessel=${vesselDistXZ.toFixed(2)}m`);
+    if (dorothyDist < requiredClearance) {
+      throw new Error(`Tugboat Dorothy clearance failed: distance=${dorothyDist.toFixed(2)}m < min ${requiredClearance}m`);
     }
 
     // 3. Collision Resolver Validation at Spawn Position
@@ -1800,9 +1787,7 @@ export class PlaytestHarness {
         spawnCoordY: spawnPos.y,
         spawnCoordZ: spawnPos.z,
         minObstacleClearanceMeters: Math.round(minObstacleDist * 1000) / 1000,
-        fuelTankClearanceMeters: Math.round(tankDist * 1000) / 1000,
-        concreteSaddleClearanceMeters: Math.round(saddle2Dist * 1000) / 1000,
-        redVesselClearanceMeters: Math.round(vesselDistXZ * 1000) / 1000,
+        dorothyExhibitClearanceMeters: Math.round(dorothyDist * 1000) / 1000,
         radialProbeHeadingsCount: radialProbes,
         radialProbesTotal: radialProbeTicks,
         radialEncroachmentsCount: radialPenetrations,
