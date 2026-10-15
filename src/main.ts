@@ -1164,7 +1164,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   }
 
-  // Pre-run tests in background for initial verification
-  const initialTestResults = TestRunner.runAllTests();
-  console.log('Shipyard Cat Test Suite Results:', initialTestResults);
+  // Pre-run tests on-demand or when explicitly requested via ?run-tests=true
+  if (typeof window !== 'undefined' && window.location.search.includes('run-tests=true')) {
+    const initialTestResults = TestRunner.runAllTests();
+    console.log('Shipyard Cat Test Suite Results:', initialTestResults);
+  }
 });

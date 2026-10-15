@@ -1137,15 +1137,21 @@ export class GameEngine {
         continue;
       }
 
-      const skipMixer = (dSq > throttleDistanceSq && this.frameTick % 2 !== 0);
+      // Distance LOD for animation mixer and visibility
+      rat.mesh.visible = true;
+      const skipMixer = rat.isKingpin ? false : (dSq > throttleDistanceSq && this.frameTick % 2 !== 0);
       const isSprinting = this.physicsInput.isSprinting;
       const isPouncing = this.physics.isPouncing;
       const inShadowZone = this.cat.isCrouching;
       rat.update(deltaTime, catPos, this.cat.isCrouching, skipMixer, isSprinting, isPouncing, inShadowZone);
       
       if ((rat.state as string) !== 'CAUGHT') {
-        // Resolve full physical collisions every frame for nearby rats (<= 15m), or staggered every 4th frame
-        if (dSq <= 225 || (i + this.frameTick) % 4 === 0) {
+        // Kingpin boss resolves collision every frame; standard rats stagger collision only when close (<= 15m)
+        if (rat.isKingpin) {
+          const prevRatPos = GameEngine.scratchRatPrevPos.copy(rat.mesh.position);
+          const resolvedRatPos = this.environment.resolveCollision(rat.mesh.position, 0.25, prevRatPos);
+          rat.mesh.position.copy(resolvedRatPos);
+        } else if (dSq <= 225 && (i + this.frameTick) % 3 === 0) {
           const prevRatPos = GameEngine.scratchRatPrevPos.copy(rat.mesh.position);
           const resolvedRatPos = this.environment.resolveCollision(rat.mesh.position, 0.25, prevRatPos);
           rat.mesh.position.copy(resolvedRatPos);

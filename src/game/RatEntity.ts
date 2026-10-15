@@ -51,7 +51,7 @@ export class RatEntity {
   };
 
   private static lastGlobalSqueakTime: number = -100;
-  private static readonly MIN_GLOBAL_SQUEAK_INTERVAL: number = 3.5;
+  private static readonly MIN_GLOBAL_SQUEAK_INTERVAL: number = 6.0;
 
   public proceduralGroup: THREE.Group;
   public readyPromise: Promise<void> = Promise.resolve();
@@ -476,12 +476,12 @@ export class RatEntity {
       this.panicSqueakTimer -= deltaTime;
       if (this.panicSqueakTimer <= 0) {
         const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
-        if (distToCat < 12.0 && (now - RatEntity.lastGlobalSqueakTime) >= RatEntity.MIN_GLOBAL_SQUEAK_INTERVAL) {
+        if (distToCat < 8.0 && (now - RatEntity.lastGlobalSqueakTime) >= RatEntity.MIN_GLOBAL_SQUEAK_INTERVAL) {
           RatEntity.lastGlobalSqueakTime = now;
-          soundEngine.playSpatialSound('RAT_SQUEAK', this.mesh.position.x, this.mesh.position.y, this.mesh.position.z, 0.35);
-          this.panicSqueakTimer = 4.5 + Math.random() * 4.0;
+          soundEngine.playSpatialSound('RAT_SQUEAK', this.mesh.position.x, this.mesh.position.y, this.mesh.position.z, 0.25);
+          this.panicSqueakTimer = 6.0 + Math.random() * 4.0;
         } else {
-          this.panicSqueakTimer = 1.5 + Math.random() * 2.0;
+          this.panicSqueakTimer = 3.0 + Math.random() * 3.0;
         }
       }
 
@@ -522,22 +522,22 @@ export class RatEntity {
       this.bodyMesh.position.y = (this.isKingpin ? 0.22 : 0.12) + Math.abs(Math.sin(this.runCycle)) * 0.03;
     }
 
-    if (this.thermalAura && this.thermalAura.visible) {
+    if (this.thermalAura && this.thermalAura.visible && distToCat < 25.0) {
       const scale = 1.0 + Math.sin(Date.now() * 0.008) * 0.15;
       this.thermalAura.scale.set(scale, scale, scale);
     }
 
-    // Update Scent Footsteps
-    this.scentTimer += deltaTime;
-    if (this.scentTimer > 0.15) {
-      this.scentTimer = 0;
-      const idx = this.scentHeadIndex * 3;
-      this.scentPositions[idx] = this.mesh.position.x + (Math.random() - 0.5) * 0.1;
-      this.scentPositions[idx + 1] = 0.06;
-      this.scentPositions[idx + 2] = this.mesh.position.z + (Math.random() - 0.5) * 0.1;
+    // Update Scent Footsteps only when whiskers mode is active and within player sensor range
+    if (this.scentTrailParticles.visible && distToCat < 25.0) {
+      this.scentTimer += deltaTime;
+      if (this.scentTimer > 0.35) {
+        this.scentTimer = 0;
+        const idx = this.scentHeadIndex * 3;
+        this.scentPositions[idx] = this.mesh.position.x + (Math.random() - 0.5) * 0.1;
+        this.scentPositions[idx + 1] = 0.06;
+        this.scentPositions[idx + 2] = this.mesh.position.z + (Math.random() - 0.5) * 0.1;
 
-      this.scentHeadIndex = (this.scentHeadIndex + 1) % (this.scentPositions.length / 3);
-      if (this.scentTrailParticles.visible) {
+        this.scentHeadIndex = (this.scentHeadIndex + 1) % (this.scentPositions.length / 3);
         (this.scentTrailParticles.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
       }
     }

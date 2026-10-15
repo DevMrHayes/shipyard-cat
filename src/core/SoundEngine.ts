@@ -719,6 +719,9 @@ export class SoundEngine {
     return this.currentZone;
   }
 
+  private activeSpatialVoices: number = 0;
+  private static readonly MAX_SPATIAL_VOICES: number = 4;
+
   /**
    * Plays a 3D spatialized sound at world coordinates (x, y, z) using an inverse-distance PannerNode.
    * Self-disconnects on completion for zero memory leaks.
@@ -733,11 +736,13 @@ export class SoundEngine {
     if (this.isMuted) return;
     this.init();
     if (!this.ctx || !this.dryGain || !this.convolver) return;
+    if (this.activeSpatialVoices >= SoundEngine.MAX_SPATIAL_VOICES) return;
 
     const buffer = this.spatialBufferCache.get(soundType as SpatialSoundType);
     if (!buffer) return;
 
     const now = this.ctx.currentTime;
+    this.activeSpatialVoices++;
 
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
@@ -745,11 +750,12 @@ export class SoundEngine {
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(Math.max(0.01, Math.min(2.0, volume)), now);
 
+    const isLightSfx = soundType === 'RAT_SQUEAK';
     const panner = this.ctx.createPanner();
-    panner.panningModel = 'HRTF';
+    panner.panningModel = isLightSfx ? 'equalpower' : 'HRTF';
     panner.distanceModel = 'inverse';
     panner.refDistance = 2.0;
-    panner.maxDistance = 45.0;
+    panner.maxDistance = isLightSfx ? 25.0 : 45.0;
     panner.rolloffFactor = 1.2;
 
     if (panner.positionX) {
@@ -763,9 +769,12 @@ export class SoundEngine {
     source.connect(gain);
     gain.connect(panner);
     panner.connect(this.dryGain);
-    panner.connect(this.convolver);
+    if (!isLightSfx && this.convolver) {
+      panner.connect(this.convolver);
+    }
 
     source.onended = () => {
+      this.activeSpatialVoices = Math.max(0, this.activeSpatialVoices - 1);
       source.disconnect();
       gain.disconnect();
       panner.disconnect();

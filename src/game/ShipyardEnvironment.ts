@@ -162,9 +162,11 @@ export class ShipyardEnvironment {
     }
 
     // O(1) Spatial Hash Query for near obstacles
-    const nearbyObstacles = this.spatialGrid.queryNear(resolved, radius + 4.0);
-    const obstaclesToTest = nearbyObstacles.length > 0 ? nearbyObstacles : this.solidObstacles;
+    const obstaclesToTest = this.spatialGrid.queryNear(resolved, radius + 4.0);
     const count = obstaclesToTest.length;
+    if (count === 0) {
+      return resolved;
+    }
 
     for (let pass = 0; pass < 3; pass++) {
       let collided = false;
