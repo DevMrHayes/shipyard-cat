@@ -90,24 +90,24 @@ export class IndustrialExpansion {
         this.group.add(col);
       }
 
-      // Incline Ramp for climbing onto Tier 1
-      const ramp = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.12, 1.6), gratingMat);
-      ramp.position.set(-48, 0.9, zPos);
-      ramp.rotation.z = Math.atan2(1.8, 4.5);
+      // Incline Ramp for climbing onto Tier 1 (anchored cleanly on open West end of rack at X=-84, safely away from building walls)
+      const ramp = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.12, 1.6), gratingMat);
+      ramp.position.set(-86.2, 0.9, zPos);
+      ramp.rotation.z = -Math.atan2(1.8, 4.5);
       this.group.add(ramp);
       this.platforms.push({
-        minX: -51,
-        maxX: -45,
+        minX: -88.5,
+        maxX: -84.0,
         minZ: zPos - 0.8,
         maxZ: zPos + 0.8,
         height: 1.0
       });
     });
 
-    // Giant Marine Wooden Cable Spools
+    // Giant Marine Wooden Cable Spools (staged neatly in open yard storage bays)
     const spools = [
-      { x: -48, z: -70, r: 1.6, h: 1.8 },
-      { x: -46, z: -50, r: 2.0, h: 2.4 },
+      { x: -56, z: -70, r: 1.6, h: 1.8 },
+      { x: -54, z: -52, r: 1.8, h: 2.2 },
       { x: -88, z: -35, r: 1.8, h: 2.0 }
     ];
 
@@ -163,15 +163,28 @@ export class IndustrialExpansion {
       shedFrame.add(colL, colR);
     }
 
-    // Curved HY-80 Submarine Hull Shell Mockup
-    const hullSegment = new THREE.Mesh(
-      new THREE.CylinderGeometry(8.5, 8.5, 12, 16, 1, false, 0, Math.PI * 0.65),
-      hy80PlateMat
-    );
-    hullSegment.rotation.z = Math.PI / 2;
-    hullSegment.position.set(0, 4.5, -5);
-    hullSegment.castShadow = true;
-    shedFrame.add(hullSegment);
+    // Heavy Submarine Plate Bending Roll Press (grounded industrial machine, eliminates thin sky curve)
+    const pressGroup = new THREE.Group();
+    pressGroup.position.set(0, 0, -5);
+
+    const pressBase = new THREE.Mesh(new THREE.BoxGeometry(10.0, 1.2, 5.0), steelWallMat);
+    pressBase.position.y = 0.6;
+    pressBase.castShadow = true;
+    pressBase.receiveShadow = true;
+
+    // Grounded bending roller cylinders
+    const rollerMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
+    const rollerGeo = new THREE.CylinderGeometry(0.6, 0.6, 8.5, 16);
+    rollerGeo.rotateZ(Math.PI / 2);
+    const roller1 = new THREE.Mesh(rollerGeo, rollerMat);
+    roller1.position.set(0, 1.6, -0.8);
+    const roller2 = new THREE.Mesh(rollerGeo, rollerMat);
+    roller2.position.set(0, 1.6, 0.8);
+    const topRoller = new THREE.Mesh(rollerGeo, rollerMat);
+    topRoller.position.set(0, 2.6, 0.0);
+
+    pressGroup.add(pressBase, roller1, roller2, topRoller);
+    shedFrame.add(pressGroup);
 
     // Staged Flat Armor Plate Pallet Stacks (walkable by Alba)
     const plateStack1 = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.8, 3.5), hy80PlateMat);

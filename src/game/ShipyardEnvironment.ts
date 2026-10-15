@@ -606,25 +606,54 @@ export class ShipyardEnvironment {
         });
       }
 
-      // Timber Heavy Side Stringers / Railings
-      const railingMat = new THREE.MeshStandardMaterial({ color: 0x271708, roughness: 0.9 });
-      for (const dz of [-4.1, 4.1]) {
-        const stringer = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.3, 0.2), railingMat);
-        stringer.position.set(42.25, 1.4, rz + dz);
+      // Sloped Timber Side Stringers, Handrails, and Newel Posts following the stair gradient (Y=0 to 1.4m)
+      const railingMat = new THREE.MeshStandardMaterial({ color: 0x3d2618, roughness: 0.85, metalness: 0.1 });
+      const slopeRun = 45.0 - 39.5; // 5.5m
+      const slopeRise = 1.4;
+      const slopeDist = Math.hypot(slopeRun, slopeRise);
+      const slopeAngle = Math.atan2(slopeRise, slopeRun);
+
+      const stringerGeo = new THREE.BoxGeometry(slopeDist, 0.24, 0.16);
+      const handrailGeo = new THREE.BoxGeometry(slopeDist, 0.08, 0.12);
+      const postGeo = new THREE.BoxGeometry(0.14, 1.1, 0.14);
+
+      for (const dz of [-4.15, 4.15]) {
+        // Sloped Stringer base
+        const stringer = new THREE.Mesh(stringerGeo, railingMat);
+        stringer.position.set(42.25, slopeRise / 2 + 0.05, rz + dz);
+        stringer.rotation.z = -slopeAngle;
         stringer.castShadow = true;
         this.group.add(stringer);
+
+        // Sloped Handrail
+        const handrail = new THREE.Mesh(handrailGeo, railingMat);
+        handrail.position.set(42.25, slopeRise / 2 + 0.75, rz + dz);
+        handrail.rotation.z = -slopeAngle;
+        handrail.castShadow = true;
+        this.group.add(handrail);
+
+        // Ground & Boardwalk Newel Posts
+        const bottomPost = new THREE.Mesh(postGeo, railingMat);
+        bottomPost.position.set(39.5, 0.55, rz + dz);
+        bottomPost.castShadow = true;
+
+        const topPost = new THREE.Mesh(postGeo, railingMat);
+        topPost.position.set(45.0, 1.4 + 0.45, rz + dz);
+        topPost.castShadow = true;
+
+        this.group.add(bottomPost, topPost);
       }
 
-      // Register solid side barriers for stairs to prevent walking through side edges
+      // Solid side barriers outside stair envelope (Z in [rz - 4.7, rz - 4.2] and [rz + 4.2, rz + 4.7]) to preserve 8m open walkway
       this.registerObstacle(
-        new THREE.Vector3(38.0, 0.0, rz - 4.4),
-        new THREE.Vector3(45.5, 1.35, rz - 3.8),
-        `Boarding Ramp South Barrier (Z=${rz})`
+        new THREE.Vector3(39.0, 0.0, rz - 4.7),
+        new THREE.Vector3(45.5, 1.4, rz - 4.2),
+        `Boarding Stairs South Barrier (Z=${rz})`
       );
       this.registerObstacle(
-        new THREE.Vector3(38.0, 0.0, rz + 3.8),
-        new THREE.Vector3(45.5, 1.35, rz + 4.4),
-        `Boarding Ramp North Barrier (Z=${rz})`
+        new THREE.Vector3(39.0, 0.0, rz + 4.2),
+        new THREE.Vector3(45.5, 1.4, rz + 4.7),
+        `Boarding Stairs North Barrier (Z=${rz})`
       );
     }
 
@@ -2327,50 +2356,19 @@ export class ShipyardEnvironment {
     bridgeCrane.castShadow = true;
     smofGroup.add(bridgeCrane);
 
-    // 7. Dual Virginia/Columbia Submarine Hull Cylinders Inside
+    // 7. Dual Virginia/Columbia Submarine Hull Cylinders in Parallel Outfitting Bays
     const subHulls = [
-      { x: -34.5, name: 'Virginia-Class Fast Attack Hull Section', hasSail: false },
-      { x: -28.5, name: 'Columbia-Class Ballistic Missile Hull Section', hasSail: true }
+      { x: -31.5, radius: 2.2, len: 28, name: 'Virginia-Class Fast Attack Hull Section', hasSail: false },
+      { x: -24.5, radius: 2.3, len: 28, name: 'Columbia-Class Ballistic Missile Hull Section', hasSail: true }
     ];
-
-    const hullRadius = 3.0;
-    const hullLen = 26;
-    const hullGeo = new THREE.CylinderGeometry(hullRadius, hullRadius, hullLen, 24);
-    hullGeo.rotateX(Math.PI / 2);
-
-    // Primary Submarine Hull Module at center (-30, 0, 45) inside Building 4677
-    const centerHullMesh = new THREE.Mesh(hullGeo, hullMat);
-    centerHullMesh.position.set(centerX, hullRadius + 0.8, centerZ);
-    centerHullMesh.castShadow = true;
-    centerHullMesh.receiveShadow = true;
-    smofGroup.add(centerHullMesh);
-
-    this.registerObstacle(
-      new THREE.Vector3(-35.0, 0, 31.0),
-      new THREE.Vector3(-25.0, 12.0, 59.0),
-      'Submarine Hull Module'
-    );
-
-    // 15-Flange Overhead Hydraulic Pipe Manifold
-    const flangeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.25 });
-    const flangeGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.18, 12);
-    flangeGeo.rotateX(Math.PI / 2);
-    const instancedFlanges = new THREE.InstancedMesh(flangeGeo, flangeMat, 15);
-    const dummyMatrix = new THREE.Matrix4();
-    let flIdx = 0;
-    for (let i = 0; i < 3; i++) {
-      for (let fz = -12; fz <= 12; fz += 6) {
-        dummyMatrix.setPosition(-34.2 + i * 4.2, 12.5, centerZ + fz);
-        instancedFlanges.setMatrixAt(flIdx++, dummyMatrix);
-      }
-    }
-    instancedFlanges.instanceMatrix.needsUpdate = true;
-    smofGroup.add(instancedFlanges);
 
     for (let sIdx = 0; sIdx < subHulls.length; sIdx++) {
       const subInfo = subHulls[sIdx];
+      const hullGeo = new THREE.CylinderGeometry(subInfo.radius, subInfo.radius, subInfo.len, 24);
+      hullGeo.rotateX(Math.PI / 2);
+
       const hullMesh = new THREE.Mesh(hullGeo, hullMat);
-      hullMesh.position.set(subInfo.x, hullRadius + 0.8, centerZ);
+      hullMesh.position.set(subInfo.x, subInfo.radius + 0.8, centerZ);
       hullMesh.castShadow = true;
       hullMesh.receiveShadow = true;
       smofGroup.add(hullMesh);
@@ -2378,17 +2376,47 @@ export class ShipyardEnvironment {
       // Keel cradle blocks
       const cradleMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.5 });
       for (const cz of [centerZ - 8, centerZ + 8]) {
-        const cradle = new THREE.Mesh(new THREE.BoxGeometry(8.2, 1.2, 3.5), cradleMat);
+        const cradle = new THREE.Mesh(new THREE.BoxGeometry(subInfo.radius * 2 + 1.2, 1.2, 3.5), cradleMat);
         cradle.position.set(subInfo.x, 0.6, cz);
         cradle.castShadow = true;
         smofGroup.add(cradle);
       }
 
       this.registerObstacle(
-        new THREE.Vector3(subInfo.x - hullRadius, 0, centerZ - hullLen / 2),
-        new THREE.Vector3(subInfo.x + hullRadius, hullRadius * 2 + 0.8, centerZ + hullLen / 2),
+        new THREE.Vector3(subInfo.x - subInfo.radius, 0, centerZ - subInfo.len / 2),
+        new THREE.Vector3(subInfo.x + subInfo.radius, subInfo.radius * 2 + 0.8, centerZ + subInfo.len / 2),
         subInfo.name
       );
+
+      this.platforms.push({
+        minX: subInfo.x - 0.9,
+        maxX: subInfo.x + 0.9,
+        minZ: centerZ - subInfo.len / 2 + 2,
+        maxZ: centerZ + subInfo.len / 2 - 2,
+        height: subInfo.radius * 2 + 0.8
+      });
+
+      if (subInfo.hasSail) {
+        const sailMesh = new THREE.Mesh(new THREE.BoxGeometry(2.0, 3.4, 5.0), hullMat);
+        sailMesh.position.set(subInfo.x, subInfo.radius * 2 + 2.5, centerZ + 2);
+        sailMesh.castShadow = true;
+        smofGroup.add(sailMesh);
+
+        const periMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+        const peri1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2, 8), periMat);
+        peri1.position.set(subInfo.x + 0.35, subInfo.radius * 2 + 4.6, centerZ + 2);
+        const peri2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.6, 8), periMat);
+        peri2.position.set(subInfo.x - 0.35, subInfo.radius * 2 + 5.0, centerZ + 3);
+        smofGroup.add(peri1, peri2);
+      }
+    }
+
+    // Overhead Hydraulic Pipe Manifold attached securely to Bridge Crane Runway (eliminates floating discs in sky)
+    const manifoldPipeMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.3 });
+    const manifoldPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 30.0, 12), manifoldPipeMat);
+    manifoldPipe.position.set(centerX, wallHeight - 1.2, centerZ);
+    manifoldPipe.rotateX(Math.PI / 2);
+    smofGroup.add(manifoldPipe);
 
       this.platforms.push({
         minX: subInfo.x - 1.0,
@@ -2467,14 +2495,21 @@ export class ShipyardEnvironment {
     smofGroup.add(catBridge);
     this.platforms.push({ minX: -36.1, maxX: -23.9, minZ: centerZ - 0.9, maxZ: centerZ + 0.9, height: catwalkH });
 
-    // Safety Yellow Guardrails along interior edges of the upper catwalks
-    const railYGeo = new THREE.CylinderGeometry(0.025, 0.025, 36.0, 8);
-    railYGeo.rotateX(Math.PI / 2);
-    const innerRailW = new THREE.Mesh(railYGeo, catwalkYellowMat);
-    innerRailW.position.set(-36.1, catwalkH + 0.85, centerZ);
-    const innerRailE = new THREE.Mesh(railYGeo, catwalkYellowMat);
+    // Safety Yellow Guardrails along interior edges of the upper catwalks (with open landing gap at Z=37 for stairs)
+    const innerRailE = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 36.0, 8), catwalkYellowMat);
+    innerRailE.rotateX(Math.PI / 2);
     innerRailE.position.set(-23.9, catwalkH + 0.85, centerZ);
-    smofGroup.add(innerRailW, innerRailE);
+
+    // West inner rail split into South and North sections to leave 2.0m open stair entrance at Z in [36.0, 38.0]
+    const innerRailW_South = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 9.0, 8), catwalkYellowMat);
+    innerRailW_South.rotateX(Math.PI / 2);
+    innerRailW_South.position.set(-36.1, catwalkH + 0.85, 31.5);
+
+    const innerRailW_North = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 25.0, 8), catwalkYellowMat);
+    innerRailW_North.rotateX(Math.PI / 2);
+    innerRailW_North.position.set(-36.1, catwalkH + 0.85, 50.5);
+
+    smofGroup.add(innerRailE, innerRailW_South, innerRailW_North);
 
     // E. Interior Steel Access Staircase (rising from ground Y=0.0m at Z=28 to Y=4.5m at Z=37 along West Wall)
     const numSmofSteps = 10;
@@ -2504,12 +2539,12 @@ export class ShipyardEnvironment {
       });
     }
 
-    // Sloped Safety Handrail along staircase
+    // Sloped Safety Handrail along outer side of staircase
     const smofStairDist = Math.hypot(catwalkH, stairZEnd - stairZStart);
     const smofStairDir = new THREE.Vector3(0, catwalkH, stairZEnd - stairZStart).normalize();
     const stairHandrail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, smofStairDist, 8), catwalkYellowMat);
     stairHandrail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), smofStairDir);
-    stairHandrail.position.set(-36.2, catwalkH / 2 + 0.85, (stairZStart + stairZEnd) / 2);
+    stairHandrail.position.set(-36.15, catwalkH / 2 + 0.85, (stairZStart + stairZEnd) / 2);
     smofGroup.add(stairHandrail);
 
     // 9. Industrial High-Bay Amber Sodium Lighting Inside Shelter
