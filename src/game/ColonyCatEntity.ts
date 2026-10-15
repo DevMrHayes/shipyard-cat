@@ -72,11 +72,14 @@ export class ColonyCatEntity {
           this.mesh.add(this.gltfModel);
           this.mesh.remove(proceduralGroup);
           proceduralGroup.visible = false;
+          this.createNametagSprite(1.15);
         }).catch(() => {
           this.buildCatMesh(color, proceduralGroup);
+          this.createNametagSprite(1.15);
         });
       } else {
         this.buildCatMesh(color, proceduralGroup);
+        this.createNametagSprite(1.15);
       }
     }
   }
@@ -211,28 +214,31 @@ export class ColonyCatEntity {
     hat.position.y = 2.22;
     this.mesh.add(hat);
 
-    // Nametag
+    this.createNametagSprite(2.7);
+  }
+
+  private createNametagSprite(yPos: number): void {
     if (typeof document !== 'undefined') {
       const nameCanvas = document.createElement('canvas');
       nameCanvas.width = 300;
       nameCanvas.height = 64;
       const ctx = nameCanvas.getContext('2d', { willReadFrequently: true })!;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
       ctx.roundRect(10, 10, 280, 44, 10);
       ctx.fill();
-      ctx.strokeStyle = '#4ade80';
+      ctx.strokeStyle = this.isHuman ? '#38bdf8' : '#4ade80';
       ctx.lineWidth = 3;
       ctx.stroke();
-      ctx.font = 'bold 20px Courier New';
-      ctx.fillStyle = '#4ade80';
+      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = this.isHuman ? '#38bdf8' : '#4ade80';
       ctx.textAlign = 'center';
       ctx.fillText(this.name, 150, 38);
 
       const texture = new THREE.CanvasTexture(nameCanvas);
-      const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
       const sprite = new THREE.Sprite(spriteMat);
-      sprite.position.set(0, 2.7, 0);
-      sprite.scale.set(2.0, 0.45, 1);
+      sprite.position.set(0, yPos, 0);
+      sprite.scale.set(this.isHuman ? 2.0 : 1.5, this.isHuman ? 0.45 : 0.35, 1);
       this.mesh.add(sprite);
     }
   }

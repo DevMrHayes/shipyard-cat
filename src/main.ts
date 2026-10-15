@@ -216,14 +216,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const dialogueArchive: { speaker: string; text: string; time: string }[] = [];
 
-  // 1. Toast Notification System with Stacking Queue (No Overlaps)
-  interface QueuedToast {
-    title: string;
-    message: string;
-    type: 'info' | 'success' | 'warn';
+  // 1. Immediate Non-Blocking Toast Notification System (Zero-Lag Floating Stack)
+  interface ActiveToastItem {
+    el: HTMLElement;
+    key: string;
+    timeoutId: number;
   }
-  const toastQueue: QueuedToast[] = [];
-  let isToastDisplaying = false;
+  const activeToasts: ActiveToastItem[] = [];
+  const MAX_ACTIVE_TOASTS = 2;
+  const TOAST_LIFETIME_MS = 2200;
 
   function showToast(title: string, message: string, type: 'info' | 'success' | 'warn' = 'info') {
     // Record all notifications in dialogueArchive so user can review full history in Logbook modal
@@ -234,36 +235,152 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (dialogueArchive.length > 50) dialogueArchive.pop();
 
-    toastQueue.push({ title, message, type });
-    processToastQueue();
-  }
+    const key = `${title}:${message}`;
+    const existing = activeToasts.find(t => t.key === key);
+    if (existing) {
+      window.clearTimeout(existing.timeoutId);
+      existing.timeoutId = window.setTimeout(() => removeToast(existing), TOAST_LIFETIME_MS);
+      return;
+    }
 
-  function processToastQueue() {
-    if (isToastDisplaying || toastQueue.length === 0) return;
-    isToastDisplaying = true;
+    while (activeToasts.length >= MAX_ACTIVE_TOASTS) {
+      const oldest = activeToasts.shift();
+      if (oldest) {
+        window.clearTimeout(oldest.timeoutId);
+        oldest.el.remove();
+      }
+    }
 
-    const next = toastQueue.shift()!;
     const toast = document.createElement('div');
-    toast.className = `toast ${next.type}`;
+    toast.className = `toast ${type}`;
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-8px)';
+    toast.style.transition = 'opacity 0.18s ease, transform 0.18s ease';
     toast.innerHTML = `
-      <div class="toast-title">${next.title}</div>
-      <div class="toast-message">${next.message}</div>
+      <div class="toast-title">${title}</div>
+      <div class="toast-message">${message}</div>
     `;
     toastContainer.appendChild(toast);
 
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateY(-10px)';
-      toast.style.transition = 'all 0.3s ease';
-      setTimeout(() => {
-        toast.remove();
-        isToastDisplaying = false;
-        processToastQueue();
-      }, 300);
-    }, 3800);
+    requestAnimationFrame(() => {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+    });
+
+    const item: ActiveToastItem = {
+      el: toast,
+      key,
+      timeoutId: window.setTimeout(() => removeToast(item), TOAST_LIFETIME_MS)
+    };
+    activeToasts.push(item);
+  }
+
+  function removeToast(item: ActiveToastItem) {
+    const idx = activeToasts.indexOf(item);
+    if (idx !== -1) {
+      window.clearTimeout(item.timeoutId);
+      activeToasts.splice(idx, 1);
+    }
+    item.el.style.opacity = '0';
+    item.el.style.transform = 'translateY(-8px)';
+    window.setTimeout(() => item.el.remove(), 200);
   }
 
   game.onNotification = showToast;
+
+  // 2. Interactive RPG NPC Dialogue Modal & Proximity Prompt
+  const dialogueOverlay = document.createElement('div');
+  dialogueOverlay.id = 'sc-dialogue-overlay';
+  dialogueOverlay.style.cssText = `
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(620px, 92vw);
+    background: rgba(15, 23, 42, 0.96);
+    border: 2px solid #eab308;
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: #f8fafc;
+    font-family: system-ui, -apple-system, sans-serif;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 960;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+    cursor: pointer;
+  `;
+  dialogueOverlay.innerHTML = `
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <div style="display: flex; align-items: baseline; gap: 8px;">
+        <span id="sc-dialogue-speaker" style="font-size: 1.15rem; font-weight: 800; color: #fde047;"></span>
+        <span id="sc-dialogue-role" style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;"></span>
+      </div>
+      <span style="font-size: 0.7rem; color: #cbd5e1; opacity: 0.6;">[CLICK / E / SPACE]</span>
+    </div>
+    <div id="sc-dialogue-text" style="font-size: 0.95rem; line-height: 1.48; color: #f1f5f9; min-height: 2.2em;"></div>
+    <div style="align-self: flex-end; font-size: 0.72rem; color: #eab308; font-weight: 600;">Continue →</div>
+  `;
+  document.body.appendChild(dialogueOverlay);
+
+  const interactionPrompt = document.createElement('div');
+  interactionPrompt.id = 'sc-interaction-prompt';
+  interactionPrompt.style.cssText = `
+    position: fixed;
+    bottom: 175px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.92);
+    color: #fde047;
+    padding: 6px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(253, 224, 71, 0.55);
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    z-index: 920;
+    display: none;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    pointer-events: none;
+  `;
+  document.body.appendChild(interactionPrompt);
+
+  let isDialogueOpen = false;
+  const speakerEl = dialogueOverlay.querySelector('#sc-dialogue-speaker') as HTMLElement;
+  const roleEl = dialogueOverlay.querySelector('#sc-dialogue-role') as HTMLElement;
+  const textEl = dialogueOverlay.querySelector('#sc-dialogue-text') as HTMLElement;
+
+  function openDialogueModal(speaker: string, role: string, text: string) {
+    if (speakerEl) speakerEl.textContent = speaker;
+    if (roleEl) roleEl.textContent = role;
+    if (textEl) textEl.textContent = text;
+    dialogueOverlay.style.display = 'flex';
+    isDialogueOpen = true;
+    interactionPrompt.style.display = 'none';
+  }
+
+  function closeDialogueModal() {
+    dialogueOverlay.style.display = 'none';
+    isDialogueOpen = false;
+  }
+
+  dialogueOverlay.addEventListener('click', () => {
+    closeDialogueModal();
+  });
+
+  game.onDialogue = (speaker, role, text) => {
+    openDialogueModal(speaker, role, text);
+  };
+
+  game.onInteractionPrompt = (promptText) => {
+    if (!promptText || isDialogueOpen) {
+      interactionPrompt.style.display = 'none';
+    } else {
+      interactionPrompt.textContent = promptText;
+      interactionPrompt.style.display = 'block';
+    }
+  };
 
   // 2. Vitals & Radiation HUD Updates (Cached & Throttled to 0.5% Delta to Eliminate DOM Thrashing)
   let lastStaminaPct = -1;
@@ -560,6 +677,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.addEventListener('keydown', (e) => {
+    if (isDialogueOpen && (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter')) {
+      e.preventDefault();
+      closeDialogueModal();
+      return;
+    }
+
     const targets = keyAliases[e.code] || [e.code];
     targets.forEach(code => {
       document.querySelectorAll(`[data-key="${code}"]`).forEach(el => el.classList.add('pressed'));

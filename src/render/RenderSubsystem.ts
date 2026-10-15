@@ -109,8 +109,8 @@ export class RenderSubsystem {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.autoUpdate = true;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -130,10 +130,10 @@ export class RenderSubsystem {
     this.sunLight = new THREE.DirectionalLight(0xfff4e0, 2.45);
     this.sunLight.position.set(45, 48, 25);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 1024;
-    this.sunLight.shadow.mapSize.height = 1024;
-    this.sunLight.shadow.bias = -0.00035;
-    this.sunLight.shadow.normalBias = 0.02;
+    this.sunLight.shadow.mapSize.width = 2048;
+    this.sunLight.shadow.mapSize.height = 2048;
+    this.sunLight.shadow.bias = -0.0001;
+    this.sunLight.shadow.normalBias = 0.035;
     this.sunLight.shadow.camera.near = 5;
     this.sunLight.shadow.camera.far = 240;
     this.sunLight.shadow.camera.left = -80;
@@ -494,8 +494,12 @@ export class RenderSubsystem {
     this.currentLookAt.lerp(rawLookTarget, Math.min(1.0, lookLerpFactor));
     this.camera.lookAt(this.currentLookAt);
 
-    // Keep sunlight shadow camera centered on Alba's quadrant for crisp shadow cascades
-    this.sunLight.target.position.set(targetPos.x, 0, targetPos.z);
+    // Keep sunlight shadow camera centered on Alba's quadrant with discrete texel snapping to eliminate shadow edge shimmering
+    const shadowTexelSnap = 0.25;
+    const snappedX = Math.round(targetPos.x / shadowTexelSnap) * shadowTexelSnap;
+    const snappedZ = Math.round(targetPos.z / shadowTexelSnap) * shadowTexelSnap;
+    this.sunLight.target.position.set(snappedX, 0, snappedZ);
+    this.sunLight.position.set(snappedX + 45, 48, snappedZ + 25);
     this.sunLight.target.updateMatrixWorld();
   }
 
@@ -534,16 +538,10 @@ export class RenderSubsystem {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
   }
 
-  private shadowFrameCounter: number = 0;
-
   /**
    * Render frame pass
    */
   public render(scene: THREE.Scene): void {
-    // Throttle shadow map re-renders to every 2nd frame (cuts shadow pass draw calls by 50%)
-    if (this.shadowFrameCounter++ % 2 === 0) {
-      this.renderer.shadowMap.needsUpdate = true;
-    }
     this.renderer.render(scene, this.camera);
   }
 

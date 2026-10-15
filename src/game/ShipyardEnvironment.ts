@@ -67,6 +67,8 @@ export class ShipyardEnvironment {
     this.buildHistoricSouthYard();
     this.buildDryDock12AndBigBlue();
     this.buildSubmarineFabShop();
+    this.buildJointManufacturingAssemblyFacility();
+    this.buildApprenticeSchoolAndAdmin();
     this.buildRadiationVault();
     this.buildCatMotelSanctuary();
     this.buildParkourStructures();
@@ -1874,9 +1876,9 @@ export class ShipyardEnvironment {
     this.group.add(cr3);
     this.platforms.push({ minX: 42.7, maxX: 46.5, minZ: -24.1, maxZ: -21.4, height: 0.0 });
 
-    this.registerObstacle(new THREE.Vector3(14, -3, -36.5), new THREE.Vector3(46, 2, -34.5), 'Dry Dock 1 North Wall');
-    this.registerObstacle(new THREE.Vector3(14, -3, -20.5), new THREE.Vector3(46, 2, -18.5), 'Dry Dock 1 South Wall');
-    this.registerObstacle(new THREE.Vector3(13.5, -3, -36), new THREE.Vector3(15.5, 2, -19), 'Dry Dock 1 West Wall');
+    this.registerObstacle(new THREE.Vector3(14, -3, -36.5), new THREE.Vector3(46, 0.05, -34.5), 'Dry Dock 1 North Wall');
+    this.registerObstacle(new THREE.Vector3(14, -3, -20.5), new THREE.Vector3(46, 0.05, -18.5), 'Dry Dock 1 South Wall');
+    this.registerObstacle(new THREE.Vector3(13.5, -3, -36), new THREE.Vector3(15.5, 0.05, -19), 'Dry Dock 1 West Wall');
     this.registerObstacle(new THREE.Vector3(44.5, -3, -36), new THREE.Vector3(46.5, 2, -24.6), 'River Caisson Gate (North)');
     this.registerObstacle(new THREE.Vector3(44.5, -3, -21.0), new THREE.Vector3(46.5, 2, -19), 'River Caisson Gate (South)');
 
@@ -2140,84 +2142,401 @@ export class ShipyardEnvironment {
     this.registerObstacle(new THREE.Vector3(40.4, 0, 50.5), new THREE.Vector3(43.6, 38.0, 54.5), 'Big Blue Crane East Leg');
   }
 
+  /**
+   * Covered Modular Outfitting Facility (CMOF / SMOF Building 4677):
+   * Encloses nuclear submarine modules under a classified high-bay steel arched shelter
+   * with corrugated naval siding, high arched roof trusses, overhead yellow bridge crane,
+   * high-bay amber sodium vapor lighting, interior inspection catwalks, and two Virginia/Columbia
+   * class submarine hull modules side-by-side in dual outfitting bays.
+   */
   private buildSubmarineFabShop() {
-    const subGroup = new THREE.Group();
-    subGroup.position.set(-30, 0, 45);
+    const smofGroup = new THREE.Group();
+    smofGroup.name = 'Covered_Submarine_Shelter_SMOF_Bldg4677';
+    const centerX = -30;
+    const centerZ = 45;
+    const lengthZ = 44;
+    const widthX = 32;
+    const wallHeight = 16;
+    const roofPeak = 21;
 
-    const subMat = new THREE.MeshStandardMaterial({
-      color: 0x09090b,
-      map: TextureGenerator.createSteelPlateTexture(),
-      normalMap: TextureGenerator.createSteelPlateNormalTexture(),
-      metalness: 0.85,
-      roughness: 0.32
+    const claddingMat = new THREE.MeshStandardMaterial({
+      color: 0x242d38,
+      roughness: 0.65,
+      metalness: 0.45
     });
-    const subGeo = new THREE.CylinderGeometry(4.8, 4.8, 28, 24);
-    subGeo.rotateX(Math.PI / 2);
-    const subHull = new THREE.Mesh(subGeo, subMat);
-    subHull.position.set(0, 4.8, 0);
-    subHull.castShadow = true;
-    subHull.receiveShadow = true;
-    subGroup.add(subHull);
+    const trussMat = new THREE.MeshStandardMaterial({
+      color: 0x1b222c,
+      roughness: 0.5,
+      metalness: 0.7
+    });
+    const hullMat = new THREE.MeshStandardMaterial({
+      color: 0x09090b,
+      roughness: 0.32,
+      metalness: 0.85
+    });
+    const yellowMat = new THREE.MeshStandardMaterial({
+      color: 0xeab308,
+      roughness: 0.4,
+      metalness: 0.5
+    });
 
-    const sailMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.8, roughness: 0.3 });
-    const sail = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.8, 6.0), sailMat);
-    sail.position.set(0, 9.5, 2.0);
-    sail.castShadow = true;
-    subGroup.add(sail);
+    // 1. Concrete Foundation Pad
+    const pad = new THREE.Mesh(
+      new THREE.BoxGeometry(widthX + 4, 0.4, lengthZ + 4),
+      new THREE.MeshStandardMaterial({ color: 0x3e4249, roughness: 0.9 })
+    );
+    pad.position.set(centerX, 0.2, centerZ);
+    pad.receiveShadow = true;
+    smofGroup.add(pad);
+    this.platforms.push({
+      minX: centerX - widthX / 2 - 2,
+      maxX: centerX + widthX / 2 + 2,
+      minZ: centerZ - lengthZ / 2 - 2,
+      maxZ: centerZ + lengthZ / 2 + 2,
+      height: 0.4
+    });
 
-    const periMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
-    const peri1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.5, 8), periMat);
-    peri1.position.set(0.4, 12.0, 2.0);
-    const peri2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.2, 8), periMat);
-    peri2.position.set(-0.4, 12.5, 3.0);
-    subGroup.add(peri1, peri2);
+    // 2. West Wall (Full Corrugated Exterior Enclosure)
+    const westWall = new THREE.Mesh(new THREE.BoxGeometry(1.2, wallHeight, lengthZ), claddingMat);
+    westWall.position.set(centerX - widthX / 2, wallHeight / 2, centerZ);
+    westWall.castShadow = true;
+    westWall.receiveShadow = true;
+    smofGroup.add(westWall);
+    this.registerObstacle(
+      new THREE.Vector3(centerX - widthX / 2 - 0.6, 0, centerZ - lengthZ / 2),
+      new THREE.Vector3(centerX - widthX / 2 + 0.6, wallHeight, centerZ + lengthZ / 2),
+      'SMOF Bldg 4677 West Wall'
+    );
 
-    const pipeColors = [0xeab308, 0xf97316, 0x0284c7];
+    // 3. East Wall (Features wide 10m roll-up equipment door in center for Alba to enter)
+    const eastSegLen = (lengthZ - 12) / 2;
+    for (const dir of [-1, 1]) {
+      const segZ = centerZ + dir * (lengthZ / 2 - eastSegLen / 2);
+      const eastSeg = new THREE.Mesh(new THREE.BoxGeometry(1.2, wallHeight, eastSegLen), claddingMat);
+      eastSeg.position.set(centerX + widthX / 2, wallHeight / 2, segZ);
+      eastSeg.castShadow = true;
+      eastSeg.receiveShadow = true;
+      smofGroup.add(eastSeg);
+      this.registerObstacle(
+        new THREE.Vector3(centerX + widthX / 2 - 0.6, 0, segZ - eastSegLen / 2),
+        new THREE.Vector3(centerX + widthX / 2 + 0.6, wallHeight, segZ + eastSegLen / 2),
+        `SMOF Bldg 4677 East Wall Seg ${dir}`
+      );
+    }
+    const eastHeader = new THREE.Mesh(new THREE.BoxGeometry(1.2, wallHeight - 8.5, 12), claddingMat);
+    eastHeader.position.set(centerX + widthX / 2, 8.5 + (wallHeight - 8.5) / 2, centerZ);
+    smofGroup.add(eastHeader);
+
+    // 4. North & South Gable End Walls with Open Equipment Portals
+    for (const dir of [-1, 1]) {
+      const wallZ = centerZ + dir * (lengthZ / 2);
+      const segW = (widthX - 10) / 2;
+      for (const wDir of [-1, 1]) {
+        const segX = centerX + wDir * (widthX / 2 - segW / 2);
+        const gableSeg = new THREE.Mesh(new THREE.BoxGeometry(segW, wallHeight, 1.2), claddingMat);
+        gableSeg.position.set(segX, wallHeight / 2, wallZ);
+        gableSeg.castShadow = true;
+        gableSeg.receiveShadow = true;
+        smofGroup.add(gableSeg);
+        this.registerObstacle(
+          new THREE.Vector3(segX - segW / 2, 0, wallZ - 0.6),
+          new THREE.Vector3(segX + segW / 2, wallHeight, wallZ + 0.6),
+          `SMOF Bldg 4677 End Wall ${dir}_${wDir}`
+        );
+      }
+      const gableHeader = new THREE.Mesh(new THREE.BoxGeometry(10, wallHeight - 8.5, 1.2), claddingMat);
+      gableHeader.position.set(centerX, 8.5 + (wallHeight - 8.5) / 2, wallZ);
+      smofGroup.add(gableHeader);
+
+      const peakMesh = new THREE.Mesh(new THREE.BoxGeometry(widthX, roofPeak - wallHeight, 1.2), claddingMat);
+      peakMesh.position.set(centerX, wallHeight + (roofPeak - wallHeight) / 2, wallZ);
+      smofGroup.add(peakMesh);
+    }
+
+    // 5. Pitched Roof Panels
+    const roofSlopeW = Math.sqrt(Math.pow(widthX / 2, 2) + Math.pow(roofPeak - wallHeight, 2));
+    const roofAngle = Math.atan2(roofPeak - wallHeight, widthX / 2);
+    const roofGeo = new THREE.BoxGeometry(roofSlopeW + 1.5, 0.6, lengthZ + 2);
+
+    const roofWest = new THREE.Mesh(roofGeo, claddingMat);
+    roofWest.position.set(centerX - widthX / 4, wallHeight + (roofPeak - wallHeight) / 2, centerZ);
+    roofWest.rotation.z = roofAngle;
+    roofWest.castShadow = true;
+    smofGroup.add(roofWest);
+
+    const roofEast = new THREE.Mesh(roofGeo, claddingMat);
+    roofEast.position.set(centerX + widthX / 4, wallHeight + (roofPeak - wallHeight) / 2, centerZ);
+    roofEast.rotation.z = -roofAngle;
+    roofEast.castShadow = true;
+    smofGroup.add(roofEast);
+
+    // 6. High-Bay Structural Trusses & Overhead Bridge Crane
+    for (let tz = centerZ - lengthZ / 2 + 6; tz <= centerZ + lengthZ / 2 - 6; tz += 10) {
+      const trussTie = new THREE.Mesh(new THREE.BoxGeometry(widthX - 2, 0.8, 0.8), trussMat);
+      trussTie.position.set(centerX, wallHeight - 0.4, tz);
+      smofGroup.add(trussTie);
+    }
+    const bridgeCrane = new THREE.Mesh(new THREE.BoxGeometry(widthX - 3, 1.4, 1.4), yellowMat);
+    bridgeCrane.position.set(centerX, wallHeight - 1.8, centerZ);
+    bridgeCrane.castShadow = true;
+    smofGroup.add(bridgeCrane);
+
+    // 7. Dual Virginia/Columbia Submarine Hull Cylinders Inside
+    const subHulls = [
+      { x: -34.5, name: 'Virginia-Class Fast Attack Hull Section', hasSail: false },
+      { x: -28.5, name: 'Columbia-Class Ballistic Missile Hull Section', hasSail: true }
+    ];
+
+    const hullRadius = 3.0;
+    const hullLen = 26;
+    const hullGeo = new THREE.CylinderGeometry(hullRadius, hullRadius, hullLen, 24);
+    hullGeo.rotateX(Math.PI / 2);
+
+    // Primary Submarine Hull Module at center (-30, 0, 45) inside Building 4677
+    const centerHullMesh = new THREE.Mesh(hullGeo, hullMat);
+    centerHullMesh.position.set(centerX, hullRadius + 0.8, centerZ);
+    centerHullMesh.castShadow = true;
+    centerHullMesh.receiveShadow = true;
+    smofGroup.add(centerHullMesh);
+
+    this.registerObstacle(
+      new THREE.Vector3(-35.0, 0, 31.0),
+      new THREE.Vector3(-25.0, 12.0, 59.0),
+      'Submarine Hull Module'
+    );
+
+    // 15-Flange Overhead Hydraulic Pipe Manifold
     const flangeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.25 });
     const flangeGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.18, 12);
     flangeGeo.rotateX(Math.PI / 2);
-
     const instancedFlanges = new THREE.InstancedMesh(flangeGeo, flangeMat, 15);
     const dummyMatrix = new THREE.Matrix4();
     let flIdx = 0;
-
     for (let i = 0; i < 3; i++) {
-      const pipeMat = new THREE.MeshStandardMaterial({ color: pipeColors[i], metalness: 0.7, roughness: 0.35 });
-      const pipeGeo = new THREE.CylinderGeometry(0.28, 0.28, 30, 16);
-      pipeGeo.rotateX(Math.PI / 2);
-      const pipe = new THREE.Mesh(pipeGeo, pipeMat);
-      pipe.position.set(-4.2 + i * 1.2, 8.5, 0);
-      subGroup.add(pipe);
-
       for (let fz = -12; fz <= 12; fz += 6) {
-        dummyMatrix.setPosition(-4.2 + i * 1.2, 8.5, fz);
+        dummyMatrix.setPosition(-34.2 + i * 4.2, 12.5, centerZ + fz);
         instancedFlanges.setMatrixAt(flIdx++, dummyMatrix);
       }
     }
     instancedFlanges.instanceMatrix.needsUpdate = true;
-    subGroup.add(instancedFlanges);
+    smofGroup.add(instancedFlanges);
 
-    // Submarine Keel Support Cradle Blocks & Staging Obstacles
-    const cradleMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.3 });
-    const cradle1 = new THREE.Mesh(new THREE.BoxGeometry(9.0, 1.5, 4.0), cradleMat);
-    cradle1.position.set(0, 0.75, -11.0);
-    cradle1.castShadow = true;
-    cradle1.receiveShadow = true;
-    const cradle2 = new THREE.Mesh(new THREE.BoxGeometry(9.0, 1.5, 4.0), cradleMat);
-    cradle2.position.set(0, 0.75, 11.0);
-    cradle2.castShadow = true;
-    cradle2.receiveShadow = true;
-    subGroup.add(cradle1, cradle2);
+    for (let sIdx = 0; sIdx < subHulls.length; sIdx++) {
+      const subInfo = subHulls[sIdx];
+      const hullMesh = new THREE.Mesh(hullGeo, hullMat);
+      hullMesh.position.set(subInfo.x, hullRadius + 0.8, centerZ);
+      hullMesh.castShadow = true;
+      hullMesh.receiveShadow = true;
+      smofGroup.add(hullMesh);
 
-    this.group.add(subGroup);
+      // Keel cradle blocks
+      const cradleMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.5 });
+      for (const cz of [centerZ - 8, centerZ + 8]) {
+        const cradle = new THREE.Mesh(new THREE.BoxGeometry(8.2, 1.2, 3.5), cradleMat);
+        cradle.position.set(subInfo.x, 0.6, cz);
+        cradle.castShadow = true;
+        smofGroup.add(cradle);
+      }
 
-    this.registerObstacle(new THREE.Vector3(-35.0, 0, 31.0), new THREE.Vector3(-25.0, 12.0, 59.0), 'Submarine Hull Module');
-    this.registerObstacle(new THREE.Vector3(-34.5, 0, 32.0), new THREE.Vector3(-25.5, 1.5, 36.0), 'Submarine Keel Support Block (Aft)');
-    this.registerObstacle(new THREE.Vector3(-34.5, 0, 54.0), new THREE.Vector3(-25.5, 1.5, 58.0), 'Submarine Keel Support Block (Forward)');
+      this.registerObstacle(
+        new THREE.Vector3(subInfo.x - hullRadius, 0, centerZ - hullLen / 2),
+        new THREE.Vector3(subInfo.x + hullRadius, hullRadius * 2 + 0.8, centerZ + hullLen / 2),
+        subInfo.name
+      );
 
-    this.weldingArcLight = new THREE.PointLight(0x38bdf8, 3.5, 30);
-    this.weldingArcLight.position.set(-25, 4.5, 45);
-    this.group.add(this.weldingArcLight);
+      this.platforms.push({
+        minX: subInfo.x - 1.0,
+        maxX: subInfo.x + 1.0,
+        minZ: centerZ - hullLen / 2 + 2,
+        maxZ: centerZ + hullLen / 2 - 2,
+        height: hullRadius * 2 + 0.8
+      });
+
+      if (subInfo.hasSail) {
+        const sailMesh = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.6, 5.5), hullMat);
+        sailMesh.position.set(subInfo.x, hullRadius * 2 + 2.5, centerZ + 2);
+        sailMesh.castShadow = true;
+        smofGroup.add(sailMesh);
+
+        const periMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+        const peri1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2, 8), periMat);
+        peri1.position.set(subInfo.x + 0.4, hullRadius * 2 + 4.8, centerZ + 2);
+        const peri2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.8, 8), periMat);
+        peri2.position.set(subInfo.x - 0.4, hullRadius * 2 + 5.2, centerZ + 3);
+        smofGroup.add(peri1, peri2);
+      }
+    }
+
+    // 8. Central Inspection Catwalk & Climbable Staging Crates
+    const catwalkMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7, metalness: 0.6 });
+    const catwalk = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.35, 34), catwalkMat);
+    catwalk.position.set(centerX, 4.0, centerZ);
+    catwalk.castShadow = true;
+    catwalk.receiveShadow = true;
+    smofGroup.add(catwalk);
+
+    this.platforms.push({
+      minX: centerX - 1.6,
+      maxX: centerX + 1.6,
+      minZ: centerZ - 17,
+      maxZ: centerZ + 17,
+      height: 4.15
+    });
+
+    for (const dir of [-1, 1]) {
+      const zBase = centerZ + dir * 18;
+      const crateSteps = [
+        { y: 1.0, dy: 1.0, offsetZ: dir * 3.0 },
+        { y: 2.2, dy: 1.2, offsetZ: dir * 1.5 },
+        { y: 3.5, dy: 1.3, offsetZ: 0 }
+      ];
+      for (let cIdx = 0; cIdx < crateSteps.length; cIdx++) {
+        const step = crateSteps[cIdx];
+        const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(2.4, step.dy, 1.4), yellowMat);
+        stepMesh.position.set(centerX, step.y - step.dy / 2, zBase + step.offsetZ);
+        stepMesh.castShadow = true;
+        smofGroup.add(stepMesh);
+        this.platforms.push({
+          minX: centerX - 1.2,
+          maxX: centerX + 1.2,
+          minZ: zBase + step.offsetZ - 0.7,
+          maxZ: zBase + step.offsetZ + 0.7,
+          height: step.y
+        });
+      }
+    }
+
+    // 9. Industrial High-Bay Amber Sodium Lighting Inside Shelter
+    for (let lz = centerZ - 12; lz <= centerZ + 12; lz += 12) {
+      const sodiumLight = new THREE.PointLight(0xffaa33, 4.0, 24, 1.2);
+      sodiumLight.position.set(centerX, wallHeight - 2.0, lz);
+      smofGroup.add(sodiumLight);
+    }
+
+    // 10. Welding Arc Light near Aft Module
+    this.weldingArcLight = new THREE.PointLight(0x38bdf8, 3.5, 25);
+    this.weldingArcLight.position.set(centerX + 6.5, 4.5, centerZ - 8);
+    smofGroup.add(this.weldingArcLight);
+
+    this.group.add(smofGroup);
+  }
+
+  /**
+   * Joint Manufacturing Assembly Facility (JMAF at Gate 4):
+   * High-bay modern plate burning & automated panel line fabrication shop.
+   */
+  private buildJointManufacturingAssemblyFacility(): void {
+    const jmafGroup = new THREE.Group();
+    jmafGroup.name = 'JMAF_Fabrication_Facility_Gate4';
+    const posX = 16;
+    const posZ = -48;
+    const width = 24;
+    const length = 20;
+    const height = 13;
+
+    const jmafMat = new THREE.MeshStandardMaterial({
+      color: 0x1e3a5f, // NNS Navy Blue
+      roughness: 0.6,
+      metalness: 0.5
+    });
+    const yellowTrim = new THREE.MeshStandardMaterial({
+      color: 0xeab308,
+      roughness: 0.4,
+      metalness: 0.4
+    });
+
+    // 1. Building Envelope
+    const buildingMesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, length), jmafMat);
+    buildingMesh.position.set(posX, height / 2, posZ);
+    buildingMesh.castShadow = true;
+    buildingMesh.receiveShadow = true;
+    jmafGroup.add(buildingMesh);
+
+    // 2. Safety Yellow Corner Trim Columns
+    for (const dx of [-width / 2, width / 2]) {
+      for (const dz of [-length / 2, length / 2]) {
+        const col = new THREE.Mesh(new THREE.BoxGeometry(0.8, height + 0.2, 0.8), yellowTrim);
+        col.position.set(posX + dx, (height + 0.2) / 2, posZ + dz);
+        jmafGroup.add(col);
+      }
+    }
+
+    // 3. Roll-up Bay Door & Canopy Facing West (Alba / Calico Belle patrol yard)
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+    const bayDoor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 7.5, 8.5), doorMat);
+    bayDoor.position.set(posX - width / 2 + 0.1, 3.75, posZ);
+    jmafGroup.add(bayDoor);
+
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.4, 10.0), yellowTrim);
+    canopy.position.set(posX - width / 2 - 1.5, 8.0, posZ);
+    canopy.castShadow = true;
+    jmafGroup.add(canopy);
+
+    this.group.add(jmafGroup);
+
+    this.registerObstacle(
+      new THREE.Vector3(posX - width / 2, 0, posZ - length / 2),
+      new THREE.Vector3(posX + width / 2, height, posZ + length / 2),
+      'JMAF Panel Assembly Facility'
+    );
+  }
+
+  /**
+   * The Apprentice School & Yard Administration Building:
+   * Stately multi-story red-brick building with arched maritime architectural windows,
+   * carved limestone cornice, portico entrance, and historic yard significance.
+   */
+  private buildApprenticeSchoolAndAdmin(): void {
+    const adminGroup = new THREE.Group();
+    adminGroup.name = 'The_Apprentice_School_Admin';
+    const posX = -14;
+    const posZ = -68;
+    const width = 34;
+    const length = 16;
+    const height = 12;
+
+    const brickMat = new THREE.MeshStandardMaterial({
+      color: 0x881337, // Rich Virginia maritime brick
+      roughness: 0.85,
+      metalness: 0.05
+    });
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: 0xd4d4d8, // Carved limestone trim & portico
+      roughness: 0.75,
+      metalness: 0.1
+    });
+
+    // 1. Brick Main Edifice
+    const buildingMesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, length), brickMat);
+    buildingMesh.position.set(posX, height / 2, posZ);
+    buildingMesh.castShadow = true;
+    buildingMesh.receiveShadow = true;
+    adminGroup.add(buildingMesh);
+
+    // 2. Limestone Cornice / Parapet Coping
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(width + 1.0, 0.6, length + 1.0), stoneMat);
+    cornice.position.set(posX, height + 0.3, posZ);
+    adminGroup.add(cornice);
+
+    // 3. Portico Columns & Entrance
+    for (const dx of [-3, 3]) {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 5.0, 12), stoneMat);
+      col.position.set(posX + dx, 2.5, posZ + length / 2 + 1.5);
+      col.castShadow = true;
+      adminGroup.add(col);
+    }
+    const pediment = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.5, 3.2), stoneMat);
+    pediment.position.set(posX, 5.25, posZ + length / 2 + 1.5);
+    pediment.castShadow = true;
+    adminGroup.add(pediment);
+
+    this.group.add(adminGroup);
+
+    this.registerObstacle(
+      new THREE.Vector3(posX - width / 2, 0, posZ - length / 2),
+      new THREE.Vector3(posX + width / 2, height + 1.0, posZ + length / 2 + 3.0),
+      'The Apprentice School & Yard Administration'
+    );
   }
 
   private buildRadiationVault() {

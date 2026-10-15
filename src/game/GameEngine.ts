@@ -136,6 +136,8 @@ export class GameEngine {
   public onAssistanceTriggered?: (event: ShipbuildingAssistEvent) => void;
   public onMissionObjectiveUpdated?: () => void;
   public onNotification?: (title: string, message: string, type: 'info' | 'success' | 'warn') => void;
+  public onDialogue?: (speaker: string, role: string, text: string) => void;
+  public onInteractionPrompt?: (prompt: string | null) => void;
   public onContextualPromptsUpdate?: (prompts: ContextualPrompt[]) => void;
   public onFrameUpdate?: () => void;
 
@@ -516,18 +518,18 @@ export class GameEngine {
   }
 
   private spawnColonyNPCs() {
-    // 1. Dr. Elena Vance
+    // 1. Dr. Elena Vance - Cat Motel Hub Sanctuary
     const elenaDialogue = [
       {
         speaker: 'Dr. Elena Vance',
         role: 'EH&S Animal Management',
-        text: "Good morning, Alba! Here's a clean tuna ration and some fresh water. Stay away from the lead-containment tents!",
+        text: "Good morning, Alba! Here's a clean tuna ration and some fresh water. Stay clear of the lead-containment tents!",
         actionReward: { type: 'HEAL' as const, amount: 100 }
       },
       {
         speaker: 'Dr. Elena Vance',
         role: 'EH&S Animal Management',
-        text: "Let me check your collar dosimeter... looks clear. Keep up the good work keeping the shipyard pest-free.",
+        text: "Let me check your collar dosimeter... 0.0 mSv, perfectly clear! Keep up the good work keeping the shipyard pest-free.",
         actionReward: { type: 'CLEANSE' as const, amount: 0 }
       }
     ];
@@ -535,36 +537,59 @@ export class GameEngine {
     this.colonyNPCs.push(elena);
     this.scene.add(elena.mesh);
 
-    // 2. Calico Belle
+    // 2. Calico Belle - Gate 4 / JMAF Automated Panel Assembly
     const belleDialogue = [
       {
         speaker: 'Calico Belle',
-        role: 'Colony Veteran',
-        text: "Keep your claws sharp, kitten. Gantry's pack has been prowling near the submarine MOF after sundown.",
+        role: 'Gate 4 Sentry Cat',
+        text: "Keep your claws sharp, kitten. Gantry's pack has been prowling near the JMAF and scrap yard after sundown.",
         actionReward: { type: 'XP' as const, amount: 50 }
       },
       {
         speaker: 'Calico Belle',
-        role: 'Colony Veteran',
-        text: "If you see a cat with glowing violet eyes in Whiskers Mode, don't trust it. That's one of Gantry's radioactive scouts."
+        role: 'Gate 4 Sentry Cat',
+        text: "If you see a cat with glowing violet eyes in Whiskers Mode [Q], watch out! That's one of Gantry's radioactive scouts."
       }
     ];
-    const belle = new ColonyCatEntity('Calico Belle', 'Veteran Guard', new THREE.Vector3(-54, 0, -56), 0xd97706, belleDialogue, false);
+    const belle = new ColonyCatEntity('Calico Belle', 'Veteran Guard', new THREE.Vector3(12, 0, -42), 0xd97706, belleDialogue, false);
     this.colonyNPCs.push(belle);
     this.scene.add(belle.mesh);
 
-    // 3. Tripod Toby
+    // 3. Tripod Toby - Historic Dry Dock 1 & Boardwalk Rim
     const tobyDialogue = [
       {
         speaker: 'Tripod Toby',
-        role: 'Colony Mentor',
-        text: "Lost my hind paw to a gantry cable back in '98, but I still out-sprint any wharf rat! Remember: always right yourself mid-air.",
+        role: 'Colony Elder',
+        text: "Lost my hind paw to a gantry cable back in '98, but I still out-sprint any wharf rat! Jump right down into Dry Dock 1 from anywhere along the rim.",
         actionReward: { type: 'BUFF' as const, amount: 50 }
+      },
+      {
+        speaker: 'Tripod Toby',
+        role: 'Colony Elder',
+        text: "Once you run the Kingpin rat out of Dry Dock 1, head over to Tugboat Dorothy Hull No. 1. The welders need help clearing the jammed foredeck winch!"
       }
     ];
-    const toby = new ColonyCatEntity('Tripod Toby', 'Colony Elder', new THREE.Vector3(-52, 0, -55), 0x71717a, tobyDialogue, false);
+    const toby = new ColonyCatEntity('Tripod Toby', 'Colony Elder', new THREE.Vector3(36, 0.5, -16), 0x71717a, tobyDialogue, false);
     this.colonyNPCs.push(toby);
     this.scene.add(toby.mesh);
+
+    // 4. Barnaby - Covered Submarine Modular Outfitting Facility (SMOF / Bldg 4677)
+    const barnabyDialogue = [
+      {
+        speaker: 'Barnaby',
+        role: 'Submarine Rigger Cat',
+        text: "Welcome to Building 4677, Alba! This is the Covered Modular Outfitting Facility. Virginia-class nuclear subs are classified—everything stays under these high-bay arched steel rafters.",
+        actionReward: { type: 'XP' as const, amount: 50 }
+      },
+      {
+        speaker: 'Barnaby',
+        role: 'Submarine Rigger Cat',
+        text: "Leap onto the yellow staging crates near the west wall if you want to reach the hull catwalks. Keep an eye out for Gantry's mutants—they hate the high beams."
+      }
+    ];
+    const barnaby = new ColonyCatEntity('Barnaby', 'Rigger Cat', new THREE.Vector3(-20, 0, 42), 0x1e293b, barnabyDialogue, false);
+    this.colonyNPCs.push(barnaby);
+    this.scene.add(barnaby.mesh);
   }
 
   private spawnShipbuilders() {
@@ -761,6 +786,7 @@ export class GameEngine {
         if (dist < 4.0) {
           const dialogue = npc.getNextDialogue();
           soundEngine.playMeow();
+          this.onDialogue?.(dialogue.speaker, dialogue.role, dialogue.text);
           this.showNotification(
             `💬 ${dialogue.speaker} (${dialogue.role})`,
             dialogue.text,
@@ -770,9 +796,16 @@ export class GameEngine {
           if (dialogue.actionReward) {
             if (dialogue.actionReward.type === 'HEAL') {
               this.vitals.feed(40);
+              this.vitals.currentHealth = this.vitals.maxHealth;
               this.showNotification('Sanctuary Healing', 'Health & hunger fully replenished by Dr. Vance!', 'success');
+            } else if (dialogue.actionReward.type === 'CLEANSE') {
+              this.cat.updateDosimeterRadiation(0);
+              this.showNotification('Dosimeter Cleanse', 'Collar dosimeter verified and decontaminated!', 'success');
             } else if (dialogue.actionReward.type === 'XP') {
               this.progression.addXP(dialogue.actionReward.amount);
+            } else if (dialogue.actionReward.type === 'BUFF') {
+              this.vitals.currentStamina = this.vitals.maxStamina;
+              this.showNotification('Veteran Encouragement', 'Stamina maxed out by Tripod Toby!', 'success');
             }
           }
           interacted = true;
@@ -788,15 +821,29 @@ export class GameEngine {
         if (dist < 4.5) {
           const dialogue = builder.getNextDialogue();
           soundEngine.playMeow();
+          const roleText = `${dialogue.trade} • ${dialogue.department}`;
+          const fullText = `${dialogue.text}${dialogue.assistTip ? `\n💡 Tip: ${dialogue.assistTip}` : ''}`;
+          this.onDialogue?.(dialogue.speaker, roleText, fullText);
           this.showNotification(
             `🛠️ ${dialogue.speaker} (${dialogue.department})`,
-            `${dialogue.text} ${dialogue.assistTip ? `\n💡 Tip: ${dialogue.assistTip}` : ''}`,
+            fullText,
             'info'
           );
           interacted = true;
           break;
         }
       }
+    }
+
+    // 4. Check Tugboat Dorothy Wheelhouse Capstan Winch
+    if (!interacted && catPos.distanceTo(new THREE.Vector3(-21, 2.2, -28)) < 3.5) {
+      soundEngine.playSuccess();
+      this.missionManager.completeObjective('clear_wheelhouse');
+      this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
+      this.showNotification('⚙️ CAPSTAN WINCH FREED!', 'You freed the tangled mooring line from Tugboat Dorothy! Winch restored. Chapter 2 Complete.', 'success');
+      this.onMissionObjectiveUpdated?.();
+      this.eventBus.emit('mission:objectiveUpdated', undefined);
+      interacted = true;
     }
 
     if (!interacted) {
@@ -942,6 +989,9 @@ export class GameEngine {
               this.missionManager.completeObjective('hunt_kingpin');
               this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
               this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: 150, isBoss: true });
+              this.onMissionObjectiveUpdated?.();
+              this.eventBus.emit('mission:objectiveUpdated', undefined);
+              this.showNotification('📜 CHAPTER 1 COMPLETE!', 'Next Work Order: Board Tugboat Dorothy (Hull No. 1, 1891) in the historic yard [M].', 'info');
             } else {
               this.showNotification('Boss Hit!', `Dockyard Kingpin stunned! (${rat.health}/${rat.maxHealth} HP remaining)`, 'warn');
             }
@@ -1200,6 +1250,9 @@ export class GameEngine {
               this.missionManager.completeObjective('hunt_kingpin');
               this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
               this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: 150, isBoss: true });
+              this.onMissionObjectiveUpdated?.();
+              this.eventBus.emit('mission:objectiveUpdated', undefined);
+              this.showNotification('📜 CHAPTER 1 COMPLETE!', 'Next Work Order: Board Tugboat Dorothy (Hull No. 1, 1891) in the historic yard [M].', 'info');
             } else {
               this.showNotification('Boss Hit!', `Dockyard Kingpin stunned! (${rat.health}/${rat.maxHealth} HP remaining)`, 'warn');
             }
@@ -1418,10 +1471,50 @@ export class GameEngine {
     const mission = this.missionManager.getCurrentMission();
     const catPos = this.cat.mesh.position;
 
-    // Mission 1
+    // 1. Proximity-based dynamic HUD prompt for nearby interactables
+    let prompt: string | null = null;
+    for (const bowl of this.environment.foodBowls) {
+      if (bowl.position.distanceTo(catPos) < 2.5) {
+        prompt = `[E] Eat ${bowl.name}`;
+        break;
+      }
+    }
+    if (!prompt) {
+      for (const npc of this.colonyNPCs) {
+        if (npc.mesh.position.distanceTo(catPos) < 3.8) {
+          prompt = `[E] Talk to ${npc.name}`;
+          break;
+        }
+      }
+    }
+    if (!prompt) {
+      for (const builder of this.shipbuilders) {
+        if (builder.mesh.position.distanceTo(catPos) < 3.8) {
+          prompt = `[E] Talk to ${builder.name}`;
+          break;
+        }
+      }
+    }
+    if (!prompt && catPos.distanceTo(new THREE.Vector3(-21, 2.2, -28)) < 3.5) {
+      prompt = `[E] Clear Dorothy Winch Snarl`;
+    }
+    this.onInteractionPrompt?.(prompt);
+
+    if (!mission || !mission.objectives) return;
+
+    // Mission 1: Wharf Rats & Historic Dry Dock 1
     if (mission.id === 1) {
-      if (catPos.x >= 15.0 && catPos.x <= 44.0 && catPos.z >= -35.0 && catPos.z <= -20.0 && catPos.y <= -1.0) {
-        if (!mission.objectives[1].isCompleted) {
+      if (mission.objectives[0] && !mission.objectives[0].isCompleted) {
+        if (catPos.distanceTo(GameEngine.DOROTHY_PROXIMITY_TARGET) < 14.0) {
+          this.missionManager.completeObjective('find_dorothy');
+          soundEngine.playSuccess();
+          this.showNotification('OBJECTIVE COMPLETE!', "You located Tugboat Dorothy! Now enter Historic Dry Dock 1.", 'success');
+          this.onMissionObjectiveUpdated?.();
+          this.eventBus.emit('mission:objectiveUpdated', undefined);
+        }
+      }
+      if (mission.objectives[1] && !mission.objectives[1].isCompleted) {
+        if (catPos.x >= 15.0 && catPos.x <= 44.0 && catPos.z >= -35.0 && catPos.z <= -20.0 && catPos.y <= -0.5) {
           this.missionManager.completeObjective('climb_dorothy');
           soundEngine.playSuccess();
           this.showNotification('OBJECTIVE COMPLETE!', "You entered Historic Dry Dock 1! Defeat the Dockyard Kingpin.", 'success');
@@ -1431,9 +1524,34 @@ export class GameEngine {
       }
     }
 
-    // Mission 2
+    // Mission 2: Dorothy's Historic Steamline
     else if (mission.id === 2) {
-      if (!mission.objectives[0].isCompleted) {
+      if (mission.objectives[0] && !mission.objectives[0].isCompleted) {
+        const distToDorothyDeck = catPos.distanceTo(new THREE.Vector3(-20, 2.2, -25));
+        if (distToDorothyDeck < 4.5 && catPos.y >= 1.4) {
+          this.missionManager.completeObjective('board_dorothy');
+          soundEngine.playSuccess();
+          this.showNotification('🚢 ABOARD TUGBOAT DOROTHY!', "Alba boarded Hull No. 1! Investigate the wheelhouse [J/E] to free the jammed winch.", 'success');
+          this.onMissionObjectiveUpdated?.();
+          this.eventBus.emit('mission:objectiveUpdated', undefined);
+        }
+      }
+      if (mission.objectives[1] && !mission.objectives[1].isCompleted) {
+        const distToWheelhouse = catPos.distanceTo(new THREE.Vector3(-21, 2.2, -28));
+        if (distToWheelhouse < 3.5) {
+          this.missionManager.completeObjective('clear_wheelhouse');
+          soundEngine.playSuccess();
+          this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
+          this.showNotification('⚙️ CAPSTAN RESTORED!', "Tugboat Dorothy's winch is free! Chapter 2 complete. Chapter 3 unlocked!", 'success');
+          this.onMissionObjectiveUpdated?.();
+          this.eventBus.emit('mission:objectiveUpdated', undefined);
+        }
+      }
+    }
+
+    // Mission 3: Tide Rising in Dry Dock 12
+    else if (mission.id === 3) {
+      if (mission.objectives[0] && !mission.objectives[0].isCompleted) {
         if (catPos.z >= 12.0 && catPos.x >= 3.0 && catPos.x <= 38.0) {
           this.missionManager.completeObjective('reach_drydock');
           soundEngine.playCatHiss();
@@ -1443,21 +1561,43 @@ export class GameEngine {
           this.eventBus.emit('mission:objectiveUpdated', undefined);
         }
       }
-      if (!mission.objectives[2].isCompleted) {
+      if (mission.objectives[2] && !mission.objectives[2].isCompleted) {
         if (catPos.x >= 26.0 && catPos.z >= 38.0 && catPos.y >= 3.0) {
           this.missionManager.completeObjective('escape_flood');
           soundEngine.playSuccess();
           this.assistanceEngine.triggerAssist('CRANE_SAFETY_TRIP');
-          this.showNotification('🎉 BASIN FLOOD ESCAPED!', "Alba reached the high gantry catwalk safely! Unlocked Mission 3.", 'success');
+          this.showNotification('🎉 BASIN FLOOD ESCAPED!', "Alba reached the high gantry catwalk safely! Chapter 3 complete. Chapter 4 unlocked!", 'success');
           this.onMissionObjectiveUpdated?.();
           this.eventBus.emit('mission:objectiveUpdated', undefined);
         }
       }
     }
 
-    // Mission 3
-    else if (mission.id === 3) {
-      if (!mission.objectives[1].isCompleted && this.renderSystem.isWhiskersMode) {
+    // Mission 4: Big Blue's High-Wire Superlift
+    else if (mission.id === 4) {
+      if (mission.objectives[0] && !mission.objectives[0].isCompleted) {
+        if (catPos.distanceTo(new THREE.Vector3(18, 3.5, 35)) < 4.5) {
+          this.missionManager.completeObjective('enter_crane_lift');
+          soundEngine.playSuccess();
+          this.showNotification('🏗️ CRANE HOIST ASCENT!', "Alba rode the rigger lift basket to the 200ft trolley bridge! Cross the I-beam to trip the breaker.", 'success');
+          this.onMissionObjectiveUpdated?.();
+          this.eventBus.emit('mission:objectiveUpdated', undefined);
+        }
+      }
+      if (mission.objectives[1] && !mission.objectives[1].isCompleted) {
+        if (catPos.y >= 30.0 && catPos.distanceTo(new THREE.Vector3(20, 36, 25)) < 6.0) {
+          this.missionManager.completeObjective('trip_crane_breaker');
+          soundEngine.playSuccess();
+          this.showNotification('⚡ CRANE BREAKER TRIPPED!', "Runaway hoist halted! Chapter 4 complete. Chapter 5 unlocked!", 'success');
+          this.onMissionObjectiveUpdated?.();
+          this.eventBus.emit('mission:objectiveUpdated', undefined);
+        }
+      }
+    }
+
+    // Mission 5: Mutants in the Machine Shop & Submarine Yard
+    else if (mission.id === 5) {
+      if (mission.objectives[1] && !mission.objectives[1].isCompleted && this.renderSystem.isWhiskersMode) {
         const distToSub = catPos.distanceTo(GameEngine.SUB_TARGET_POS);
         if (distToSub < 25.0) {
           this.missionManager.completeObjective('identify_radioactivity');
@@ -1468,26 +1608,30 @@ export class GameEngine {
         }
       }
 
-      if (!mission.objectives[2].isCompleted) {
+      if (mission.objectives[2] && !mission.objectives[2].isCompleted) {
         const distToScrap = catPos.distanceTo(GameEngine.SCRAP_TARGET_POS);
         if (distToScrap < 14.0) {
           this.missionManager.completeObjective('confront_gantry');
           soundEngine.playSuccess();
           this.assistanceEngine.triggerAssist('CONDUIT_PULL_STRING');
-          this.showNotification('⭐ SCRAP YARD SECURED!', "You repelled Gantry's vanguard and saved the submarine wire harness!", 'success');
+          this.showNotification('⭐ SCRAP YARD SECURED!', "You repelled Gantry's vanguard and saved the submarine wire harness! Chapter 5 Complete.", 'success');
           this.onMissionObjectiveUpdated?.();
           this.eventBus.emit('mission:objectiveUpdated', undefined);
         }
       }
     }
 
-    // Mission 4
-    else if (mission.id === 4) {
-      const distToVault = catPos.distanceTo(GameEngine.VAULT_TARGET_POS);
-      if (distToVault < 12.0 && this.renderSystem.isWhiskersMode) {
-        this.missionManager.completeObjective('activate_whiskers');
-        this.onMissionObjectiveUpdated?.();
-        this.eventBus.emit('mission:objectiveUpdated', undefined);
+    // Mission 6: Shadows in the Shielding
+    else if (mission.id === 6) {
+      if (mission.objectives[0] && !mission.objectives[0].isCompleted && this.renderSystem.isWhiskersMode) {
+        const distToVault = catPos.distanceTo(GameEngine.VAULT_TARGET_POS);
+        if (distToVault < 14.0) {
+          this.missionManager.completeObjective('activate_whiskers');
+          soundEngine.playSuccess();
+          this.showNotification('☢️ VAULT ISOTOPE CORRIDOR!', "Radiation traces illuminated. Sneak behind shielding to breach the reactor vault.", 'info');
+          this.onMissionObjectiveUpdated?.();
+          this.eventBus.emit('mission:objectiveUpdated', undefined);
+        }
       }
     }
   }
@@ -1659,12 +1803,12 @@ export class GameEngine {
       const kingpin = this.rats.find((r) => r.isKingpin && r.state !== 'CAUGHT');
       const isBattlingBoss = !!(
         kingpin &&
+        kingpin.state !== 'CAUGHT' &&
+        kingpin.health > 0 &&
         this.cat &&
         (
-          kingpin.bossPhase > 1 ||
           kingpin.health < kingpin.maxHealth ||
-          kingpin.isStunned ||
-          (this.cat.mesh.position.y < -0.8 && this.cat.mesh.position.distanceTo(kingpin.mesh.position) < 8.0)
+          (this.cat.mesh.position.y <= -1.2 && this.cat.mesh.position.distanceTo(kingpin.mesh.position) < 5.0 && (kingpin.isStunned || kingpin.bossPhase > 1))
         )
       );
       soundEngine.updateBGM(isBattlingBoss);
