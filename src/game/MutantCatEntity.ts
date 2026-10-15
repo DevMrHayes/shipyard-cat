@@ -51,9 +51,9 @@ export class MutantCatEntity {
         this.gltfModel.position.set(0, 0, 0);
 
         const mutantFurMat = new THREE.MeshStandardMaterial({
-          color: 0x2e1065, // Dark radioactive bruised purple/black fur
-          roughness: 0.8,
-          metalness: 0.25,
+          color: 0x1f242b, // Realistically gritty charred ash/charcoal shipyard stray coat
+          roughness: 0.88,
+          metalness: 0.15,
           side: THREE.DoubleSide
         });
 
@@ -99,14 +99,13 @@ export class MutantCatEntity {
     }
 
     // Eye PointLight (kept allocated for API compatibility but detached from scene to eliminate forward PBR light loop)
-    this.eyeLight = new THREE.PointLight(0xa855f7, 1.2, 5);
+    this.eyeLight = new THREE.PointLight(0x84cc16, 1.2, 5);
     this.eyeLight.position.set(0.5, 0.5, 0);
-    // this.mesh.add(this.eyeLight);
 
     // Radioactive Whiskers Aura (Visible in Whiskers Mode with Tier 2+)
     const auraGeo = new THREE.SphereGeometry(0.7, 12, 12);
     const auraMat = new THREE.MeshBasicMaterial({
-      color: 0xa855f7,
+      color: 0x84cc16,
       wireframe: true,
       transparent: true,
       opacity: 0.0
@@ -121,16 +120,16 @@ export class MutantCatEntity {
       canvas.width = 256;
       canvas.height = 64;
       const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
       ctx.roundRect(10, 10, 236, 44, 10);
       ctx.fill();
-      ctx.strokeStyle = '#a855f7';
+      ctx.strokeStyle = '#84cc16';
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.font = 'bold 20px Courier New';
-      ctx.fillStyle = '#c084fc';
+      ctx.fillStyle = '#a3e635';
       ctx.textAlign = 'center';
-      ctx.fillText('â˜£ ' + this.name, 128, 38);
+      ctx.fillText('☣ ' + this.name, 128, 38);
 
       const texture = new THREE.CanvasTexture(canvas);
       const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
@@ -142,8 +141,9 @@ export class MutantCatEntity {
   }
 
   private buildProceduralMutant(group: THREE.Group) {
-    // Mutant Cat Body (Dark mottled steel fur, larger frame)
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.85 });
+    group.rotation.y = -Math.PI / 2;
+    // Mutant Cat Body (Dark mottled ash/charcoal fur, larger frame)
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1f242b, roughness: 0.88 });
     const clawMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 });
     const bodyGeo = new THREE.CapsuleGeometry(0.18, 0.55, 8, 12);
     bodyGeo.rotateZ(Math.PI / 2);
@@ -195,8 +195,13 @@ export class MutantCatEntity {
     createMutantLeg(false, true);
     createMutantLeg(false, false);
 
-    // Radioactive Glowing Violet Eyes
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xc084fc }); // Bright violet isotope glow
+    // Radioactive Glowing Yellow-Green Tapetum Eyes
+    const eyeMat = new THREE.MeshStandardMaterial({
+      color: 0x84cc16,
+      emissive: 0xa3e635,
+      emissiveIntensity: 1.5,
+      roughness: 0.2
+    });
     const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), eyeMat);
     eyeL.position.set(0.48, 0.49, 0.08);
     const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), eyeMat);
@@ -280,23 +285,23 @@ export class MutantCatEntity {
       }
     }
 
-    if (distToPlayer < 7.0) {
-      // Aggro on Alba!
+    if (distToPlayer < 12.0) {
+      // Aggro on Alba! Stalk and charge
       this.state = 'HOSTILE';
       const dir = MutantCatEntity.scratchDir.subVectors(playerPos, this.mesh.position).normalize();
       dir.y = 0;
-      const newPos = MutantCatEntity.scratchNewPos.copy(this.mesh.position).addScaledVector(dir, 3.2 * deltaTime);
+      const newPos = MutantCatEntity.scratchNewPos.copy(this.mesh.position).addScaledVector(dir, 3.8 * deltaTime);
       if (resolveCollision) {
         this.mesh.position.copy(resolveCollision(newPos, 0.3, prevPos));
       } else {
         this.mesh.position.copy(newPos);
       }
-      this.mesh.rotation.y = Math.atan2(-dir.z, dir.x);
+      this.mesh.rotation.y = Math.atan2(dir.x, dir.z);
 
-      // Attack Alba if in melee range (< 1.2m)
-      if (distToPlayer < 1.2 && this.attackCooldown <= 0) {
-        this.attackCooldown = 1.4;
-        onAttackPlayer?.(12);
+      // Melee attack Alba when in range (< 1.4m)
+      if (distToPlayer < 1.4 && this.attackCooldown <= 0) {
+        this.attackCooldown = 1.2;
+        onAttackPlayer?.(14);
       }
     } else {
       // Idle patrol around spawn point
@@ -314,7 +319,7 @@ export class MutantCatEntity {
         } else {
           this.mesh.position.copy(newPos);
         }
-        this.mesh.rotation.y = Math.atan2(-dir.z, dir.x);
+        this.mesh.rotation.y = Math.atan2(dir.x, dir.z);
       }
     }
   }

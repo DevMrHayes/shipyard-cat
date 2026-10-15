@@ -200,6 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnDismissOnboarding = document.getElementById('btn-dismiss-onboarding') as HTMLButtonElement;
   const btnControls = document.getElementById('btn-controls') as HTMLButtonElement;
   const btnWorkorder = document.getElementById('btn-workorder') as HTMLButtonElement;
+  const btnNightMode = document.getElementById('btn-night-mode') as HTMLButtonElement | null;
+  const hudShiftLabel = document.getElementById('hud-shift-label');
   const modalWorkorder = document.getElementById('modal-workorder') as HTMLElement;
 
   const btnWhiskers = document.getElementById('btn-whiskers') as HTMLButtonElement;
@@ -223,8 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
     timeoutId: number;
   }
   const activeToasts: ActiveToastItem[] = [];
-  const MAX_ACTIVE_TOASTS = 2;
-  const TOAST_LIFETIME_MS = 2200;
+  const MAX_ACTIVE_TOASTS = 3;
+  const TOAST_LIFETIME_MS = 2500;
 
   function showToast(title: string, message: string, type: 'info' | 'success' | 'warn' = 'info') {
     // Record all notifications in dialogueArchive so user can review full history in Logbook modal
@@ -476,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         el.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (p.type === 'TALK' || p.type === 'EAT') {
+          if (p.type === 'TALK' || p.type === 'EAT' || p.type === 'SLEEP') {
             game.handleInteractOrMeow();
           } else if (p.type === 'POUNCE') {
             game.executePounce();
@@ -720,6 +722,13 @@ document.addEventListener('DOMContentLoaded', () => {
   btnWorkorder?.addEventListener('click', () => {
     modalWorkorder?.classList.add('open');
     renderWorkOrderModal();
+  });
+
+  btnNightMode?.addEventListener('click', () => {
+    const isNight = game.toggleNightMode();
+    if (hudShiftLabel) {
+      hudShiftLabel.textContent = isNight ? '☀️ Day [N]' : '🌙 Night [N]';
+    }
   });
 
   const btnSwipe = document.getElementById('btn-swipe') as HTMLButtonElement;

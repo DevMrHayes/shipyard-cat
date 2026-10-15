@@ -24,7 +24,7 @@ import { RenderSubsystem } from '../render/RenderSubsystem';
 
 export interface ContextualPrompt {
   id: string;
-  type: 'TALK' | 'EAT' | 'POUNCE' | 'SECURITY';
+  type: 'TALK' | 'EAT' | 'POUNCE' | 'SECURITY' | 'SLEEP';
   title: string;
   subtitle?: string;
   keyText: string;
@@ -510,8 +510,8 @@ export class GameEngine {
       this.scene.add(rat.scentTrailParticles);
     });
 
-    // Dockyard Kingpin in Dry Dock 1 (X: 28, Y: -2.0, Z: -27.5)
-    const kingpin = new RatEntity(new THREE.Vector3(28, -2.0, -27.5), true);
+    // Dockyard Kingpin in Dry Dock 1 (X: 28, Y: -2.0, Z: -23.0 in open south runway)
+    const kingpin = new RatEntity(new THREE.Vector3(28, -2.0, -23.0), true);
     this.rats.push(kingpin);
     this.scene.add(kingpin.mesh);
     this.scene.add(kingpin.scentTrailParticles);
@@ -710,6 +710,11 @@ export class GameEngine {
       if (e.code === 'KeyF' && !e.repeat) {
         this.executePounce();
       }
+
+      // Shift Mode Toggle: Day / Night Shift (N)
+      if (e.code === 'KeyN' && !e.repeat) {
+        this.toggleNightMode();
+      }
     };
 
     this.onKeyUpBound = (e: KeyboardEvent) => {
@@ -763,6 +768,23 @@ export class GameEngine {
   public handleInteractOrMeow() {
     const catPos = this.cat.mesh.position;
     let interacted = false;
+
+    // 0. Check Cat Haven Sanctuary Orthopedic Cushion Bed
+    const distToHavenCushion = catPos.distanceTo(new THREE.Vector3(-55, 0.28, -66.5));
+    if (distToHavenCushion < 2.5) {
+      soundEngine.playPurr();
+      this.cat.triggerRest(3.5);
+      this.vitals.currentHealth = this.vitals.maxHealth;
+      this.vitals.currentStamina = this.vitals.maxStamina;
+      this.vitals.currentHunger = this.vitals.maxHunger;
+      this.cat.updateDosimeterRadiation(0.0);
+      this.showNotification(
+        '🛌 CAT HAVEN SANCTUARY REST',
+        'Alba curled up on the heated orthopedic cushion and purred peacefully. Vitals 100% restored, radiation purged, and gained "Well-Rested Feline" buff (+20% Sprint, +15% Jump)!',
+        'success'
+      );
+      return;
+    }
 
     // 1. Check food bowls
     for (const bowl of this.environment.foodBowls) {
@@ -987,6 +1009,7 @@ export class GameEngine {
 
               this.showNotification('👑 KINGPIN DEFEATED!', 'You defeated the Dockyard Kingpin! +1 Skill Point awarded & Vitals fully restored!', 'success');
               this.missionManager.completeObjective('hunt_kingpin');
+              this.missionManager.advanceToNextMission();
               this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
               this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: 150, isBoss: true });
               this.onMissionObjectiveUpdated?.();
@@ -1097,6 +1120,7 @@ export class GameEngine {
 
               this.showNotification('👑 KINGPIN DEFEATED!', 'You defeated the Dockyard Kingpin with Tail Sweep! +1 Skill Point awarded & Vitals restored!', 'success');
               this.missionManager.completeObjective('hunt_kingpin');
+              this.missionManager.advanceToNextMission();
               this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
               this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: 150, isBoss: true });
               this.onMissionObjectiveUpdated?.();
@@ -1175,10 +1199,27 @@ export class GameEngine {
     }
   }
 
+  public toggleNightMode(): boolean {
+    const isNight = !this.renderSystem.isNightMode;
+    this.renderSystem.setNightMode(isNight, this.scene);
+
+    if (this.cat?.dosimeterLight) {
+      this.cat.dosimeterLight.intensity = isNight ? 1.6 : 0.4;
+    }
+
+    const shiftName = isNight ? '🌙 NIGHT SHIFT (2nd & 3rd Shift Active)' : '☀️ DAY SHIFT (1st Shift Active)';
+    const shiftDesc = isNight
+      ? 'High-mast gantry floodlights and sodium corridor lamps illuminated.'
+      : 'Natural daylight over Newport News Shipbuilding.';
+    this.showNotification(shiftName, shiftDesc, 'info');
+    return isNight;
+  }
+
   private onMutantAttack = (damage: number) => {
-    this.vitals.takeHazardDamage(damage / 100);
+    this.vitals.takeDamage(damage);
     soundEngine.playCatHiss();
-    this.showNotification('MUTANT ATTACK!', 'A mutant insurgent swiped at Alba! Health reduced.', 'warn');
+    this.triggerHitFeedback(this.cat.mesh.position, true);
+    this.showNotification('MUTANT ATTACK!', `A mutant insurgent swiped at Alba dealing ${damage} damage! Dodge or fight back [J]!`, 'warn');
   };
 
   private resolveEnvCollision = (pos: THREE.Vector3, rad: number, prevPos?: THREE.Vector3) => this.environment.resolveCollision(pos, rad, prevPos);
@@ -1201,6 +1242,10 @@ export class GameEngine {
         this.resolveEnvCollision,
         skipMixer
       );
+
+      // Clamp mutant cat elevation to terrain floor
+      const floorY = this.environment.getPlatformFloor(mutant.mesh.position.x, mutant.mesh.position.z, mutant.mesh.position.y);
+      mutant.mesh.position.y = floorY;
     }
 
     for (let i = 0; i < this.colonyNPCs.length; i++) {
@@ -1263,57 +1308,22 @@ export class GameEngine {
       }
 
       if ((rat.state as string) !== 'CAUGHT') {
+        // Clamp rat elevation to terrain floor (prevents floating across dry dock rims)
+        const floorY = this.environment.getPlatformFloor(rat.mesh.position.x, rat.mesh.position.z, rat.mesh.position.y);
+        rat.mesh.position.y = floorY;
+
         const dist = rat.mesh.position.distanceTo(catPos);
 
         if (rat.isKingpin) {
           // Kingpin Boss Combat:
-          // 1. Alba lands active airborne pounce on Kingpin
-          if (this.physics.isPouncing && dist < 1.8) {
-            this.triggerHitFeedback(rat.mesh.position, true);
-            const killed = rat.takeDamage(1, (newPhase) => {
-              if (newPhase === 2) {
-                this.showNotification('👑 KINGPIN SKIRMISH!', 'Dockyard Kingpin sprints across the dry dock basin! Intercept his flanking charge with Paw Swipe [J]!', 'warn');
-                soundEngine.playRatPanic();
-              } else if (newPhase === 3) {
-                this.showNotification('👑 KINGPIN FRENZY!', 'Dockyard Kingpin enters Berserk Frenzy! Dodging serpentine charges required!', 'warn');
-                soundEngine.playRatPanic();
-              }
-            });
-            rat.isStunned = true;
-            rat.stunTimer = 1.2;
-            rat.attackCooldown = 2.0;
-            soundEngine.playRatCatch();
-
-            if (killed || rat.health <= 0) {
-              rat.state = 'CAUGHT';
-              rat.mesh.visible = false;
-              rat.scentTrailParticles.visible = false;
-              this.cat.triggerEat();
-              soundEngine.playSuccess();
-              this.vitals.feed(100);
-              this.vitals.currentStamina = this.vitals.maxStamina;
-              this.vitals.currentHealth = this.vitals.maxHealth;
-              this.progression.skillPoints += 1;
-              this.progression.addXP(150);
-
-              this.showNotification('👑 KINGPIN DEFEATED!', 'You defeated the Dockyard Kingpin! +1 Skill Point awarded & Vitals fully restored!', 'success');
-              this.missionManager.completeObjective('hunt_kingpin');
-              this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
-              this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: 150, isBoss: true });
-              this.onMissionObjectiveUpdated?.();
-              this.eventBus.emit('mission:objectiveUpdated', undefined);
-              this.showNotification('📜 CHAPTER 1 COMPLETE!', 'Next Work Order: Board Tugboat Dorothy (Hull No. 1, 1891) in the historic yard [M].', 'info');
-            } else {
-              this.showNotification('Boss Hit!', `Dockyard Kingpin struck by pounce! (${rat.health}/${rat.maxHealth} HP remaining)`, 'warn');
-            }
-          }
-          // 2. Contact Damage: Kingpin strikes Alba if close and not stunned
-          else if (dist < 1.6 && !rat.isStunned && rat.attackCooldown <= 0) {
+          // Contact Damage: Kingpin strikes Alba if close (< 1.6m) and not stunned
+          // (Alba cannot damage Kingpin by merely touching him; she must actively strike with Paw Swipe [J] or Tail Sweep [K]!)
+          if (dist < 1.6 && !rat.isStunned && rat.attackCooldown <= 0) {
             rat.attackCooldown = 1.8;
             this.vitals.takeDamage(12);
             soundEngine.playCatHiss();
             this.triggerHitFeedback(catPos, true);
-            this.showNotification('👑 KINGPIN ATTACKS!', 'The Dockyard Kingpin bit Alba! Dodge away or attack with Paw Swipe [J]!', 'warn');
+            this.showNotification('👑 KINGPIN ATTACKS!', 'The Dockyard Kingpin bit Alba! Dodge away and strike back with Paw Swipe [J]!', 'warn');
           }
         } else {
           // Standard Vermin Hunting (Mice / Small Rats)
@@ -1352,7 +1362,7 @@ export class GameEngine {
   private addContextualPrompt(
     count: number,
     id: string,
-    type: 'TALK' | 'EAT' | 'POUNCE' | 'SECURITY',
+    type: 'TALK' | 'EAT' | 'POUNCE' | 'SECURITY' | 'SLEEP',
     title: string,
     subtitle: string | undefined,
     keyText: string,
@@ -1384,6 +1394,27 @@ export class GameEngine {
     if (!this.onContextualPromptsUpdate && this.eventBus.getListenerCount('ui:contextualPrompts') === 0) return;
     const catPos = this.cat.mesh.position;
     let count = 0;
+
+    // 0. Check Cat Haven Sanctuary Orthopedic Cushion Bed (< 3.2m)
+    const havenPos = new THREE.Vector3(-55, 0.28, -66.5);
+    const distToHaven = catPos.distanceTo(havenPos);
+    if (distToHaven < 3.2) {
+      const proj = this.renderSystem.projectPoint(havenPos, 0.45);
+      if (proj.visible) {
+        count = this.addContextualPrompt(
+          count,
+          'cat-sanctuary-sleep',
+          'SLEEP',
+          'Curl Up & Sleep',
+          'Heated Orthopedic Cushion • Restores 100% Vitals & Purges Radiation',
+          'E',
+          proj.screenX,
+          proj.screenY,
+          Math.round(distToHaven * 10) / 10,
+          true
+        );
+      }
+    }
 
     // 1. Check Colony NPCs (< 4.2m)
     for (let i = 0; i < this.colonyNPCs.length; i++) {
@@ -1853,17 +1884,22 @@ export class GameEngine {
     // 8. AI & Entity Updates — once per render frame
     this.flightRecorder.startSection('rats_ai');
     this.updateRatsAndHunting(frameDelta);
-    if (this.frameTick % 20 === 0) {
+    if (this.frameTick % 10 === 0) {
       const kingpin = this.rats.find((r) => r.isKingpin && r.state !== 'CAUGHT');
+      const catPos = this.cat?.mesh?.position;
+      const inDryDock1Arena = !!(
+        catPos &&
+        catPos.x >= 14 && catPos.x <= 44 &&
+        catPos.z >= -38 && catPos.z <= -18 &&
+        catPos.y <= -0.5
+      );
+      const distToKingpin = (catPos && kingpin) ? catPos.distanceTo(kingpin.mesh.position) : 999;
       const isBattlingBoss = !!(
         kingpin &&
         kingpin.state !== 'CAUGHT' &&
         kingpin.health > 0 &&
         this.cat &&
-        (
-          kingpin.health < kingpin.maxHealth ||
-          (this.cat.mesh.position.y <= -1.2 && this.cat.mesh.position.distanceTo(kingpin.mesh.position) < 5.0 && (kingpin.isStunned || kingpin.bossPhase > 1))
-        )
+        (inDryDock1Arena || distToKingpin < 16.0 || kingpin.health < kingpin.maxHealth)
       );
       soundEngine.updateBGM(isBattlingBoss);
     }

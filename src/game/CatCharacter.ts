@@ -230,7 +230,7 @@ export class CatCharacter {
 
           // Attach Alba's signature fitted Safety-Orange Collar and OLED Dosimeter Tag to GLTF rig
           if (this.collarGroup) {
-            this.collarGroup.scale.set(1.85, 1.82, 1.85);
+            this.collarGroup.scale.set(1.0, 1.0, 1.0);
             this.mesh.add(this.collarGroup);
           }
         }
@@ -396,23 +396,23 @@ export class CatCharacter {
 
     this.collarGroup = new THREE.Group();
 
-    // Snug Collar Ring (Tilted with neck angle)
-    const collarGeo = new THREE.CylinderGeometry(0.076, 0.079, 0.028, 24, 1, true);
+    // Snug Collar Ring (Fitted around cat neck vertebrae)
+    const collarGeo = new THREE.CylinderGeometry(0.046, 0.048, 0.022, 24, 1, true);
     this.collar = new THREE.Mesh(collarGeo, orangeCollarMat);
     this.collar.castShadow = true;
     this.collarGroup.add(this.collar);
 
     // Brass Collar Buckle at front throat
     const buckleMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.2 });
-    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.028, 0.012), buckleMat);
-    buckle.position.set(0, -0.005, 0.079);
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.022, 0.008), buckleMat);
+    buckle.position.set(0, -0.003, 0.049);
     this.collarGroup.add(buckle);
 
     // Brass dosimeter medal tag (NNS Medallion)
-    const tagGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.004, 12);
+    const tagGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.003, 12);
     tagGeo.rotateX(Math.PI / 2);
     this.dosimeterTag = new THREE.Mesh(tagGeo, brassTagMat);
-    this.dosimeterTag.position.set(0, -0.024, 0.084);
+    this.dosimeterTag.position.set(0, -0.018, 0.053);
     this.dosimeterTag.castShadow = true;
     this.collarGroup.add(this.dosimeterTag);
 
@@ -425,19 +425,19 @@ export class CatCharacter {
     });
     const housingMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.25 });
 
-    const housing = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.024, 0.016), housingMat);
-    housing.position.set(0, 0.01, -0.079);
+    const housing = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.018, 0.012), housingMat);
+    housing.position.set(0, 0.005, -0.049);
     housing.rotateX(Math.PI); // Facing rearwards toward third person camera
 
-    this.dosimeterScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.036, 0.016), screenMat);
-    this.dosimeterScreen.position.set(0, 0, -0.009);
+    this.dosimeterScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.028, 0.012), screenMat);
+    this.dosimeterScreen.position.set(0, 0, -0.007);
     this.dosimeterScreen.rotateY(Math.PI);
     housing.add(this.dosimeterScreen);
     this.collarGroup.add(housing);
 
     // Subtle localized collar dosimeter glow
     this.dosimeterLight = new THREE.PointLight(0x06b6d4, 0.4, 0.8);
-    this.dosimeterLight.position.set(0, 0.02, -0.082);
+    this.dosimeterLight.position.set(0, 0.01, -0.052);
     this.collarGroup.add(this.dosimeterLight);
 
     this.collarGroup.position.set(0, 0.31, 0.22);
@@ -520,6 +520,18 @@ export class CatCharacter {
     this.eatTimer = 1.2;
   }
 
+  public restTimer: number = 0;
+  public wellRestedTimer: number = 0;
+
+  public triggerRest(duration: number = 3.5) {
+    this.restTimer = duration;
+    this.wellRestedTimer = 600; // 10 minutes buff
+  }
+
+  public get isWellRested(): boolean {
+    return this.wellRestedTimer > 0;
+  }
+
   public animate(deltaTime: number, speed: number, isGrounded: boolean, turnInput: number = 0) {
     this.animTime += deltaTime;
 
@@ -534,6 +546,8 @@ export class CatCharacter {
 
     if (this.attackTimer > 0) this.attackTimer -= deltaTime;
     if (this.eatTimer > 0) this.eatTimer -= deltaTime;
+    if (this.restTimer > 0) this.restTimer -= deltaTime;
+    if (this.wellRestedTimer > 0) this.wellRestedTimer -= deltaTime;
 
     // 1. Update GLTF Skeletal Animation Mixer
     if (this.mixer) {
@@ -547,6 +561,9 @@ export class CatCharacter {
         isHighPriorityAction = true;
       } else if (this.eatTimer > 0 && this.animations['eat']) {
         targetName = 'eat';
+        isHighPriorityAction = true;
+      } else if (this.restTimer > 0 && this.animations['sit']) {
+        targetName = 'sit';
         isHighPriorityAction = true;
       } else if (this.isPouncing && this.animations['pounce']) {
         targetName = 'pounce';
@@ -649,14 +666,10 @@ export class CatCharacter {
       this.neckBone.getWorldQuaternion(CatCharacter.scratchBoneQuat);
 
       this.mesh.worldToLocal(CatCharacter.scratchBonePos);
-      // Anatomical clearance offset along neck vertebrae to eliminate chest penetration
-      CatCharacter.scratchBonePos.y += 0.022;
-      CatCharacter.scratchBonePos.z += 0.012;
       this.collarGroup.position.copy(CatCharacter.scratchBonePos);
 
       this.mesh.getWorldQuaternion(CatCharacter.scratchMeshQuat);
       this.collarGroup.quaternion.copy(CatCharacter.scratchMeshQuat.invert().multiply(CatCharacter.scratchBoneQuat));
-      this.collarGroup.rotateX(0.38);
     }
 
     // 1. Combat Strike Animation Overrides

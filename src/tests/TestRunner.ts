@@ -542,18 +542,18 @@ export class TestRunner {
       throw new Error(`Expected pier floor height 1.4, got ${pierFloor}`);
     }
 
-    // Exact Ramp Platform Floor Tracking (X: 38.0 to 45.5, Y: 0.0 to 1.4m)
-    const rampBottomFloor = env.getPlatformFloor(38.0, 20.0, 0.0);
-    if (Math.abs(rampBottomFloor - 0.0) > 0.01) {
-      throw new Error(`Expected ramp bottom floor 0.0, got ${rampBottomFloor}`);
+    // Stepped Timber Dock Stairs Platform Floor Tracking (X: 39.5 to 45.0, 5 steps to 1.4m)
+    const stairBottomFloor = env.getPlatformFloor(38.0, 20.0, 0.0);
+    if (Math.abs(stairBottomFloor - 0.0) > 0.01) {
+      throw new Error(`Expected ground floor 0.0 before stairs, got ${stairBottomFloor}`);
     }
-    const rampMidFloor = env.getPlatformFloor(41.75, 20.0, 0.5);
-    if (Math.abs(rampMidFloor - 0.70) > 0.01) {
-      throw new Error(`Expected ramp mid floor 0.70, got ${rampMidFloor}`);
+    const stairStep3Floor = env.getPlatformFloor(41.75, 20.0, 0.5);
+    if (Math.abs(stairStep3Floor - 0.84) > 0.01) {
+      throw new Error(`Expected dock stair step 3 floor 0.84, got ${stairStep3Floor}`);
     }
-    const rampTopFloor = env.getPlatformFloor(45.5, 20.0, 1.2);
-    if (Math.abs(rampTopFloor - 1.40) > 0.01) {
-      throw new Error(`Expected ramp top floor 1.40, got ${rampTopFloor}`);
+    const stairTopFloor = env.getPlatformFloor(45.5, 20.0, 1.2);
+    if (Math.abs(stairTopFloor - 1.40) > 0.01) {
+      throw new Error(`Expected dock boardwalk floor 1.40, got ${stairTopFloor}`);
     }
 
     const dorothyDeckFloor = env.getPlatformFloor(-20.0, -25.0, 2.0);
@@ -599,7 +599,7 @@ export class TestRunner {
       'Tugboat Dorothy Wheelhouse',
       'Submarine Hull Module',
       'RCOH Radiological Vault',
-      'Cat Motel Hub',
+      'Cat Motel North Wall',
       'Big Blue Crane West Leg',
       'Big Blue Crane East Leg',
       'West Yard Security Fence',
@@ -1734,32 +1734,25 @@ export class TestRunner {
       throw new Error(`Expected Dave O'Connor floor elevation at Y=0.0, got ${daveFloor}`);
     }
 
-    // SMOF Yellow Crate Steps (centerX: -30.0, step 1: 0.7m, step 2: 1.4m, step 3: 2.1m, step 4: 2.8m, step 5: 3.5m)
-    // Standing on ground Y=0, step 1 must be detectable within feline mantle range (0.95m)
-    const s1 = env.getPlatformFloor(-30.0, 45.0 + 18 + 5.6, 0.0);
-    if (s1 !== 0.7) {
-      throw new Error(`Expected SMOF Yellow Crate Step 1 platform 0.7m from ground, got ${s1}`);
+    // SMOF Building 4677 Interior Steel Access Staircase & 360-Degree Upper Catwalk (Y=4.5m)
+    // Step 1: Detectable from ground (Y=0.0m) within feline mantle reach (0.95m)
+    const step1 = env.getPlatformFloor(-37.0, 28.5, 0.0);
+    if (Math.abs(step1 - 0.45) > 0.01) {
+      throw new Error(`Expected SMOF interior staircase step 1 platform 0.45m, got ${step1}`);
     }
-    const s2 = env.getPlatformFloor(-30.0, 45.0 + 18 + 4.2, 0.7);
-    if (s2 !== 1.4) {
-      throw new Error(`Expected SMOF Yellow Crate Step 2 platform 1.4m from Step 1 (0.7m), got ${s2}`);
+    // Mid-stair flight elevation
+    const midStep = env.getPlatformFloor(-37.0, 32.0, 2.0);
+    if (Math.abs(midStep - 2.25) > 0.01) {
+      throw new Error(`Expected SMOF interior staircase mid-flight platform 2.25m, got ${midStep}`);
     }
-    const s3 = env.getPlatformFloor(-30.0, 45.0 + 18 + 2.8, 1.4);
-    if (s3 !== 2.1) {
-      throw new Error(`Expected SMOF Yellow Crate Step 3 platform 2.1m from Step 2 (1.4m), got ${s3}`);
+    // Upper 360-degree inspection catwalk platform (Y=4.5m) overlooking nuclear submarines
+    const upperCatwalkSouth = env.getPlatformFloor(-30.0, 27.0, 4.0);
+    if (upperCatwalkSouth !== 4.5) {
+      throw new Error(`Expected SMOF 360-degree upper catwalk platform 4.5m, got ${upperCatwalkSouth}`);
     }
-    const s4 = env.getPlatformFloor(-30.0, 45.0 + 18 + 1.4, 2.1);
-    if (s4 !== 2.8) {
-      throw new Error(`Expected SMOF Yellow Crate Step 4 platform 2.8m from Step 3 (2.1m), got ${s4}`);
-    }
-    const s5 = env.getPlatformFloor(-30.0, 45.0 + 18, 2.8);
-    if (s5 !== 3.5) {
-      throw new Error(`Expected SMOF Yellow Crate Step 5 platform 3.5m from Step 4 (2.8m), got ${s5}`);
-    }
-    // Catwalk connection from Step 5
-    const catwalk = env.getPlatformFloor(-30.0, 45.0 + 16, 3.5);
-    if (catwalk !== 4.15) {
-      throw new Error(`Expected SMOF Crane Catwalk platform 4.15m from Step 5 (3.5m), got ${catwalk}`);
+    const upperCatwalkBridge = env.getPlatformFloor(-30.0, 45.0, 4.0);
+    if (upperCatwalkBridge !== 4.5) {
+      throw new Error(`Expected SMOF submarine crossover bridge platform 4.5m, got ${upperCatwalkBridge}`);
     }
 
     // 4. Frank Miller and Mutant 2 Solid Staging Apron Elevation Verification

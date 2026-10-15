@@ -259,24 +259,24 @@ export class ShipyardEnvironment {
     this.beaconGroup = new THREE.Group();
     this.beaconGroup.position.set(-20, 0, -25);
 
-    const beaconGeo = new THREE.CylinderGeometry(0.6, 1.2, 35, 16);
+    const beaconGeo = new THREE.CylinderGeometry(0.04, 0.18, 5.0, 12);
     const beaconMat = new THREE.MeshBasicMaterial({
       color: 0xfacc15,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.15,
       side: THREE.DoubleSide
     });
     this.objectiveBeacon = new THREE.Mesh(beaconGeo, beaconMat);
-    this.objectiveBeacon.position.set(0, 17.5, 0);
+    this.objectiveBeacon.position.set(0, 2.5, 0);
     this.beaconGroup.add(this.objectiveBeacon);
 
-    const diamondGeo = new THREE.OctahedronGeometry(1.2, 0);
+    const diamondGeo = new THREE.OctahedronGeometry(0.7, 0);
     const diamondMat = new THREE.MeshBasicMaterial({
       color: 0xfef08a,
       wireframe: false
     });
     this.beaconDiamond = new THREE.Mesh(diamondGeo, diamondMat);
-    this.beaconDiamond.position.set(0, 8.0, 0);
+    this.beaconDiamond.position.set(0, 3.5, 0);
     this.beaconGroup.add(this.beaconDiamond);
 
     const ringGeo = new THREE.RingGeometry(0.5, 3.5, 24);
@@ -559,24 +559,47 @@ export class ShipyardEnvironment {
     this.seagullFlock = new SeagullFlock();
     this.group.add(this.seagullFlock.group);
 
-    // Boarding Ramps (X in [38.0, 45.5], Y from 0.0 to 1.4m)
-    const rampMat = new THREE.MeshStandardMaterial({
+    // Timber Dock Staircases connecting concrete shipyard ground (Y=0.0m) to pier boardwalk (Y=1.4m)
+    const stairMat = new THREE.MeshStandardMaterial({
       map: pierWoodTex,
       normalMap: pierWoodNor,
       roughness: 0.8,
       metalness: 0.1
     });
-    const rampZPositions = [-100, -60, 20, 60, 100];
-    for (const rz of rampZPositions) {
-      const rampGeo = new THREE.BoxGeometry(7.63, 0.35, 8.0);
-      rampGeo.rotateZ(0.18435); // Slope 1.4m rise over 7.5m run
-      const ramp = new THREE.Mesh(rampGeo, rampMat);
-      ramp.position.set(41.75, 0.7, rz);
-      ramp.castShadow = true;
-      ramp.receiveShadow = true;
-      this.group.add(ramp);
+    const stairZPositions = [-100, -60, 20, 60, 100];
+    const numDockSteps = 5;
+    const stepRise = 1.4 / numDockSteps; // 0.28m rise per step
+    const stepRun = (45.0 - 39.5) / numDockSteps; // 1.1m run per step
 
-      // Register solid side barriers for boarding ramps to prevent walking through triangular side edges
+    for (const rz of stairZPositions) {
+      for (let s = 0; s < numDockSteps; s++) {
+        const stepH = (s + 1) * stepRise;
+        const stepX = 39.5 + (s + 0.5) * stepRun;
+        const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(stepRun + 0.1, stepH, 8.0), stairMat);
+        stepMesh.position.set(stepX, stepH / 2, rz);
+        stepMesh.castShadow = true;
+        stepMesh.receiveShadow = true;
+        this.group.add(stepMesh);
+
+        this.platforms.push({
+          minX: 39.5 + s * stepRun,
+          maxX: 39.5 + (s + 1) * stepRun + (s === numDockSteps - 1 ? 0.2 : 0),
+          minZ: rz - 4.0,
+          maxZ: rz + 4.0,
+          height: stepH
+        });
+      }
+
+      // Timber Heavy Side Stringers / Railings
+      const railingMat = new THREE.MeshStandardMaterial({ color: 0x271708, roughness: 0.9 });
+      for (const dz of [-4.1, 4.1]) {
+        const stringer = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.3, 0.2), railingMat);
+        stringer.position.set(42.25, 1.4, rz + dz);
+        stringer.castShadow = true;
+        this.group.add(stringer);
+      }
+
+      // Register solid side barriers for stairs to prevent walking through side edges
       this.registerObstacle(
         new THREE.Vector3(38.0, 0.0, rz - 4.4),
         new THREE.Vector3(45.5, 1.35, rz - 3.8),
@@ -844,10 +867,10 @@ export class ShipyardEnvironment {
       { x: -30.6, y: 0.52, z: -11.2, color: 0x1e293b },
       { x: -30.6, y: 1.57, z: -10.6, color: 0xdc2626 },
 
-      // 3. Waterfront Pier Boardwalk (Safety Amber & Navy)
-      { x: 42.0, y: 1.4 + 0.52, z: -10.0, color: 0xf59e0b },
-      { x: 43.2, y: 1.4 + 0.52, z: -10.0, color: 0x0284c7 },
-      { x: 42.6, y: 1.4 + 0.52, z: -11.2, color: 0x1e293b },
+      // 3. Waterfront Pier Boardwalk (Safety Amber & Navy on pier deck X in [45, 57])
+      { x: 49.0, y: 1.4 + 0.52, z: -10.0, color: 0xf59e0b },
+      { x: 50.2, y: 1.4 + 0.52, z: -10.0, color: 0x0284c7 },
+      { x: 49.6, y: 1.4 + 0.52, z: -11.2, color: 0x1e293b },
 
       // 4. Submarine MOF Heavy Hydraulic Drums (Heavy Charcoal & Orange)
       { x: -38.0, y: 0.52, z: 40.0, color: 0x334155 },
@@ -1873,9 +1896,9 @@ export class ShipyardEnvironment {
     this.group.add(cr3);
     this.platforms.push({ minX: 42.7, maxX: 46.5, minZ: -24.1, maxZ: -21.4, height: 0.0 });
 
-    this.registerObstacle(new THREE.Vector3(14, -3, -36.5), new THREE.Vector3(46, 0.05, -34.5), 'Dry Dock 1 North Wall');
-    this.registerObstacle(new THREE.Vector3(14, -3, -20.5), new THREE.Vector3(46, 0.05, -18.5), 'Dry Dock 1 South Wall');
-    this.registerObstacle(new THREE.Vector3(13.5, -3, -36), new THREE.Vector3(15.5, 0.05, -19), 'Dry Dock 1 West Wall');
+    this.registerObstacle(new THREE.Vector3(14, -3, -36.5), new THREE.Vector3(46, -0.25, -34.5), 'Dry Dock 1 North Wall');
+    this.registerObstacle(new THREE.Vector3(14, -3, -20.5), new THREE.Vector3(46, -0.25, -18.5), 'Dry Dock 1 South Wall');
+    this.registerObstacle(new THREE.Vector3(13.5, -3, -36), new THREE.Vector3(15.5, -0.25, -19), 'Dry Dock 1 West Wall');
     this.registerObstacle(new THREE.Vector3(44.5, -3, -36), new THREE.Vector3(46.5, 2, -24.6), 'River Caisson Gate (North)');
     this.registerObstacle(new THREE.Vector3(44.5, -3, -21.0), new THREE.Vector3(46.5, 2, -19), 'River Caisson Gate (South)');
 
@@ -2368,54 +2391,102 @@ export class ShipyardEnvironment {
       }
     }
 
-    // 8. Central Inspection Catwalk & Climbable Staging Crates
-    const catwalkMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7, metalness: 0.6 });
-    const catwalk = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.35, 34), catwalkMat);
-    catwalk.position.set(centerX, 4.0, centerZ);
-    catwalk.castShadow = true;
-    catwalk.receiveShadow = true;
-    smofGroup.add(catwalk);
-
-    this.platforms.push({
-      minX: centerX - 1.6,
-      maxX: centerX + 1.6,
-      minZ: centerZ - 17,
-      maxZ: centerZ + 17,
-      height: 4.15
+    // 8. High-Bay 360-Degree Perimeter Inspection Catwalk & Interior Access Staircase (Elevation Y = 4.5m)
+    const gratingMat = new THREE.MeshStandardMaterial({
+      map: TextureGenerator.createIndustrialGratingTexture(),
+      normalMap: TextureGenerator.createIndustrialGratingNormalTexture(),
+      roughnessMap: TextureGenerator.createIndustrialGratingRoughnessTexture(),
+      metalness: 0.85,
+      roughness: 0.35,
+      transparent: true,
+      side: THREE.DoubleSide
     });
+    const catwalkYellowMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.8, roughness: 0.3 });
+    const steelBeamMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.88, roughness: 0.28 });
+    const catwalkH = 4.5;
 
-    for (const dir of [-1, 1]) {
-      const zBase = centerZ + dir * 18;
-      // 5 Progressive 0.7m Step Tiers for effortless feline climbing and mantling
-      const crateSteps = [
-        { y: 0.7, dy: 0.7, offsetZ: dir * 5.6 },
-        { y: 1.4, dy: 1.4, offsetZ: dir * 4.2 },
-        { y: 2.1, dy: 2.1, offsetZ: dir * 2.8 },
-        { y: 2.8, dy: 2.8, offsetZ: dir * 1.4 },
-        { y: 3.5, dy: 3.5, offsetZ: 0 }
-      ];
-      for (let cIdx = 0; cIdx < crateSteps.length; cIdx++) {
-        const step = crateSteps[cIdx];
-        const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, step.dy, 1.5), yellowMat);
-        stepMesh.position.set(centerX, step.y - step.dy / 2, zBase + step.offsetZ);
-        stepMesh.castShadow = true;
-        stepMesh.receiveShadow = true;
-        smofGroup.add(stepMesh);
+    // A. South Perimeter Catwalk (along Z = 27.0, X in [-37.5, -22.5])
+    const catSouth = new THREE.Mesh(new THREE.BoxGeometry(15.0, 0.15, 1.8), gratingMat);
+    catSouth.position.set(centerX, catwalkH - 0.075, 27.0);
+    catSouth.castShadow = true;
+    catSouth.receiveShadow = true;
+    smofGroup.add(catSouth);
+    this.platforms.push({ minX: -37.5, maxX: -22.5, minZ: 26.1, maxZ: 27.9, height: catwalkH });
 
-        const sMinX = centerX - 1.3;
-        const sMaxX = centerX + 1.3;
-        const sMinZ = zBase + step.offsetZ - 0.75;
-        const sMaxZ = zBase + step.offsetZ + 0.75;
+    // B. West Perimeter Catwalk (along X = -37.0, Z in [27.0, 63.0])
+    const catWest = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.15, 36.0), gratingMat);
+    catWest.position.set(-37.0, catwalkH - 0.075, centerZ);
+    catWest.castShadow = true;
+    catWest.receiveShadow = true;
+    smofGroup.add(catWest);
+    this.platforms.push({ minX: -37.9, maxX: -36.1, minZ: 27.0, maxZ: 63.0, height: catwalkH });
 
-        this.platforms.push({
-          minX: sMinX,
-          maxX: sMaxX,
-          minZ: sMinZ,
-          maxZ: sMaxZ,
-          height: step.y
-        });
-      }
+    // C. North Perimeter Catwalk (along Z = 63.0, X in [-37.5, -22.5])
+    const catNorth = new THREE.Mesh(new THREE.BoxGeometry(15.0, 0.15, 1.8), gratingMat);
+    catNorth.position.set(centerX, catwalkH - 0.075, 63.0);
+    catNorth.castShadow = true;
+    catNorth.receiveShadow = true;
+    smofGroup.add(catNorth);
+    this.platforms.push({ minX: -37.5, maxX: -22.5, minZ: 62.1, maxZ: 63.9, height: catwalkH });
+
+    // D. East Perimeter Catwalk (along X = -23.0, Z in [27.0, 63.0])
+    const catEast = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.15, 36.0), gratingMat);
+    catEast.position.set(-23.0, catwalkH - 0.075, centerZ);
+    catEast.castShadow = true;
+    catEast.receiveShadow = true;
+    smofGroup.add(catEast);
+    this.platforms.push({ minX: -23.9, maxX: -22.1, minZ: 27.0, maxZ: 63.0, height: catwalkH });
+
+    // Central Cross-Over Catwalk Bridge between Submarines
+    const catBridge = new THREE.Mesh(new THREE.BoxGeometry(12.2, 0.15, 1.8), gratingMat);
+    catBridge.position.set(centerX, catwalkH - 0.075, centerZ);
+    catBridge.castShadow = true;
+    catBridge.receiveShadow = true;
+    smofGroup.add(catBridge);
+    this.platforms.push({ minX: -36.1, maxX: -23.9, minZ: centerZ - 0.9, maxZ: centerZ + 0.9, height: catwalkH });
+
+    // Safety Yellow Guardrails along interior edges of the upper catwalks
+    const railYGeo = new THREE.CylinderGeometry(0.025, 0.025, 36.0, 8);
+    railYGeo.rotateX(Math.PI / 2);
+    const innerRailW = new THREE.Mesh(railYGeo, catwalkYellowMat);
+    innerRailW.position.set(-36.1, catwalkH + 0.85, centerZ);
+    const innerRailE = new THREE.Mesh(railYGeo, catwalkYellowMat);
+    innerRailE.position.set(-23.9, catwalkH + 0.85, centerZ);
+    smofGroup.add(innerRailW, innerRailE);
+
+    // E. Interior Steel Access Staircase (rising from ground Y=0.0m at Z=28 to Y=4.5m at Z=37 along West Wall)
+    const numSmofSteps = 10;
+    const stairZStart = 28.0;
+    const stairZEnd = 37.0;
+    const stairStepZ = (stairZEnd - stairZStart) / numSmofSteps;
+    const stairStepY = catwalkH / numSmofSteps;
+
+    for (let s = 0; s < numSmofSteps; s++) {
+      const stepH = (s + 1) * stairStepY;
+      const stepZ = stairZStart + (s + 0.5) * stairStepZ;
+      const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, Math.abs(stairStepZ) + 0.1), gratingMat);
+      stepMesh.position.set(-37.0, stepH - 0.04, stepZ);
+      stepMesh.castShadow = true;
+      stepMesh.receiveShadow = true;
+
+      const riserMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, stairStepY, 0.04), steelBeamMat);
+      riserMesh.position.set(-37.0, stepH - stairStepY / 2, stepZ + stairStepZ / 2);
+
+      smofGroup.add(stepMesh, riserMesh);
+      this.platforms.push({
+        minX: -37.8,
+        maxX: -36.2,
+        minZ: Math.min(stepZ - 0.5, stepZ + 0.5),
+        maxZ: Math.max(stepZ - 0.5, stepZ + 0.5),
+        height: stepH
+      });
     }
+
+    // Sloped Safety Handrail along staircase
+    const stairHandrail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 10.2, 8), catwalkYellowMat);
+    stairHandrail.rotateX(-Math.atan2(catwalkH, stairZEnd - stairZStart));
+    stairHandrail.position.set(-36.2, catwalkH / 2 + 0.85, (stairZStart + stairZEnd) / 2);
+    smofGroup.add(stairHandrail);
 
     // 9. Industrial High-Bay Amber Sodium Lighting Inside Shelter
     for (let lz = centerZ - 12; lz <= centerZ + 12; lz += 12) {
@@ -2694,15 +2765,63 @@ export class ShipyardEnvironment {
     const motelGroup = new THREE.Group();
     motelGroup.position.set(-55, 0, -65);
 
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.7 });
-    const bldgGeo = new THREE.BoxGeometry(14, 5, 12);
-    const bldg = new THREE.Mesh(bldgGeo, wallMat);
-    bldg.position.set(0, 2.5, 0);
-    bldg.castShadow = true;
-    bldg.receiveShadow = true;
-    motelGroup.add(bldg);
+    // 1. Cat Motel Exterior Shell with Accessible Feline Flap Doorway
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 });
+    const bldgWalls = [
+      // West Wall
+      new THREE.Mesh(new THREE.BoxGeometry(0.6, 5.0, 12.0), wallMat),
+      // East Wall
+      new THREE.Mesh(new THREE.BoxGeometry(0.6, 5.0, 12.0), wallMat),
+      // North Wall (Back)
+      new THREE.Mesh(new THREE.BoxGeometry(14.0, 5.0, 0.6), wallMat),
+      // Roof
+      new THREE.Mesh(new THREE.BoxGeometry(14.4, 0.4, 12.4), wallMat)
+    ];
+    bldgWalls[0].position.set(-6.7, 2.5, 0);
+    bldgWalls[1].position.set(6.7, 2.5, 0);
+    bldgWalls[2].position.set(0, 2.5, -5.7);
+    bldgWalls[3].position.set(0, 5.0, 0);
+    bldgWalls.forEach(w => { w.castShadow = true; w.receiveShadow = true; motelGroup.add(w); });
 
-    this.registerObstacle(new THREE.Vector3(-62, 0, -71), new THREE.Vector3(-48, 5, -59), 'Cat Motel Hub');
+    // Front South Wall with Feline Entrance Flap (open doorway from X: -1.2 to 1.2)
+    const frontL = new THREE.Mesh(new THREE.BoxGeometry(5.8, 5.0, 0.6), wallMat);
+    frontL.position.set(-3.8, 2.5, 5.7);
+    const frontR = new THREE.Mesh(new THREE.BoxGeometry(5.8, 5.0, 0.6), wallMat);
+    frontR.position.set(3.8, 2.5, 5.7);
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.2, 0.6), wallMat);
+    lintel.position.set(0, 3.4, 5.7);
+    motelGroup.add(frontL, frontR, lintel);
+
+    // Warm Interior Wood Floor
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(13.0, 0.1, 11.0), floorMat);
+    floor.position.set(0, 0.05, 0);
+    floor.receiveShadow = true;
+    motelGroup.add(floor);
+
+    // Heated Veterinary Sleeping Cushion Bed
+    const cushionMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.9 });
+    const fleeceMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.95 });
+    const cushionBase = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.5, 0.22, 20), cushionMat);
+    cushionBase.position.set(0, 0.16, -1.5);
+    cushionBase.castShadow = true;
+    cushionBase.receiveShadow = true;
+    const cushionTop = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.1, 20), fleeceMat);
+    cushionTop.position.set(0, 0.28, -1.5);
+    cushionTop.receiveShadow = true;
+    motelGroup.add(cushionBase, cushionTop);
+
+    // Warm Haven Glow Light
+    const havenGlow = new THREE.PointLight(0xfde047, 2.2, 12, 1.2);
+    havenGlow.position.set(0, 2.8, -1.5);
+    motelGroup.add(havenGlow);
+
+    // Outer Colliders (leaving doorway open at X in [-1.4, 1.4], Z in [4.8, 6.2])
+    this.registerObstacle(new THREE.Vector3(-62, 0, -71), new THREE.Vector3(-61, 5, -59), 'Cat Motel West Wall');
+    this.registerObstacle(new THREE.Vector3(-49, 0, -71), new THREE.Vector3(-48, 5, -59), 'Cat Motel East Wall');
+    this.registerObstacle(new THREE.Vector3(-62, 0, -71), new THREE.Vector3(-48, 5, -70), 'Cat Motel North Wall');
+    this.registerObstacle(new THREE.Vector3(-62, 0, -60), new THREE.Vector3(-56.4, 5, -59), 'Cat Motel Front Left');
+    this.registerObstacle(new THREE.Vector3(-53.6, 0, -60), new THREE.Vector3(-48, 5, -59), 'Cat Motel Front Right');
 
     const acGeo = new THREE.BoxGeometry(2.5, 1.6, 2.0);
     const acMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.6 });
@@ -3102,7 +3221,7 @@ export class ShipyardEnvironment {
       }
       if (this.beaconDiamond) {
         this.beaconDiamond.rotation.y += deltaTime * 1.5;
-        this.beaconDiamond.position.y = 8.0 + Math.sin(this.envTime * 3.0) * 0.8;
+        this.beaconDiamond.position.y = 3.5 + Math.sin(this.envTime * 3.0) * 0.4;
       }
       if (this.beaconRipple) {
         const rippleScale = 1.0 + ((this.envTime * 2.0) % 1.0) * 1.8;

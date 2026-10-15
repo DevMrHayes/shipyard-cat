@@ -836,7 +836,7 @@ export class SoundEngine {
 
     if (!this.bgmExploration) {
       try {
-        this.bgmExploration = new Audio('/src/music/Paws_at_the_Pier.mp3');
+        this.bgmExploration = new Audio('/music/Paws_at_the_Pier.mp3');
         this.bgmExploration.loop = true;
         this.bgmExploration.volume = this.musicEnabled ? this.musicVolume : 0;
       } catch {}
@@ -844,7 +844,7 @@ export class SoundEngine {
 
     if (!this.bgmBoss) {
       try {
-        this.bgmBoss = new Audio('/src/music/Titan_s_Gantry.mp3');
+        this.bgmBoss = new Audio('/music/Titan_s_Gantry.mp3');
         this.bgmBoss.loop = true;
         this.bgmBoss.volume = 0;
       } catch {}

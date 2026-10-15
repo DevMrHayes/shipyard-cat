@@ -285,10 +285,10 @@ export class RatEntity {
   private static readonly scratchToCat = new THREE.Vector3();
   private static readonly scratchRatForward = new THREE.Vector3();
   public static readonly BASIN_WAYPOINTS: THREE.Vector3[] = [
-    new THREE.Vector3(20.0, -2.0, -32.0),
+    new THREE.Vector3(20.0, -2.0, -23.0),
+    new THREE.Vector3(38.0, -2.0, -23.0),
     new THREE.Vector3(38.0, -2.0, -32.0),
-    new THREE.Vector3(38.0, -2.0, -22.5),
-    new THREE.Vector3(20.0, -2.0, -22.5)
+    new THREE.Vector3(20.0, -2.0, -32.0)
   ];
 
   /**
@@ -432,18 +432,34 @@ export class RatEntity {
         return;
       }
 
-      // Phase 1: Heavy Lunge Attacks & Dry Dock 1 Basin Patrol
-      if (distToCat < 4.5 && this.attackCooldown <= 0) {
+      // Phase 1: Heavy Lunge Attacks, Tactical Evasion & Basin Patrol
+      if (distToCat < 7.0 && this.attackCooldown <= 0) {
+        // Active aggro charge toward Alba
         const lungeDir = RatEntity.scratchLungeDir.subVectors(catPosition, this.mesh.position).normalize();
         lungeDir.y = 0;
-        this.mesh.position.addScaledVector(lungeDir, this.moveSpeed * 1.8 * deltaTime);
+        this.mesh.position.addScaledVector(lungeDir, this.moveSpeed * 1.6 * deltaTime);
         this.mesh.rotation.y = Math.atan2(lungeDir.x, lungeDir.z);
+      } else if (distToCat < 4.5 && this.attackCooldown > 0) {
+        // Tactical evasion circuit while attack is on cooldown
+        const targetWp = RatEntity.BASIN_WAYPOINTS[this.basinWaypointIndex % RatEntity.BASIN_WAYPOINTS.length];
+        const runDir = RatEntity.scratchDir.subVectors(targetWp, this.mesh.position).normalize();
+        runDir.y = 0;
+        this.mesh.position.addScaledVector(runDir, this.moveSpeed * 1.5 * deltaTime);
+        this.mesh.rotation.y = Math.atan2(runDir.x, runDir.z);
+        if (this.mesh.position.distanceTo(targetWp) < 1.6) {
+          this.basinWaypointIndex = (this.basinWaypointIndex + 1) % RatEntity.BASIN_WAYPOINTS.length;
+        }
       } else {
-        const time = Date.now() * 0.001;
-        const radius = 1.6;
-        this.mesh.position.x = this.spawnOrigin.x + Math.sin(time * 0.8) * radius;
-        this.mesh.position.z = this.spawnOrigin.z + Math.cos(time * 0.8) * radius;
-        this.mesh.rotation.y = time * 0.8 + Math.PI / 2;
+        // Continuous patrol through open basin corridor waypoints
+        const targetWp = RatEntity.BASIN_WAYPOINTS[this.basinWaypointIndex % RatEntity.BASIN_WAYPOINTS.length];
+        const distToWp = this.mesh.position.distanceTo(targetWp);
+        if (distToWp < 1.6) {
+          this.basinWaypointIndex = (this.basinWaypointIndex + 1) % RatEntity.BASIN_WAYPOINTS.length;
+        }
+        const runDir = RatEntity.scratchDir.subVectors(targetWp, this.mesh.position).normalize();
+        runDir.y = 0;
+        this.mesh.position.addScaledVector(runDir, this.moveSpeed * 1.2 * deltaTime);
+        this.mesh.rotation.y = Math.atan2(runDir.x, runDir.z);
       }
       return;
     }

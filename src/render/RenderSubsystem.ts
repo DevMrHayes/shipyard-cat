@@ -48,11 +48,58 @@ export class RenderSubsystem {
   public subShopFlood: THREE.SpotLight;
   public riverFlood: THREE.DirectionalLight;
 
-  // Fog & Background Colors
   public static readonly normalBgColor = new THREE.Color(0x131d2e);
   public static readonly sonarBgColor = new THREE.Color(0x021726);
   public normalFog = new THREE.FogExp2(0x131d2e, 0.0075);
   public sonarFog = new THREE.Fog(0x021726, 40, 300);
+  public isNightMode: boolean = false;
+
+  public setNightMode(isNight: boolean, scene: THREE.Scene): void {
+    this.isNightMode = isNight;
+    if (isNight) {
+      this.hemiLight.color.setHex(0x1e293b);
+      this.hemiLight.groundColor.setHex(0x020617);
+      this.hemiLight.intensity = 0.35;
+
+      this.sunLight.color.setHex(0x60a5fa);
+      this.sunLight.intensity = 0.35;
+
+      this.fillLight.color.setHex(0x1e293b);
+      this.fillLight.intensity = 0.15;
+
+      this.riverFlood.intensity = 0.35;
+
+      // High-mast stadium floodlights burn brightly on night shift
+      this.southYardFlood.intensity = 6.5;
+      this.dryDockFlood.intensity = 7.5;
+      this.subShopFlood.intensity = 6.5;
+
+      const nightBg = new THREE.Color(0x020617);
+      scene.background = nightBg;
+      scene.fog = new THREE.FogExp2(0x020617, 0.008);
+      this.renderer.toneMappingExposure = 0.95;
+    } else {
+      this.hemiLight.color.setHex(0xcbd5e1);
+      this.hemiLight.groundColor.setHex(0x1e293b);
+      this.hemiLight.intensity = 1.35;
+
+      this.sunLight.color.setHex(0xfff4e0);
+      this.sunLight.intensity = 2.45;
+
+      this.fillLight.color.setHex(0x38bdf8);
+      this.fillLight.intensity = 1.4;
+
+      this.riverFlood.intensity = 1.7;
+
+      this.southYardFlood.intensity = 2.4;
+      this.dryDockFlood.intensity = 2.8;
+      this.subShopFlood.intensity = 2.4;
+
+      scene.background = RenderSubsystem.normalBgColor;
+      scene.fog = this.normalFog;
+      this.renderer.toneMappingExposure = 1.05;
+    }
+  }
 
   // --- Whiskers Vision Sonar Pulse Wave & Thermal Signature Properties ---
   public sonarWaveRing!: THREE.Mesh;
