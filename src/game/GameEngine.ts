@@ -389,8 +389,10 @@ export class GameEngine {
     this.camera.fov = 135;
     this.camera.updateProjectionMatrix();
 
-    // Compile entire scene graph
-    if (this.renderer && typeof this.renderer.compile === 'function') {
+    // Compile entire scene graph (prefer compileAsync for parallel driver compilation)
+    if (this.renderer && typeof (this.renderer as any).compileAsync === 'function') {
+      await (this.renderer as any).compileAsync(this.scene, this.camera);
+    } else if (this.renderer && typeof this.renderer.compile === 'function') {
       this.renderer.compile(this.scene, this.camera);
     }
 
@@ -434,7 +436,9 @@ export class GameEngine {
       for (let i = 0; i < this.mutantCats.length; i++) this.mutantCats[i].setWhiskersAura(true, true);
       this.environment.setWhiskersMode(true);
 
-      if (typeof this.renderer.compile === 'function') {
+      if (typeof (this.renderer as any).compileAsync === 'function') {
+        await (this.renderer as any).compileAsync(this.scene, this.camera);
+      } else if (typeof this.renderer.compile === 'function') {
         this.renderer.compile(this.scene, this.camera);
       }
       this.renderer.render(this.scene, this.camera);
