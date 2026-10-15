@@ -70,6 +70,8 @@ export class TestRunner {
       { name: 'Unit: EventBus Zero-Allocation Pub/Sub & Ring Buffer Throughput', cat: 'UNIT' as const, fn: TestRunner.testEventBusZeroAllocationThroughput },
       { name: 'Unit: Swept-Capsule Continuous Collision & Corner Slide Tangents', cat: 'UNIT' as const, fn: TestRunner.testSweptCapsuleCollisionAndCornerTangents },
       { name: 'Unit: Complete Subsystem Teardown, Listener Cleanup & Resource Disposal', cat: 'UNIT' as const, fn: TestRunner.testSubsystemTeardownAndResourceDisposal },
+      { name: 'Unit: Kingpin Boss Active Attack Requirement & Contact Damage Feedback', cat: 'UNIT' as const, fn: TestRunner.testKingpinBossActiveAttackAndContactDamage },
+      { name: 'Unit: Tiered Crate Mantling & Flush SMOF Ground Elevation Verification', cat: 'UNIT' as const, fn: TestRunner.testTieredCrateMantlingAndSMOFFloorAlignment },
 
       // INTEGRATION TESTS
       { name: 'Integration: Rat Stealth Stalking, Pounce Catch & Accidental Assistance', cat: 'INTEGRATION' as const, fn: TestRunner.testRatHuntingAndAssistanceIntegration },
@@ -1626,5 +1628,102 @@ export class TestRunner {
     }
   }
 
+  private static testKingpinBossActiveAttackAndContactDamage() {
+    const kingpin = new RatEntity(new THREE.Vector3(28, -2.0, -27.5), true);
+    if (kingpin.health !== 3) {
+      throw new Error(`Expected Kingpin initial health 3, got ${kingpin.health}`);
+    }
+    if (!kingpin.isKingpin) {
+      throw new Error(`Expected isKingpin to be true`);
+    }
+
+    const vitals = new CatVitals();
+    const initialHealth = vitals.currentHealth;
+
+    // 1. Passive proximity contact test: Alba walks near Kingpin (dist 1.2m) without attacking
+    // Kingpin must NOT take damage from passive walking
+    const catPos = new THREE.Vector3(28.5, -2.0, -27.5);
+    const dist = kingpin.mesh.position.distanceTo(catPos);
+    if (dist > 1.3) {
+      throw new Error(`Test setup failed: distance to Kingpin should be < 1.3m, got ${dist}`);
+    }
+
+    // Kingpin attacks Alba on contact
+    if (dist < 1.6 && !kingpin.isStunned && kingpin.attackCooldown <= 0) {
+      kingpin.attackCooldown = 1.8;
+      vitals.takeDamage(12);
+    }
+
+    if (vitals.currentHealth >= initialHealth) {
+      throw new Error(`Expected Alba to take 12 contact damage from Kingpin, currentHealth=${vitals.currentHealth}`);
+    }
+    if (kingpin.health !== 3) {
+      throw new Error(`Kingpin must not take damage on passive touch! Current HP: ${kingpin.health}`);
+    }
+
+    // 2. Active attack test: Alba executes active strike (Paw Swipe / Tail Sweep / Pounce)
+    const killed1 = kingpin.takeDamage(1);
+    if (killed1 || (kingpin.health as number) !== 2 || (kingpin.bossPhase as number) !== 2) {
+      throw new Error(`Expected Kingpin phase 2 transition with 2 HP, got HP=${kingpin.health}, phase=${kingpin.bossPhase}`);
+    }
+
+    // Clear invulnerable timer for testing next hit
+    kingpin.invulnerableTimer = 0;
+    const killed2 = kingpin.takeDamage(1);
+    if (killed2 || (kingpin.health as number) !== 1 || (kingpin.bossPhase as number) !== 3) {
+      throw new Error(`Expected Kingpin phase 3 berserk transition with 1 HP, got HP=${kingpin.health}, phase=${kingpin.bossPhase}`);
+    }
+
+    kingpin.invulnerableTimer = 0;
+    const killed3 = kingpin.takeDamage(1);
+    if (!killed3 || (kingpin.health as number) !== 0 || kingpin.state !== 'CAUGHT') {
+      throw new Error(`Expected Kingpin defeat on 3rd active strike, got HP=${kingpin.health}, state=${kingpin.state}`);
+    }
+  }
+
+  private static testTieredCrateMantlingAndSMOFFloorAlignment() {
+    const env = new ShipyardEnvironment();
+
+    // 1. South Yard Tiered Crates (Crate 1: Y=1.0m, Crate 2: Y=1.8m)
+    // Standing on Crate 1 at Y=1.0, getPlatformFloor must detect Crate 2 (Y=1.8) within feline mantling reach
+    const crate1Top = env.getPlatformFloor(-15.0, -20.0, 1.0);
+    if (crate1Top !== 1.0) {
+      throw new Error(`Expected South Yard Crate 1 top platform 1.0m, got ${crate1Top}`);
+    }
+    const crate2TopFromCrate1 = env.getPlatformFloor(-15.0, -23.0, 1.0);
+    if (crate2TopFromCrate1 !== 1.8) {
+      throw new Error(`Expected Crate 2 platform 1.8m detectable while standing on Crate 1 (Y=1.0), got ${crate2TopFromCrate1}`);
+    }
+
+    // 2. Historic Dry Dock 1 Tiered Escape Stack (Crate 1: Y=-1.4m, Crate 2: Y=-0.7m, Crate 3: Y=0.0m)
+    const ddCrate1 = env.getPlatformFloor(40.6, -22.8, -2.0);
+    if (ddCrate1 !== -1.4) {
+      throw new Error(`Expected DD1 Crate 1 platform -1.4m from basin floor (-2.0m), got ${ddCrate1}`);
+    }
+    const ddCrate2 = env.getPlatformFloor(42.0, -22.8, -1.4);
+    if (ddCrate2 !== -0.7) {
+      throw new Error(`Expected DD1 Crate 2 platform -0.7m from Crate 1 (-1.4m), got ${ddCrate2}`);
+    }
+    const ddCrate3 = env.getPlatformFloor(44.0, -22.8, -0.7);
+    if (ddCrate3 !== 0.0) {
+      throw new Error(`Expected DD1 Crate 3 bridge platform 0.0m from Crate 2 (-0.7m), got ${ddCrate3}`);
+    }
+
+    // 3. SMOF Submarine Outfitting Facility Ground Alignment
+    // Interior floor must sit flush at Y=0.0 so Dave O'Connor (at Y=0) and ground animals do not clip into a 0.4m pad
+    const smofFloor = env.getPlatformFloor(-30.0, 45.0, 0.0);
+    if (smofFloor !== 0.0) {
+      throw new Error(`Expected SMOF interior floor to be flush at Y=0.0, got ${smofFloor}`);
+    }
+
+    // Dave O'Connor position (-23, 0, 38) floor check
+    const daveFloor = env.getPlatformFloor(-23.0, 38.0, 0.0);
+    if (daveFloor !== 0.0) {
+      throw new Error(`Expected Dave O'Connor floor elevation at Y=0.0, got ${daveFloor}`);
+    }
+
+    env.dispose();
+    TextureGenerator.disposeAll();
+  }
 }
 

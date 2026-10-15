@@ -1060,6 +1060,55 @@ export class GameEngine {
         }
       }
     }
+
+    // Check hit on Kingpin and surrounding rats
+    for (let i = 0; i < this.rats.length; i++) {
+      const rat = this.rats[i];
+      if (rat.state !== 'CAUGHT') {
+        const dist = rat.mesh.position.distanceTo(catPos);
+        if (dist < 2.5) {
+          if (rat.isKingpin) {
+            const killed = rat.takeDamage(1, (newPhase) => {
+              if (newPhase === 2) {
+                this.showNotification('👑 KINGPIN RETREATS!', 'Dockyard Kingpin retreats atop the Dry Dock 1 crate stack! Flank from high ground!', 'warn');
+                soundEngine.playRatPanic();
+              } else if (newPhase === 3) {
+                this.showNotification('👑 KINGPIN FRENZY!', 'Dockyard Kingpin enters Berserk Frenzy! Dodging serpentine charges required!', 'warn');
+                soundEngine.playRatPanic();
+              }
+            });
+            this.triggerHitFeedback(rat.mesh.position, true);
+            rat.isStunned = true;
+            rat.stunTimer = 1.6;
+            rat.attackCooldown = 2.5;
+            soundEngine.playRatCatch();
+
+            if (killed || rat.health <= 0) {
+              rat.state = 'CAUGHT';
+              rat.mesh.visible = false;
+              rat.scentTrailParticles.visible = false;
+              this.cat.triggerEat();
+              soundEngine.playSuccess();
+              this.vitals.feed(100);
+              this.vitals.currentStamina = this.vitals.maxStamina;
+              this.vitals.currentHealth = this.vitals.maxHealth;
+              this.progression.skillPoints += 1;
+              this.progression.addXP(150);
+
+              this.showNotification('👑 KINGPIN DEFEATED!', 'You defeated the Dockyard Kingpin with Tail Sweep! +1 Skill Point awarded & Vitals restored!', 'success');
+              this.missionManager.completeObjective('hunt_kingpin');
+              this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
+              this.eventBus.emit('combat:strikeKO', { victimName: rat.name, xpEarned: 150, isBoss: true });
+              this.onMissionObjectiveUpdated?.();
+              this.eventBus.emit('mission:objectiveUpdated', undefined);
+              this.showNotification('📜 CHAPTER 1 COMPLETE!', 'Next Work Order: Board Tugboat Dorothy (Hull No. 1, 1891) in the historic yard [M].', 'info');
+            } else {
+              this.showNotification('Boss Stunned!', `Dockyard Kingpin stunned by Tail Sweep! (${rat.health}/${rat.maxHealth} HP remaining)`, 'warn');
+            }
+          }
+        }
+      }
+    }
   }
 
   private setupAssistanceListeners() {
@@ -1214,12 +1263,12 @@ export class GameEngine {
 
       if ((rat.state as string) !== 'CAUGHT') {
         const dist = rat.mesh.position.distanceTo(catPos);
-        const catchThreshold = rat.isKingpin ? 2.8 : (this.physics.isPouncing ? 2.4 : 1.3);
 
-        if (dist < catchThreshold && (this.physics.isPouncing || dist < 1.3)) {
-          this.triggerHitFeedback(rat.mesh.position, rat.isKingpin);
-
-          if (rat.isKingpin) {
+        if (rat.isKingpin) {
+          // Kingpin Boss Combat:
+          // 1. Alba lands active airborne pounce on Kingpin
+          if (this.physics.isPouncing && dist < 1.8) {
+            this.triggerHitFeedback(rat.mesh.position, true);
             const killed = rat.takeDamage(1, (newPhase) => {
               if (newPhase === 2) {
                 this.showNotification('👑 KINGPIN RETREATS!', 'Dockyard Kingpin retreats atop the Dry Dock 1 crate stack! Flank from high ground!', 'warn');
@@ -1254,9 +1303,22 @@ export class GameEngine {
               this.eventBus.emit('mission:objectiveUpdated', undefined);
               this.showNotification('📜 CHAPTER 1 COMPLETE!', 'Next Work Order: Board Tugboat Dorothy (Hull No. 1, 1891) in the historic yard [M].', 'info');
             } else {
-              this.showNotification('Boss Hit!', `Dockyard Kingpin stunned! (${rat.health}/${rat.maxHealth} HP remaining)`, 'warn');
+              this.showNotification('Boss Hit!', `Dockyard Kingpin struck by pounce! (${rat.health}/${rat.maxHealth} HP remaining)`, 'warn');
             }
-          } else {
+          }
+          // 2. Contact Damage: Kingpin strikes Alba if close and not stunned
+          else if (dist < 1.6 && !rat.isStunned && rat.attackCooldown <= 0) {
+            rat.attackCooldown = 1.8;
+            this.vitals.takeDamage(12);
+            soundEngine.playCatHiss();
+            this.triggerHitFeedback(catPos, true);
+            this.showNotification('👑 KINGPIN ATTACKS!', 'The Dockyard Kingpin bit Alba! Dodge away or attack with Paw Swipe [J]!', 'warn');
+          }
+        } else {
+          // Standard Vermin Hunting (Mice / Small Rats)
+          const catchThreshold = this.physics.isPouncing ? 2.4 : 1.3;
+          if (dist < catchThreshold && (this.physics.isPouncing || dist < 1.3)) {
+            this.triggerHitFeedback(rat.mesh.position, false);
             rat.state = 'CAUGHT';
             rat.mesh.visible = false;
             rat.scentTrailParticles.visible = false;
@@ -1504,15 +1566,6 @@ export class GameEngine {
 
     // Mission 1: Wharf Rats & Historic Dry Dock 1
     if (mission.id === 1) {
-      if (mission.objectives[0] && !mission.objectives[0].isCompleted) {
-        if (catPos.distanceTo(GameEngine.DOROTHY_PROXIMITY_TARGET) < 14.0) {
-          this.missionManager.completeObjective('find_dorothy');
-          soundEngine.playSuccess();
-          this.showNotification('OBJECTIVE COMPLETE!', "You located Tugboat Dorothy! Now enter Historic Dry Dock 1.", 'success');
-          this.onMissionObjectiveUpdated?.();
-          this.eventBus.emit('mission:objectiveUpdated', undefined);
-        }
-      }
       if (mission.objectives[1] && !mission.objectives[1].isCompleted) {
         if (catPos.x >= 15.0 && catPos.x <= 44.0 && catPos.z >= -35.0 && catPos.z <= -20.0 && catPos.y <= -0.5) {
           this.missionManager.completeObjective('climb_dorothy');

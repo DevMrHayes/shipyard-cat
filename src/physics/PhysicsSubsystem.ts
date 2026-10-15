@@ -147,7 +147,7 @@ export class PhysicsSubsystem {
 
     // 2. Jump Handling
     if (input.jumpRequested && this.isGrounded && !this.isPouncing) {
-      const jumpPower = 6.2 * progression.jumpMultiplier;
+      const jumpPower = 7.8 * progression.jumpMultiplier;
       this.velocity.y = jumpPower;
       this.isGrounded = false;
       vitals.consumePounceStamina(10);
@@ -215,8 +215,8 @@ export class PhysicsSubsystem {
           this.isPouncing = false;
           this.pounceTimer = 0;
         }
-      } else if (heightDiff > 0.18 && heightDiff <= 0.75) {
-        // Smooth upward step-up (stairs, curbs, pallets, escape crates)
+      } else if (heightDiff > 0.18 && heightDiff <= 0.95) {
+        // Smooth upward step-up (stairs, curbs, pallets, tiered crates up to 0.95m)
         const stepSpeed = Math.max(9.5, this.currentSpeed * 2.8);
         this.position.y = Math.min(currentFloor, this.position.y + stepSpeed * dt);
         this.velocity.y = 0;
@@ -224,13 +224,13 @@ export class PhysicsSubsystem {
           this.isPouncing = false;
           this.pounceTimer = 0;
         }
-      } else if (heightDiff < -0.18 && heightDiff >= -0.75) {
+      } else if (heightDiff < -0.18 && heightDiff >= -0.95) {
         // Continuous downward slope & stair adherence without ungrounding
         const stepDownSpeed = Math.max(10.0, this.currentSpeed * 2.8);
         this.position.y = Math.max(currentFloor, this.position.y - stepDownSpeed * dt);
         this.velocity.y = 0;
-      } else if (heightDiff < -0.75) {
-        // True ledge drop-off (> 0.75m drop)
+      } else if (heightDiff < -0.95) {
+        // True ledge drop-off (> 0.95m drop)
         this.isGrounded = false;
         this.velocity.y = Math.min(0, this.velocity.y);
       } else {
@@ -238,8 +238,9 @@ export class PhysicsSubsystem {
         this.velocity.y = 0;
       }
     } else {
-      // Airborne: Check landing on platform surface or ground
-      if (this.position.y <= currentFloor) {
+      // Airborne: Check landing or feline ledge mantle onto platform surface
+      const canMantle = (currentFloor > this.position.y && (currentFloor - this.position.y) <= 0.35 && this.velocity.y <= 2.5);
+      if (this.position.y <= currentFloor || canMantle) {
         const fallSpeed = Math.abs(this.velocity.y);
         this.position.y = currentFloor;
         this.velocity.set(0, 0, 0);

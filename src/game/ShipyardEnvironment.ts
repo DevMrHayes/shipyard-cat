@@ -175,7 +175,7 @@ export class ShipyardEnvironment {
       for (let i = 0; i < count; i++) {
         const obs = obstaclesToTest[i];
         
-        if (resolved.y < obs.min.y - 0.05 || resolved.y >= obs.max.y - 0.05) continue;
+        if (resolved.y < obs.min.y - 0.05 || resolved.y >= obs.max.y - 0.38) continue;
 
         const minX = obs.min.x - radius;
         const maxX = obs.max.x + radius;
@@ -2180,21 +2180,21 @@ export class ShipyardEnvironment {
       metalness: 0.5
     });
 
-    // 1. Concrete Foundation Pad
+    // 1. Concrete Foundation Pad (Flush at ground level Y = 0.01 with polygonOffset to eliminate NPC/animal floor clipping)
+    const padMat = new THREE.MeshStandardMaterial({
+      color: 0x3e4249,
+      roughness: 0.9,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
     const pad = new THREE.Mesh(
-      new THREE.BoxGeometry(widthX + 4, 0.4, lengthZ + 4),
-      new THREE.MeshStandardMaterial({ color: 0x3e4249, roughness: 0.9 })
+      new THREE.BoxGeometry(widthX + 4, 0.02, lengthZ + 4),
+      padMat
     );
-    pad.position.set(centerX, 0.2, centerZ);
+    pad.position.set(centerX, 0.01, centerZ);
     pad.receiveShadow = true;
     smofGroup.add(pad);
-    this.platforms.push({
-      minX: centerX - widthX / 2 - 2,
-      maxX: centerX + widthX / 2 + 2,
-      minZ: centerZ - lengthZ / 2 - 2,
-      maxZ: centerZ + lengthZ / 2 + 2,
-      height: 0.4
-    });
 
     // 2. West Wall (Full Corrugated Exterior Enclosure)
     const westWall = new THREE.Mesh(new THREE.BoxGeometry(1.2, wallHeight, lengthZ), claddingMat);
@@ -2667,7 +2667,7 @@ export class ShipyardEnvironment {
     for (let i = 0; i < pCount; i++) {
       const p = this.platforms[i];
       if (x >= p.minX && x <= p.maxX && z >= p.minZ && z <= p.maxZ) {
-        if (currentY >= (p.height - 0.65)) {
+        if (currentY >= (p.height - 0.95)) {
           if (p.height > maxFloor) {
             maxFloor = p.height;
           }
@@ -2687,7 +2687,7 @@ export class ShipyardEnvironment {
           if (px >= 38.0 && px <= 45.5 && pz >= rz - 4.0 && pz <= rz + 4.0) {
             const rampProgress = (px - 38.0) / (45.5 - 38.0);
             const rampH = THREE.MathUtils.clamp(rampProgress * 1.4, 0.0, 1.4);
-            if (currentY >= (rampH - 0.65) && rampH > maxFloor) {
+            if (currentY >= (rampH - 0.95) && rampH > maxFloor) {
               maxFloor = rampH;
             }
           }
@@ -2696,7 +2696,7 @@ export class ShipyardEnvironment {
       for (let i = 0; i < pCount; i++) {
         const p = this.platforms[i];
         if (px >= p.minX && px <= p.maxX && pz >= p.minZ && pz <= p.maxZ) {
-          if (currentY >= (p.height - 0.65)) {
+          if (currentY >= (p.height - 0.95)) {
             if (p.height > maxFloor) {
               maxFloor = p.height;
             }
