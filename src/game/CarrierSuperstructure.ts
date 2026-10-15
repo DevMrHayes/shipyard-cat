@@ -161,10 +161,10 @@ export class CarrierSuperstructure {
     gangwayGroup.name = 'CVN80_FlightDeck_Gangway';
 
     // In local coordinates of cvnGroup (origin = 20.5, -2.5, 32.0):
-    // Yard rim is at X = 12.5 (local X = 12.5 - 20.5 = -8.0), local Y = 2.5 (world Y = 0.0), Z = 12.0
-    // Flight deck edge is at local X = -4.0, local Y = 5.75 (world Y = 3.25), Z = 12.0
-    const startLocal = new THREE.Vector3(-8.2, 2.5, 12.0);
-    const endLocal = new THREE.Vector3(-4.0, 5.75, 12.0);
+    // Dock West rim (yard apron) is at world X = 5.0 (local X = 5.0 - 20.5 = -15.5), world Y = 0.0 (local Y = 2.5), Z = 44.0 (local Z = 12.0)
+    // Flight deck edge is at world X = 12.5 (local X = 12.5 - 20.5 = -8.0), world Y = 3.25 (local Y = 5.75), Z = 44.0 (local Z = 12.0)
+    const startLocal = new THREE.Vector3(-15.5, 2.5, 12.0);
+    const endLocal = new THREE.Vector3(-8.0, 5.75, 12.0);
 
     const delta = new THREE.Vector3().subVectors(endLocal, startLocal);
     const spanLen = delta.length();
@@ -214,14 +214,14 @@ export class CarrierSuperstructure {
 
     root.add(gangwayGroup);
 
-    // Register climbable ramp platform for smooth cat ascent
+    // Register climbable ramp platform for smooth cat ascent from yard rim (X=5.0) to deck (X=12.5)
     if (this.registerPlatform) {
-      const worldStartX = this.origin.x + startLocal.x; // 12.3
-      const worldEndX = this.origin.x + endLocal.x;     // 16.5
+      const worldStartX = this.origin.x + startLocal.x; // 5.0
+      const worldEndX = this.origin.x + endLocal.x;     // 12.5
       const worldZ = this.origin.z + 12.0;              // 44.0
 
-      // Stepped ramp platform surfaces (4 segments)
-      const numRampSteps = 4;
+      // Stepped ramp platform surfaces (8 segments for fine feline elevation tracking)
+      const numRampSteps = 8;
       const stepDistX = (worldEndX - worldStartX) / numRampSteps;
       const stepRiseY = 3.25 / numRampSteps;
 

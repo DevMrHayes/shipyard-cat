@@ -44,6 +44,7 @@ export class RenderSubsystem {
   public hemiLight: THREE.HemisphereLight;
   public sunLight: THREE.DirectionalLight;
   public fillLight: THREE.DirectionalLight;
+  public ambientLight!: THREE.AmbientLight;
   public southYardFlood: THREE.SpotLight;
   public dryDockFlood: THREE.SpotLight;
   public subShopFlood: THREE.SpotLight;
@@ -68,6 +69,7 @@ export class RenderSubsystem {
       this.hemiLight.color.setHex(0x1e293b);
       this.hemiLight.groundColor.setHex(0x020617);
       this.hemiLight.intensity = 0.35;
+      if (this.ambientLight) this.ambientLight.intensity = 0.2;
 
       this.sunLight.color.setHex(0x60a5fa);
       this.sunLight.intensity = 0.35;
@@ -225,6 +227,7 @@ export class RenderSubsystem {
 
     // 4B. Diurnal Celestial & Shift Progression System
     const ambientFallback = new THREE.AmbientLight(0xffffff, 0.4);
+    this.ambientLight = ambientFallback;
     scene.add(ambientFallback);
     this.diurnalSystem = new DiurnalSystem(
       scene,
