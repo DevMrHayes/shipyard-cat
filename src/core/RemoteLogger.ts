@@ -5,7 +5,7 @@
  */
 
 export interface RemoteLogPayload {
-  type: 'ERROR' | 'UNHANDLED_REJECTION' | 'WEBGL_CONTEXT_LOST' | 'WEBGL_CONTEXT_RESTORED' | 'FREEZE_SPIKE' | 'SHADER_WARN' | 'INFO';
+  type: 'ERROR' | 'UNHANDLED_REJECTION' | 'WEBGL_CONTEXT_LOST' | 'WEBGL_CONTEXT_RESTORED' | 'FREEZE_SPIKE' | 'SHADER_WARN' | 'CLIPPING_ALERT' | 'PHYSICS_WARN' | 'INFO';
   message: string;
   source?: string;
   lineno?: number;
@@ -50,6 +50,31 @@ export class RemoteLogger {
       });
     });
 
+    // 3. Intercept Console Errors and Warnings for Real-Time Runtime Auditing
+    const originalConsoleError = console.error;
+    console.error = (...args: any[]) => {
+      originalConsoleError.apply(console, args);
+      const msg = args.map(a => (typeof a === 'object' ? (a?.message || JSON.stringify(a)) : String(a))).join(' ');
+      const key = `err_${msg.slice(0, 60)}`;
+      if (!this.recentMessages.has(key)) {
+        this.recentMessages.add(key);
+        setTimeout(() => this.recentMessages.delete(key), 3000);
+        this.send({ type: 'ERROR', message: msg });
+      }
+    };
+
+    const originalConsoleWarn = console.warn;
+    console.warn = (...args: any[]) => {
+      originalConsoleWarn.apply(console, args);
+      const msg = args.map(a => (typeof a === 'object' ? (a?.message || JSON.stringify(a)) : String(a))).join(' ');
+      const key = `warn_${msg.slice(0, 60)}`;
+      if (!this.recentMessages.has(key)) {
+        this.recentMessages.add(key);
+        setTimeout(() => this.recentMessages.delete(key), 3000);
+        this.send({ type: 'SHADER_WARN', message: msg });
+      }
+    };
+
     // Initial boot heartbeat
     this.send({
       type: 'INFO',
@@ -88,6 +113,29 @@ export class RemoteLogger {
     this.send({
       type: 'FREEZE_SPIKE',
       message: `[Freeze Spike] Frame #${incident.frameTick}: '${incident.culpritSection}' took ${incident.sectionDurationMs}ms (Total Frame: ${incident.totalFrameMs}ms)`,
+      details: incident
+    });
+  }
+
+  /**
+   * Logs collision clipping, penetration into obstacles, or floor drop-throughs
+   */
+  public static logClippingIncident(incident: {
+    type: 'OBSTACLE_PENETRATION' | 'FLOOR_VOID_DROP' | 'PLATFORM_CLIPPING' | 'STUCK_IN_GEOMETRY';
+    message: string;
+    position: { x: number; y: number; z: number };
+    floorElevation?: number;
+    obstacleName?: string;
+    penetrationDepth?: number;
+  }): void {
+    const key = `${incident.type}_${incident.obstacleName || 'floor'}_${Math.round(incident.position.x * 2)}_${Math.round(incident.position.z * 2)}`;
+    if (this.recentMessages.has(key)) return;
+    this.recentMessages.add(key);
+    setTimeout(() => this.recentMessages.delete(key), 2500);
+
+    this.send({
+      type: 'CLIPPING_ALERT',
+      message: `[Clipping Alert] ${incident.message}`,
       details: incident
     });
   }

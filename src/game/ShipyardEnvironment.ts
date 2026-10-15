@@ -4,6 +4,7 @@ import { SpatialHashGrid } from '../core/SpatialHashGrid';
 import { StylizedWater } from '../graphics/StylizedWater';
 import { SeagullFlock } from '../game/SeagullFlock';
 import { ToonMaterialFactory } from '../graphics/ToonMaterialFactory';
+import { RemoteLogger } from '../core/RemoteLogger';
 
 export interface SolidObstacle {
   min: THREE.Vector3;
@@ -212,6 +213,17 @@ export class ShipyardEnvironment {
           const penRight = maxX - resolved.x;
           const penNear = resolved.z - minZ;
           const penFar = maxZ - resolved.z;
+          const minPen = Math.min(penLeft, penRight, penNear, penFar);
+
+          if (minPen > 0.20 && typeof window !== 'undefined') {
+            RemoteLogger.logClippingIncident({
+              type: 'OBSTACLE_PENETRATION',
+              message: `Deep penetration (${minPen.toFixed(2)}m) into '${obs.name || 'Obstacle'}' at (${resolved.x.toFixed(2)}, ${resolved.y.toFixed(2)}, ${resolved.z.toFixed(2)}). Resolved collision.`,
+              position: { x: resolved.x, y: resolved.y, z: resolved.z },
+              obstacleName: obs.name,
+              penetrationDepth: minPen
+            });
+          }
 
           if (previousPos) {
             const prevSafeX = previousPos.x <= minX || previousPos.x >= maxX;

@@ -4,6 +4,7 @@ import { ProgressionSystem } from '../core/ProgressionSystem';
 import { ShipyardEnvironment } from '../game/ShipyardEnvironment';
 import { PounceTargetCandidate } from '../game/GameEngine';
 import { soundEngine } from '../core/SoundEngine';
+import { RemoteLogger } from '../core/RemoteLogger';
 
 export interface PhysicsInputState {
   driveInput: number;
@@ -241,6 +242,15 @@ export class PhysicsSubsystem {
       // Airborne: Check landing or feline ledge mantle onto platform surface
       const canMantle = (currentFloor > this.position.y && (currentFloor - this.position.y) <= 0.35 && this.velocity.y <= 2.5);
       if (this.position.y <= currentFloor || canMantle) {
+        if (this.position.y < currentFloor - 0.25 && !this.isPouncing && typeof window !== 'undefined') {
+          RemoteLogger.logClippingIncident({
+            type: 'PLATFORM_CLIPPING',
+            message: `Alba dropped below platform elevation (${currentFloor.toFixed(2)}m) at Y=${this.position.y.toFixed(2)}m. Restoring to platform surface.`,
+            position: { x: this.position.x, y: this.position.y, z: this.position.z },
+            floorElevation: currentFloor
+          });
+        }
+
         const fallSpeed = Math.abs(this.velocity.y);
         this.position.y = currentFloor;
         this.velocity.set(0, 0, 0);
@@ -294,6 +304,14 @@ export class PhysicsSubsystem {
     const isInsideDD1 = (this.position.x >= 15.0 && this.position.x <= 44.5 && this.position.z >= -36.0 && this.position.z <= -19.0);
     const isInsideDD12 = (this.position.x >= 5.0 && this.position.x <= 35.0 && this.position.z >= 10.0 && this.position.z <= 80.0);
     if (!isInsideDD1 && !isInsideDD12 && this.position.y < 0.0) {
+      if (this.position.y < -0.05 && typeof window !== 'undefined') {
+        RemoteLogger.logClippingIncident({
+          type: 'FLOOR_VOID_DROP',
+          message: `Alba dropped below ground floor at (${this.position.x.toFixed(2)}, ${this.position.y.toFixed(2)}, ${this.position.z.toFixed(2)})! Clamped to Y=0.0m.`,
+          position: { x: this.position.x, y: this.position.y, z: this.position.z },
+          floorElevation: 0.0
+        });
+      }
       this.position.y = 0.0;
       this.velocity.y = Math.max(0, this.velocity.y);
       this.isGrounded = true;
