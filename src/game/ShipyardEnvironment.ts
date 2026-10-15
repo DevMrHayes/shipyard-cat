@@ -390,37 +390,50 @@ export class ShipyardEnvironment {
     this.group.add(this.groundMesh);
 
     // 1. INSTANCED RAILWAY TIES & STEEL TIE PLATES (Saves ~150 WebGL Draw Calls)
-    const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.85, roughness: 0.25 });
+    const railMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.85,
+      roughness: 0.25,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
     const tieMat = new THREE.MeshStandardMaterial({
       map: TextureGenerator.createPierWoodTexture(),
       normalMap: TextureGenerator.createPierWoodNormalTexture(),
       roughness: 0.85,
-      metalness: 0.05
+      metalness: 0.05,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
     const tiePlateMat = new THREE.MeshStandardMaterial({
       color: 0x334155,
       metalness: 0.9,
-      roughness: 0.25
+      roughness: 0.25,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
 
     const railGroup = new THREE.Group();
-    // South Track Segment (Z: -120 to 8.0m, solid shipyard concrete ground)
-    const railSouthGeo = new THREE.BoxGeometry(0.16, 0.22, 128);
+    // South Track Segment (Embedded flush grade-level rails on solid shipyard concrete ground)
+    const railSouthGeo = new THREE.BoxGeometry(0.12, 0.02, 128);
     const rail1South = new THREE.Mesh(railSouthGeo, railMat);
-    rail1South.position.set(8.2, 0.1, -56.0);
-    rail1South.castShadow = true;
+    rail1South.position.set(8.2, 0.01, -56.0);
+    rail1South.receiveShadow = true;
     const rail2South = new THREE.Mesh(railSouthGeo, railMat);
-    rail2South.position.set(10.8, 0.1, -56.0);
-    rail2South.castShadow = true;
+    rail2South.position.set(10.8, 0.01, -56.0);
+    rail2South.receiveShadow = true;
 
-    // North Track Segment (Z: 82.0 to 120m, solid north shipyard apron)
-    const railNorthGeo = new THREE.BoxGeometry(0.16, 0.22, 38);
+    // North Track Segment (Embedded flush grade-level rails on solid north shipyard apron)
+    const railNorthGeo = new THREE.BoxGeometry(0.12, 0.02, 38);
     const rail1North = new THREE.Mesh(railNorthGeo, railMat);
-    rail1North.position.set(8.2, 0.1, 101.0);
-    rail1North.castShadow = true;
+    rail1North.position.set(8.2, 0.01, 101.0);
+    rail1North.receiveShadow = true;
     const rail2North = new THREE.Mesh(railNorthGeo, railMat);
-    rail2North.position.set(10.8, 0.1, 101.0);
-    rail2North.castShadow = true;
+    rail2North.position.set(10.8, 0.01, 101.0);
+    rail2North.receiveShadow = true;
 
     railGroup.add(rail1South, rail2South, rail1North, rail2North);
 
@@ -465,12 +478,12 @@ export class ShipyardEnvironment {
       }
     }
 
-    const tieGeo = new THREE.BoxGeometry(3.6, 0.14, 0.32);
+    const tieGeo = new THREE.BoxGeometry(3.6, 0.015, 0.32);
     const instancedTies = new THREE.InstancedMesh(tieGeo, tieMat, tieZPositions.length);
     const dummyMatrix = new THREE.Matrix4();
 
     tieZPositions.forEach((z, i) => {
-      dummyMatrix.setPosition(9.5, 0.04, z);
+      dummyMatrix.setPosition(9.5, 0.0075, z);
       instancedTies.setMatrixAt(i, dummyMatrix);
     });
     instancedTies.instanceMatrix.needsUpdate = true;
@@ -478,13 +491,13 @@ export class ShipyardEnvironment {
     railGroup.add(instancedTies);
 
     // Track Tie Plates (under each rail at X: 8.2 and X: 10.8 for each solid ground tie)
-    const tiePlateGeo = new THREE.BoxGeometry(0.36, 0.03, 0.28);
+    const tiePlateGeo = new THREE.BoxGeometry(0.36, 0.015, 0.28);
     const instancedTiePlates = new THREE.InstancedMesh(tiePlateGeo, tiePlateMat, tieZPositions.length * 2);
     let plateIdx = 0;
     tieZPositions.forEach((z) => {
-      dummyMatrix.setPosition(8.2, 0.09, z);
+      dummyMatrix.setPosition(8.2, 0.012, z);
       instancedTiePlates.setMatrixAt(plateIdx++, dummyMatrix);
-      dummyMatrix.setPosition(10.8, 0.09, z);
+      dummyMatrix.setPosition(10.8, 0.012, z);
       instancedTiePlates.setMatrixAt(plateIdx++, dummyMatrix);
     });
     instancedTiePlates.instanceMatrix.needsUpdate = true;

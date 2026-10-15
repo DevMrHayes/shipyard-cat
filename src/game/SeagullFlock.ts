@@ -37,7 +37,7 @@ export class SeagullFlock {
       new THREE.Vector3(55.5, 2.3, 0),    // Pier Bollard Mid
       new THREE.Vector3(55.5, 2.3, 20),   // Pier Bollard North
       new THREE.Vector3(45.0, 1.9, -60),  // Boarding Ramp Post
-      new THREE.Vector3(-15.0, 0.9, -18), // Dorothy Tugboat Capstan
+      new THREE.Vector3(-18.5, 5.5, -22.0), // Tugboat Dorothy Wheelhouse Mast (cleared away from Mo Kelly welding cart)
       new THREE.Vector3(13.8, 0.9, -27.5) // Dry Dock 1 Basin Rim
     ];
 
