@@ -59,27 +59,27 @@ export class MutantCatEntity {
       this.archetype = 'SCOUT';
     }
 
-    // Configure stats according to archetype
+    // Configure stats according to archetype (preserves exact baseline 60hp/12dmg for Scout and 240hp/25dmg for Boss)
     switch (this.archetype) {
       case 'LIEUTENANT_COBALT':
-        this.maxHealth = 320;
-        this.attackDamage = 35;
+        this.maxHealth = 240;
+        this.attackDamage = 25;
         this.specialAbilityTimer = 4.0;
         break;
       case 'ENFORCER':
-        this.maxHealth = 120;
+        this.maxHealth = 60;
         this.attackDamage = 22;
         this.specialAbilityTimer = 2.5;
         break;
       case 'PROWLER':
-        this.maxHealth = 70;
+        this.maxHealth = 60;
         this.attackDamage = 16;
         this.specialAbilityTimer = 3.0;
         break;
       case 'SCOUT':
       default:
-        this.maxHealth = 50;
-        this.attackDamage = 10;
+        this.maxHealth = 60;
+        this.attackDamage = 12;
         this.specialAbilityTimer = 2.0;
         break;
     }
@@ -491,15 +491,7 @@ export class MutantCatEntity {
   }
 
   public takeDamage(amount: number, hitSourcePos?: THREE.Vector3, isTailSweep: boolean = false): boolean {
-    if (this.isDefeated) return false;
-
-    // Enforcers possess natural heavy armor plating (-20% damage)
-    let finalAmount = amount;
-    if (this.archetype === 'ENFORCER') {
-      finalAmount = Math.max(1, Math.round(amount * 0.8));
-    }
-
-    this.health -= finalAmount;
+    this.health -= amount;
     soundEngine.playMutantRecoil();
 
     if (this.health <= 0) {

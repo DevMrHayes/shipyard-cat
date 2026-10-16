@@ -667,6 +667,8 @@ export class PlaytestHarness {
     observations.push(`--- ACT 2: MISSION 4 (${m4.title}) ---`);
     if (m4.id !== 4) throw new Error('Failed to advance to Mission 4');
 
+    mm.completeObjective('board_cvn80_deck');
+    mm.completeObjective('patrol_catapult_island');
     mm.completeObjective('enter_crane_lift');
     mm.completeObjective('trip_crane_breaker');
     prog.addXP(220);

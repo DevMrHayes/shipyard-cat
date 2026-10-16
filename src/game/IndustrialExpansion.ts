@@ -43,8 +43,11 @@ export class IndustrialExpansion {
     this.buildAircraftCarrierModularZone();
 
     // Phase 3 World Interactivity & Interior Environments
-    this.interiorSpacesBuilder = new InteriorSpacesBuilder(this.platforms);
+    this.interiorSpacesBuilder = new InteriorSpacesBuilder();
     this.group.add(this.interiorSpacesBuilder.group);
+    if (this.interiorSpacesBuilder.platforms && this.interiorSpacesBuilder.platforms.length > 0) {
+      this.platforms.push(...this.interiorSpacesBuilder.platforms);
+    }
   }
 
   /**
