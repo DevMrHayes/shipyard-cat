@@ -2,6 +2,26 @@ import * as THREE from 'three';
 import { ModelManager } from '../core/ModelManager';
 import { soundEngine } from '../core/SoundEngine';
 
+export type MutantArchetype = 'SCOUT' | 'PROWLER' | 'ENFORCER' | 'BOSS' | 'STANDARD';
+
+export interface MutantCombatProfile {
+  archetype: MutantArchetype;
+  moveSpeed: number;
+  patrolSpeed: number;
+  patrolRadius: number;
+  aggroDistance: number;
+  attackRange: number;
+  attackCooldownMax: number;
+  windupDuration: number;
+  heavyKnockback: boolean;
+  knockbackForce: number;
+  pulseRadius: number;
+  pulseCooldownMax: number;
+  pulseDamage: number;
+  eyeEmissiveColor: number;
+  spineColor: number;
+}
+
 export class MutantCatEntity {
   public mesh: THREE.Group;
   public name: string;
@@ -28,14 +48,30 @@ export class MutantCatEntity {
   public isBoss: boolean;
   public attackDamage: number;
 
+  // Archetype & Phase 3 Combat Depth Attributes
+  public readonly archetype: MutantArchetype;
+  public readonly profile: MutantCombatProfile;
+  public attackWindupTimer: number = 0;
+  public isWindup: boolean = false;
+  public pulseCooldown: number = 0;
+  public lastPulseTriggered: boolean = false;
+  private visualSpineGroup: THREE.Group | null = null;
+  private visualGlowEyes: THREE.Mesh[] = [];
+
   constructor(name: string, position: THREE.Vector3, isBoss: boolean = false) {
     this.name = name;
     this.spawnOrigin = position.clone();
     this.patrolOrigin = position.clone();
-    this.isBoss = isBoss;
-    this.maxHealth = isBoss ? 240 : 60;
+
+    // Determine archetype based on entity name and boss flag
+    this.archetype = MutantCatEntity.resolveArchetype(name, isBoss);
+    this.isBoss = isBoss || this.archetype === 'BOSS';
+    this.profile = MutantCatEntity.buildCombatProfile(this.archetype, this.isBoss);
+
+    this.maxHealth = this.isBoss ? 240 : (this.archetype === 'ENFORCER' ? 95 : (this.archetype === 'SCOUT' ? 45 : 60));
     this.health = this.maxHealth;
-    this.attackDamage = isBoss ? 25 : 12;
+    this.attackDamage = this.isBoss ? 25 : (this.archetype === 'ENFORCER' ? 18 : (this.archetype === 'SCOUT' ? 9 : 12));
+
     this.mesh = new THREE.Group();
     this.mesh.position.copy(position);
 
@@ -46,14 +82,15 @@ export class MutantCatEntity {
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
       this.readyPromise = ModelManager.loadCatModel().then((gltf) => {
         this.gltfModel = gltf.scene;
-        // Imposing mutant scale (2.1x)
-        this.gltfModel.scale.set(2.1, 2.1, 2.1);
+        // Imposing mutant scale (scale adjustments per archetype)
+        const scaleMult = this.isBoss ? 2.35 : (this.archetype === 'ENFORCER' ? 2.25 : (this.archetype === 'SCOUT' ? 1.85 : 2.1));
+        this.gltfModel.scale.set(scaleMult, scaleMult, scaleMult);
         this.gltfModel.position.set(0, 0, 0);
 
         const mutantFurMat = new THREE.MeshStandardMaterial({
-          color: 0x1f242b, // Realistically gritty charred ash/charcoal shipyard stray coat
+          color: this.isBoss ? 0x161d27 : (this.archetype === 'SCOUT' ? 0x272c33 : 0x1f242b), // Charred ash / cobalt sheen
           roughness: 0.88,
-          metalness: 0.15,
+          metalness: this.isBoss ? 0.35 : 0.15,
           side: THREE.DoubleSide
         });
 
@@ -98,42 +135,51 @@ export class MutantCatEntity {
       this.buildProceduralMutant(proceduralGroup);
     }
 
-    // Persistent 3D Mutant Identifiers (visible on both GLTF and procedural models: glowing green tapetum eyes + dorsal spines)
+    // Persistent 3D Mutant Identifiers (visible on both GLTF and procedural models: glowing tapetum eyes + dorsal spines)
     const mutantIdentifierGroup = new THREE.Group();
+    this.visualSpineGroup = mutantIdentifierGroup;
+
     const spineMat = new THREE.MeshStandardMaterial({
-      color: 0x84cc16,
-      emissive: 0x65a30d,
-      emissiveIntensity: 1.4,
+      color: this.profile.spineColor,
+      emissive: this.profile.eyeEmissiveColor,
+      emissiveIntensity: this.isBoss ? 1.8 : 1.4,
       roughness: 0.25,
       metalness: 0.3
     });
+
+    const spineScale = this.archetype === 'ENFORCER' ? 1.35 : (this.archetype === 'SCOUT' ? 0.75 : 1.0);
     const spinePositions = [
-      { z: 0.12, y: 0.56, s: 1.0, tilt: -0.25 },
-      { z: -0.04, y: 0.58, s: 1.15, tilt: -0.35 },
-      { z: -0.20, y: 0.53, s: 0.85, tilt: -0.45 }
+      { z: 0.12, y: 0.56, s: 1.0 * spineScale, tilt: -0.25 },
+      { z: -0.04, y: 0.58, s: 1.15 * spineScale, tilt: -0.35 },
+      { z: -0.20, y: 0.53, s: 0.85 * spineScale, tilt: -0.45 }
     ];
+
     for (const sp of spinePositions) {
       const spine = new THREE.Mesh(new THREE.ConeGeometry(0.032 * sp.s, 0.14 * sp.s, 5), spineMat);
       spine.position.set(0, sp.y, sp.z);
       spine.rotation.x = sp.tilt;
       mutantIdentifierGroup.add(spine);
     }
-    const glowEyeGeo = new THREE.SphereGeometry(0.028, 8, 8);
+
+    const glowEyeGeo = new THREE.SphereGeometry(this.archetype === 'SCOUT' ? 0.024 : 0.028, 8, 8);
     const glowEyeL = new THREE.Mesh(glowEyeGeo, spineMat);
     glowEyeL.position.set(0.07, 0.52, 0.38);
     const glowEyeR = new THREE.Mesh(glowEyeGeo, spineMat);
     glowEyeR.position.set(-0.07, 0.52, 0.38);
     mutantIdentifierGroup.add(glowEyeL, glowEyeR);
+    this.visualGlowEyes.push(glowEyeL, glowEyeR);
+
     this.mesh.add(mutantIdentifierGroup);
 
     // Eye PointLight (kept allocated for API compatibility)
-    this.eyeLight = new THREE.PointLight(0x84cc16, 1.2, 5);
+    this.eyeLight = new THREE.PointLight(this.profile.eyeEmissiveColor, this.isBoss ? 1.8 : 1.2, this.isBoss ? 7 : 5);
     this.eyeLight.position.set(0.5, 0.5, 0);
 
     // Radioactive Whiskers Aura (Subtle 0.12 base opacity so mutants have an unmistakable 3D silhouette, brighter in Whiskers Mode)
-    const auraGeo = new THREE.SphereGeometry(0.7, 12, 12);
+    const auraRadius = this.isBoss ? 1.2 : (this.archetype === 'ENFORCER' ? 0.85 : 0.7);
+    const auraGeo = new THREE.SphereGeometry(auraRadius, 12, 12);
     const auraMat = new THREE.MeshBasicMaterial({
-      color: 0x84cc16,
+      color: this.profile.spineColor,
       wireframe: true,
       transparent: true,
       opacity: 0.0
@@ -151,27 +197,145 @@ export class MutantCatEntity {
       ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
       ctx.roundRect(10, 10, 236, 44, 10);
       ctx.fill();
-      ctx.strokeStyle = '#84cc16';
+
+      const hexColor = '#' + this.profile.spineColor.toString(16).padStart(6, '0');
+      ctx.strokeStyle = hexColor;
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.font = 'bold 20px Courier New';
-      ctx.fillStyle = '#a3e635';
+      ctx.fillStyle = hexColor;
       ctx.textAlign = 'center';
       ctx.fillText('☣ ' + this.name, 128, 38);
 
       const texture = new THREE.CanvasTexture(canvas);
       const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
       const sprite = new THREE.Sprite(spriteMat);
-      sprite.position.set(0, 1.1, 0);
+      sprite.position.set(0, 1.15, 0);
       sprite.scale.set(1.6, 0.4, 1);
       this.mesh.add(sprite);
+    }
+  }
+
+  public static resolveArchetype(name: string, isBoss: boolean): MutantArchetype {
+    if (isBoss || name.toLowerCase().includes('cobalt') || name.toLowerCase().includes('boss')) {
+      return 'BOSS';
+    }
+    const lower = name.toLowerCase();
+    if (lower.includes('fang') || lower.includes('scout')) {
+      return 'SCOUT';
+    }
+    if (lower.includes('prowler') || lower.includes('alpha')) {
+      return 'PROWLER';
+    }
+    if (lower.includes('enforcer') || lower.includes('mezzanine') || lower.includes('heavy')) {
+      return 'ENFORCER';
+    }
+    return 'STANDARD';
+  }
+
+  public static buildCombatProfile(archetype: MutantArchetype, isBoss: boolean): MutantCombatProfile {
+    if (isBoss || archetype === 'BOSS') {
+      return {
+        archetype: 'BOSS',
+        moveSpeed: 3.4,
+        patrolSpeed: 1.6,
+        patrolRadius: 6.0,
+        aggroDistance: 16.0,
+        attackRange: 1.6,
+        attackCooldownMax: 1.6,
+        windupDuration: 0.35,
+        heavyKnockback: true,
+        knockbackForce: 4.8,
+        pulseRadius: 4.2,
+        pulseCooldownMax: 5.5,
+        pulseDamage: 14,
+        eyeEmissiveColor: 0x38bdf8, // Deep isotopic cobalt cyan
+        spineColor: 0x0284c7
+      };
+    }
+
+    switch (archetype) {
+      case 'SCOUT': // Fast ambush dash, low health, quick hits
+        return {
+          archetype: 'SCOUT',
+          moveSpeed: 5.6,
+          patrolSpeed: 2.4,
+          patrolRadius: 4.5,
+          aggroDistance: 13.5,
+          attackRange: 1.25,
+          attackCooldownMax: 0.75,
+          windupDuration: 0.15,
+          heavyKnockback: false,
+          knockbackForce: 1.2,
+          pulseRadius: 0,
+          pulseCooldownMax: 0,
+          pulseDamage: 0,
+          eyeEmissiveColor: 0xfacc15, // Amber vigilance
+          spineColor: 0xeab308
+        };
+      case 'ENFORCER': // Heavy tanky bruiser with telegraphed slam knockback
+        return {
+          archetype: 'ENFORCER',
+          moveSpeed: 2.9,
+          patrolSpeed: 1.3,
+          patrolRadius: 3.0,
+          aggroDistance: 11.0,
+          attackRange: 1.7,
+          attackCooldownMax: 1.8,
+          windupDuration: 0.55,
+          heavyKnockback: true,
+          knockbackForce: 5.5,
+          pulseRadius: 0,
+          pulseCooldownMax: 0,
+          pulseDamage: 0,
+          eyeEmissiveColor: 0xef4444, // Crimson enforcer glare
+          spineColor: 0xdc2626
+        };
+      case 'PROWLER': // Stalker with wide perimeter stealth circling
+        return {
+          archetype: 'PROWLER',
+          moveSpeed: 4.2,
+          patrolSpeed: 2.0,
+          patrolRadius: 6.5,
+          aggroDistance: 14.0,
+          attackRange: 1.45,
+          attackCooldownMax: 1.1,
+          windupDuration: 0.25,
+          heavyKnockback: false,
+          knockbackForce: 2.0,
+          pulseRadius: 0,
+          pulseCooldownMax: 0,
+          pulseDamage: 0,
+          eyeEmissiveColor: 0xa855f7, // Violet prowler tapetum
+          spineColor: 0x9333ea
+        };
+      case 'STANDARD':
+      default:
+        return {
+          archetype: 'STANDARD',
+          moveSpeed: 3.8,
+          patrolSpeed: 1.8,
+          patrolRadius: 3.5,
+          aggroDistance: 12.0,
+          attackRange: 1.4,
+          attackCooldownMax: 1.2,
+          windupDuration: 0.2,
+          heavyKnockback: false,
+          knockbackForce: 2.2,
+          pulseRadius: 0,
+          pulseCooldownMax: 0,
+          pulseDamage: 0,
+          eyeEmissiveColor: 0xa3e635, // Classic irradiated lime
+          spineColor: 0x84cc16
+        };
     }
   }
 
   private buildProceduralMutant(group: THREE.Group) {
     group.rotation.y = -Math.PI / 2;
     // Mutant Cat Body (Dark mottled ash/charcoal fur, larger frame)
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1f242b, roughness: 0.88 });
+    const bodyColor = this.isBoss ? 0x161d27 : (this.archetype === 'SCOUT' ? 0x272c33 : 0x1f242b);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.88 });
     const clawMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 });
     const bodyGeo = new THREE.CapsuleGeometry(0.18, 0.55, 8, 12);
     bodyGeo.rotateZ(Math.PI / 2);
@@ -223,10 +387,10 @@ export class MutantCatEntity {
     createMutantLeg(false, true);
     createMutantLeg(false, false);
 
-    // Radioactive Glowing Yellow-Green Tapetum Eyes
+    // Radioactive Glowing Tapetum Eyes matching Archetype palette
     const eyeMat = new THREE.MeshStandardMaterial({
-      color: 0x84cc16,
-      emissive: 0xa3e635,
+      color: this.profile.spineColor,
+      emissive: this.profile.eyeEmissiveColor,
       emissiveIntensity: 1.5,
       roughness: 0.2
     });
@@ -255,6 +419,9 @@ export class MutantCatEntity {
 
     if (this.attackCooldown > 0) {
       this.attackCooldown -= deltaTime;
+    }
+    if (this.pulseCooldown > 0) {
+      this.pulseCooldown -= deltaTime;
     }
 
     const prevPos = MutantCatEntity.scratchPrevPos.copy(this.mesh.position);
@@ -289,6 +456,8 @@ export class MutantCatEntity {
         this.mesh.rotation.x = 0;
         if (this.gltfModel) this.gltfModel.position.y = 0;
         this.attackCooldown = 0.9; // Brief recovery before next swipe
+        this.isWindup = false;
+        this.attackWindupTimer = 0;
       }
       return;
     }
@@ -300,7 +469,7 @@ export class MutantCatEntity {
       let targetAnim = this.animations['walk'];
       if (this.isDefeated) {
         // Stop animation
-      } else if (distToPlayer < 1.4 && this.attackCooldown > 0.8) {
+      } else if (distToPlayer < this.profile.attackRange && (this.attackCooldown > 0.8 || this.isWindup)) {
         targetAnim = this.animations['attack'] || this.animations['run'] || this.animations['walk'];
       } else if (distToPlayer < 7.0) {
         targetAnim = this.animations['run'] || this.animations['walk'];
@@ -313,12 +482,61 @@ export class MutantCatEntity {
       }
     }
 
-    if (distToPlayer < 12.0) {
-      // Aggro on Alba! Stalk and charge
+    // Archetype-Specific Combat Mechanics & Aggro Behavior
+    if (distToPlayer < this.profile.aggroDistance) {
       this.state = 'HOSTILE';
-      const dir = MutantCatEntity.scratchDir.subVectors(playerPos, this.mesh.position).normalize();
+
+      // Lieutenant Cobalt Boss: Radiation Pulse Shockwave
+      if (this.archetype === 'BOSS' && this.pulseCooldown <= 0 && distToPlayer <= this.profile.pulseRadius) {
+        this.pulseCooldown = this.profile.pulseCooldownMax;
+        this.lastPulseTriggered = true;
+        // Visual tell: burst aura pulse
+        (this.radioactiveAura.material as THREE.MeshBasicMaterial).opacity = 1.0;
+        onAttackPlayer?.(this.profile.pulseDamage);
+      } else if (this.pulseCooldown < this.profile.pulseCooldownMax - 0.4) {
+        this.lastPulseTriggered = false;
+      }
+
+      const dir = MutantCatEntity.scratchDir.subVectors(playerPos, this.mesh.position);
       dir.y = 0;
-      const newPos = MutantCatEntity.scratchNewPos.copy(this.mesh.position).addScaledVector(dir, 3.8 * deltaTime);
+      const actualDist = dir.length();
+      if (actualDist > 0.001) {
+        dir.divideScalar(actualDist);
+      }
+
+      // Windup Visual Tell Handling
+      if (this.isWindup) {
+        this.attackWindupTimer -= deltaTime;
+        // Visual tell: crouch / rear back with shudder
+        const windupProgress = 1.0 - (this.attackWindupTimer / Math.max(0.01, this.profile.windupDuration));
+        this.mesh.rotation.x = 0.2 * Math.sin(windupProgress * Math.PI);
+        this.eyeLight.intensity = (this.isBoss ? 2.5 : 2.0) + Math.sin(windupProgress * Math.PI * 4) * 0.8;
+
+        if (this.attackWindupTimer <= 0) {
+          this.isWindup = false;
+          this.mesh.rotation.x = 0;
+          this.attackCooldown = this.profile.attackCooldownMax;
+          // Deliver actual strike if player remains within range
+          if (distToPlayer <= this.profile.attackRange + 0.35) {
+            onAttackPlayer?.(this.attackDamage);
+          }
+        }
+        return; // Pause locomotion during active windup strike
+      }
+
+      // Movement vector calculation per archetype
+      let stepSpeed = this.profile.moveSpeed;
+
+      // Mutant Prowler Alpha: wide flanking stalk angle when approaching
+      if (this.archetype === 'PROWLER' && distToPlayer > 2.8) {
+        const perpX = -dir.z;
+        const perpZ = dir.x;
+        dir.x = dir.x * 0.65 + perpX * 0.35;
+        dir.z = dir.z * 0.65 + perpZ * 0.35;
+        dir.normalize();
+      }
+
+      const newPos = MutantCatEntity.scratchNewPos.copy(this.mesh.position).addScaledVector(dir, stepSpeed * deltaTime);
       if (resolveCollision) {
         this.mesh.position.copy(resolveCollision(newPos, 0.3, prevPos));
       } else {
@@ -326,22 +544,24 @@ export class MutantCatEntity {
       }
       this.mesh.rotation.y = Math.atan2(dir.x, dir.z);
 
-      // Melee attack Alba when in range (< 1.4m)
-      if (distToPlayer < 1.4 && this.attackCooldown <= 0) {
-        this.attackCooldown = 1.2;
-        onAttackPlayer?.(this.attackDamage);
+      // Trigger Melee Attack with windup tell
+      if (distToPlayer <= this.profile.attackRange && this.attackCooldown <= 0) {
+        this.isWindup = true;
+        this.attackWindupTimer = this.profile.windupDuration;
       }
     } else {
       // Idle patrol around spawn point
       this.state = 'PATROL';
+      this.isWindup = false;
+      this.mesh.rotation.x = 0;
       this.patrolAngle += deltaTime * 0.8;
-      const targetX = this.patrolOrigin.x + Math.sin(this.patrolAngle) * 3.5;
-      const targetZ = this.patrolOrigin.z + Math.cos(this.patrolAngle) * 3.5;
+      const targetX = this.patrolOrigin.x + Math.sin(this.patrolAngle) * this.profile.patrolRadius;
+      const targetZ = this.patrolOrigin.z + Math.cos(this.patrolAngle) * this.profile.patrolRadius;
       
       const dir = MutantCatEntity.scratchDir.set(targetX - this.mesh.position.x, 0, targetZ - this.mesh.position.z);
       if (dir.length() > 0.1) {
         dir.normalize();
-        const newPos = MutantCatEntity.scratchNewPos.copy(this.mesh.position).addScaledVector(dir, 1.8 * deltaTime);
+        const newPos = MutantCatEntity.scratchNewPos.copy(this.mesh.position).addScaledVector(dir, this.profile.patrolSpeed * deltaTime);
         if (resolveCollision) {
           this.mesh.position.copy(resolveCollision(newPos, 0.3, prevPos));
         } else {
@@ -367,9 +587,10 @@ export class MutantCatEntity {
       return true; // Defeated!
     }
 
-    // Trigger Stagger & Recoil
+    // Trigger Stagger & Recoil (Enforcers have higher poise)
     this.state = 'STAGGER';
-    this.staggerDuration = isTailSweep ? 0.65 : 0.4;
+    const poiseReduction = this.archetype === 'ENFORCER' ? 0.7 : 1.0;
+    this.staggerDuration = (isTailSweep ? 0.65 : 0.4) * poiseReduction;
     this.staggerTimer = this.staggerDuration;
 
     if (hitSourcePos) {
@@ -408,4 +629,3 @@ export class MutantCatEntity {
     this.mixer.update(0);
   }
 }
-
