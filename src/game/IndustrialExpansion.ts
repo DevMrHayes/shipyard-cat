@@ -381,19 +381,29 @@ export class IndustrialExpansion {
       cvnGroup.add(block);
     }
 
-    // 2. Main Carrier Keel & Lower Hull Module Block (Width: 16m, Length: 32m, Height: 5.5m)
-    const hullBlock = new THREE.Mesh(new THREE.BoxGeometry(16.0, 5.0, 30.0), carrierHullMat);
-    hullBlock.position.set(0, 3.25, 0);
+    // 2. Main Carrier Keel & Lower Hull Module Block (Width: 16m, Length: 45m spanning Z=17..62, Height: 5.0m)
+    const hullBlock = new THREE.Mesh(new THREE.BoxGeometry(16.0, 5.0, 45.0), carrierHullMat);
+    hullBlock.position.set(0, 3.25, 7.5);
     hullBlock.castShadow = true;
     hullBlock.receiveShadow = true;
     cvnGroup.add(hullBlock);
 
+    // Non-skid dark charcoal flight deck surface overlay + yellow foul-line safety striping
+    const flightDeckTop = new THREE.Mesh(new THREE.BoxGeometry(16.4, 0.16, 45.4), flightDeckMat);
+    flightDeckTop.position.set(0, 5.75, 7.5);
+    flightDeckTop.receiveShadow = true;
+    cvnGroup.add(flightDeckTop);
+
+    const stripeCenter = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 42.0), scaffoldYellow);
+    stripeCenter.position.set(-1.5, 5.84, 7.5);
+    cvnGroup.add(stripeCenter);
+
     // Register Hull Top Deck Platform (elevation in world space: -2.5 + 5.75 = 3.25m above ground!)
     this.platforms.push({
-      minX: 20.5 - 8.0,
-      maxX: 20.5 + 8.0,
-      minZ: 32.0 - 15.0,
-      maxZ: 32.0 + 15.0,
+      minX: 20.5 - 8.2,
+      maxX: 20.5 + 8.2,
+      minZ: 17.0,
+      maxZ: 62.0,
       height: 3.25
     });
 

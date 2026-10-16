@@ -119,6 +119,7 @@ export class ShipyardEnvironment {
     const count = this.solidObstacles.length;
     for (let i = 0; i < count; i++) {
       const obs = this.solidObstacles[i];
+      if (obs.max.y - obs.min.y < 1.5) continue;
       let tminX = (obs.min.x - origin.x) * invDirX;
       let tmaxX = (obs.max.x - origin.x) * invDirX;
       if (tminX > tmaxX) { const tmp = tminX; tminX = tmaxX; tmaxX = tmp; }
@@ -327,8 +328,8 @@ export class ShipyardEnvironment {
         roughnessMap: asphaltRough,
         aoMap: asphaltAO,
         aoMapIntensity: 0.65,
-        roughness: 0.78,
-        metalness: 0.15,
+        roughness: 0.88,
+        metalness: 0.04,
         side: THREE.DoubleSide
       });
     } else {
@@ -2036,58 +2037,15 @@ export class ShipyardEnvironment {
     this.group.add(dd12Cr4);
     this.platforms.push({ minX: 4.8, maxX: 6.4, minZ: 15.6, maxZ: 17.4, height: 0.0 });
 
-    const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 55), dockWallMat);
-    wallLeft.position.set(5, 4, 52.5);
-    const wallRight = new THREE.Mesh(new THREE.BoxGeometry(3, 8, 55), dockWallMat);
-    wallRight.position.set(35, 4, 52.5);
-    this.group.add(wallLeft, wallRight);
-
     this.buildDryDock12Perimeter();
 
-    this.registerObstacle(new THREE.Vector3(3.5, 0, 25), new THREE.Vector3(6.5, 8, 80), 'CVN Basin West Wall');
-    this.registerObstacle(new THREE.Vector3(33.5, 0, 25), new THREE.Vector3(36.5, 8, 80), 'CVN Basin East Wall');
+    // Sunken graving dock wall & safety coping curb obstacles (split at Z in [42.6, 45.4] so CVN-80 gangway at Z=44.0 is 100% open)
+    this.registerObstacle(new THREE.Vector3(3.5, -2.5, 25.0), new THREE.Vector3(6.5, 0.5, 42.6), 'CVN Basin West Wall South');
+    this.registerObstacle(new THREE.Vector3(3.5, -2.5, 45.4), new THREE.Vector3(6.5, 0.5, 80.0), 'CVN Basin West Wall');
+    this.registerObstacle(new THREE.Vector3(33.5, -2.5, 25.0), new THREE.Vector3(36.5, 0.5, 80.0), 'CVN Basin East Wall');
 
-    const steelPlateTex = TextureGenerator.createSteelPlateTexture();
-    const steelPlateNor = TextureGenerator.createSteelPlateNormalTexture();
-    const steelPlateRough = TextureGenerator.createSteelPlateRoughnessTexture();
-    const carrierMat = new THREE.MeshStandardMaterial({
-      map: steelPlateTex,
-      normalMap: steelPlateNor,
-      roughnessMap: steelPlateRough,
-      metalness: 0.7,
-      roughness: 0.35
-    });
-    // Dry Dock 12 Heavy Timber Keel Blocks supporting carrier hull on basin floor (Y = -2.5m)
-    const dd12KeelMat = new THREE.MeshStandardMaterial({
-      map: TextureGenerator.createPierWoodTexture(),
-      roughness: 0.85,
-      metalness: 0.1
-    });
-    for (let kz = 32.0; kz <= 72.0; kz += 5.0) {
-      const block = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.8, 2.0), dd12KeelMat);
-      block.position.set(20.5, -2.1, kz);
-      block.castShadow = true;
-      block.receiveShadow = true;
-      this.group.add(block);
-    }
-
-    const carrierGeo = new THREE.BoxGeometry(20, 10, 45);
-    const carrierHull = new THREE.Mesh(carrierGeo, carrierMat);
-    // Resting on keel blocks at bottom of basin (keel blocks top Y=-1.7m, hull center Y=3.3m, flight deck Y=8.3m)
-    carrierHull.position.set(20.5, 3.3, 52.5);
-    carrierHull.castShadow = true;
-    carrierHull.receiveShadow = true;
-    this.group.add(carrierHull);
-
-    const islandMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6, roughness: 0.35 });
-    const island = new THREE.Mesh(new THREE.BoxGeometry(4, 7, 12), islandMat);
-    island.position.set(28.5, 11.8, 52.5);
-    island.castShadow = true;
-    island.receiveShadow = true;
-    this.group.add(island);
-
-    this.registerObstacle(new THREE.Vector3(10.0, -2.5, 30.0), new THREE.Vector3(31.0, 8.5, 75.0), 'CVN-80 Carrier Hull Module');
-    this.platforms.push({ minX: 10.0, maxX: 31.0, minZ: 30.0, maxZ: 75.0, height: 8.3 });
+    // Unified CVN-80 Carrier Hull obstacle in Dry Dock 12 basin (matches modular CVN-80 assembly in IndustrialExpansion.ts)
+    this.registerObstacle(new THREE.Vector3(12.5, -2.5, 17.0), new THREE.Vector3(28.5, 3.25, 62.0), 'CVN-80 Carrier Hull Module');
 
     // 5. BIG BLUE CRANE WITH DETAILED LATTICE CROSS-BRACING
     // Straddles over the open Dry Dock 12 basin, casting dynamic shadows down to the basin floor
@@ -2202,7 +2160,7 @@ export class ShipyardEnvironment {
 
     const moduleGeo = new THREE.BoxGeometry(8, 2, 8);
     const moduleMesh = new THREE.Mesh(moduleGeo, new THREE.MeshStandardMaterial({
-      map: steelPlateTex,
+      map: TextureGenerator.createSteelPlateTexture(),
       metalness: 0.7,
       roughness: 0.35
     }));
@@ -2358,8 +2316,8 @@ export class ShipyardEnvironment {
 
     // 7. Dual Virginia/Columbia Submarine Hull Cylinders in Parallel Outfitting Bays
     const subHulls = [
-      { x: -31.5, radius: 2.2, len: 28, name: 'Submarine Hull Module', hasSail: false },
-      { x: -24.5, radius: 2.3, len: 28, name: 'Columbia-Class Ballistic Missile Hull Section', hasSail: true }
+      { x: -31.5, radius: 1.85, len: 28, name: 'Submarine Hull Module', hasSail: false },
+      { x: -25.0, radius: 1.9, len: 28, name: 'Columbia-Class Ballistic Missile Hull Section', hasSail: true }
     ];
 
     for (let sIdx = 0; sIdx < subHulls.length; sIdx++) {
@@ -2367,8 +2325,10 @@ export class ShipyardEnvironment {
       const hullGeo = new THREE.CylinderGeometry(subInfo.radius, subInfo.radius, subInfo.len, 24);
       hullGeo.rotateX(Math.PI / 2);
 
+      const hullCenterY = subInfo.radius + 0.35;
+      const hullTopY = hullCenterY + subInfo.radius; // ~4.05m - 4.15m, cleanly below the Y = 4.5m crossover catwalk bridge
       const hullMesh = new THREE.Mesh(hullGeo, hullMat);
-      hullMesh.position.set(subInfo.x, subInfo.radius + 0.8, centerZ);
+      hullMesh.position.set(subInfo.x, hullCenterY, centerZ);
       hullMesh.castShadow = true;
       hullMesh.receiveShadow = true;
       smofGroup.add(hullMesh);
@@ -2376,15 +2336,15 @@ export class ShipyardEnvironment {
       // Keel cradle blocks
       const cradleMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.5 });
       for (const cz of [centerZ - 8, centerZ + 8]) {
-        const cradle = new THREE.Mesh(new THREE.BoxGeometry(subInfo.radius * 2 + 1.2, 1.2, 3.5), cradleMat);
-        cradle.position.set(subInfo.x, 0.6, cz);
+        const cradle = new THREE.Mesh(new THREE.BoxGeometry(subInfo.radius * 2 + 1.0, 0.9, 3.5), cradleMat);
+        cradle.position.set(subInfo.x, 0.45, cz);
         cradle.castShadow = true;
         smofGroup.add(cradle);
       }
 
       this.registerObstacle(
         new THREE.Vector3(subInfo.x - subInfo.radius, 0, centerZ - subInfo.len / 2),
-        new THREE.Vector3(subInfo.x + subInfo.radius, subInfo.radius * 2 + 0.8, centerZ + subInfo.len / 2),
+        new THREE.Vector3(subInfo.x + subInfo.radius, hullTopY, centerZ + subInfo.len / 2),
         subInfo.name
       );
 
@@ -2393,20 +2353,22 @@ export class ShipyardEnvironment {
         maxX: subInfo.x + 0.9,
         minZ: centerZ - subInfo.len / 2 + 2,
         maxZ: centerZ + subInfo.len / 2 - 2,
-        height: subInfo.radius * 2 + 0.8
+        height: hullTopY
       });
 
       if (subInfo.hasSail) {
-        const sailMesh = new THREE.Mesh(new THREE.BoxGeometry(2.0, 3.4, 5.0), hullMat);
-        sailMesh.position.set(subInfo.x, subInfo.radius * 2 + 2.5, centerZ + 2);
+        // Positioned North of the central crossover bridge (Z = 51.5) so it never blocks the Z = 45.0 catwalk
+        const sailZ = centerZ + 6.5;
+        const sailMesh = new THREE.Mesh(new THREE.BoxGeometry(1.8, 3.2, 4.6), hullMat);
+        sailMesh.position.set(subInfo.x, hullTopY + 1.4, sailZ);
         sailMesh.castShadow = true;
         smofGroup.add(sailMesh);
 
         const periMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
         const peri1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2, 8), periMat);
-        peri1.position.set(subInfo.x + 0.35, subInfo.radius * 2 + 4.6, centerZ + 2);
+        peri1.position.set(subInfo.x + 0.35, hullTopY + 3.4, sailZ - 0.5);
         const peri2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.6, 8), periMat);
-        peri2.position.set(subInfo.x - 0.35, subInfo.radius * 2 + 5.0, centerZ + 3);
+        peri2.position.set(subInfo.x - 0.35, hullTopY + 3.8, sailZ + 0.5);
         smofGroup.add(peri1, peri2);
       }
     }
@@ -2472,7 +2434,7 @@ export class ShipyardEnvironment {
     smofGroup.add(catBridge);
     this.platforms.push({ minX: -36.1, maxX: -23.9, minZ: centerZ - 0.9, maxZ: centerZ + 0.9, height: catwalkH });
 
-    // Safety Yellow Guardrails along interior edges of the upper catwalks (with open landing gap at Z=37 for stairs)
+    // Safety Yellow Guardrails with Vertical Stanchion Posts along interior edges of the upper catwalks
     const innerRailE = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 36.0, 8), catwalkYellowMat);
     innerRailE.rotateX(Math.PI / 2);
     innerRailE.position.set(-23.9, catwalkH + 0.85, centerZ);
@@ -2487,6 +2449,21 @@ export class ShipyardEnvironment {
     innerRailW_North.position.set(-36.1, catwalkH + 0.85, 50.5);
 
     smofGroup.add(innerRailE, innerRailW_South, innerRailW_North);
+
+    // Vertical guardrail stanchions anchoring top rails to the catwalk deck
+    const stanchionGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.85, 6);
+    for (let sz = 27.0; sz <= 63.0; sz += 4.5) {
+      if (Math.abs(sz - centerZ) > 1.0) {
+        const postE = new THREE.Mesh(stanchionGeo, catwalkYellowMat);
+        postE.position.set(-23.9, catwalkH + 0.425, sz);
+        smofGroup.add(postE);
+      }
+      if ((sz < 36.0 || sz > 38.0) && Math.abs(sz - centerZ) > 1.0) {
+        const postW = new THREE.Mesh(stanchionGeo, catwalkYellowMat);
+        postW.position.set(-36.1, catwalkH + 0.425, sz);
+        smofGroup.add(postW);
+      }
+    }
 
     // E. Interior Steel Access Staircase (rising from ground Y=0.0m at Z=28 to Y=4.5m at Z=37 along West Wall)
     const numSmofSteps = 10;
@@ -2942,6 +2919,15 @@ export class ShipyardEnvironment {
     const isInsideDryDock12 = (x >= 5.0 && x <= 35.0 && z >= 10.0 && z <= 80.0);
     let maxFloor = isInsideDryDock1 ? -2.0 : (isInsideDryDock12 ? -2.5 : 0);
 
+    // Smooth, exact elevation tracking up the CVN-80 Flight Deck Gangway (X in [3.8, 12.6], Z in [42.8, 45.2], Y in [0.0, 3.25m])
+    if (x >= 3.8 && x <= 12.6 && z >= 42.8 && z <= 45.2) {
+      const gangwayProgress = THREE.MathUtils.clamp((x - 3.8) / (12.5 - 3.8), 0.0, 1.0);
+      const gangwayH = gangwayProgress * 3.25;
+      if (currentY >= (gangwayH - 0.95) && gangwayH > maxFloor) {
+        maxFloor = gangwayH;
+      }
+    }
+
     // Smooth, exact elevation tracking up the boarding ramps (X in [38.0, 45.5], Y in [0.0, 1.4m])
     if (!isInsideDryDock1 && !isInsideDryDock12) {
       const rampZPositions = [-100, -60, 20, 60, 100];
@@ -2971,6 +2957,13 @@ export class ShipyardEnvironment {
     if (probeX !== 0 || probeZ !== 0) {
       const px = x + probeX;
       const pz = z + probeZ;
+      if (px >= 3.8 && px <= 12.6 && pz >= 42.8 && pz <= 45.2) {
+        const gangwayProgress = THREE.MathUtils.clamp((px - 3.8) / (12.5 - 3.8), 0.0, 1.0);
+        const gangwayH = gangwayProgress * 3.25;
+        if (currentY >= (gangwayH - 0.95) && gangwayH > maxFloor) {
+          maxFloor = gangwayH;
+        }
+      }
       const isProbeInsideDD = ((px >= 15.0 && px <= 44.5 && pz >= -36.0 && pz <= -19.0) || (px >= 5.0 && px <= 35.0 && pz >= 10.0 && pz <= 80.0));
       if (!isProbeInsideDD) {
         const rampZPositions = [-100, -60, 20, 60, 100];

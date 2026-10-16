@@ -728,13 +728,14 @@ export class GameEngine {
       }
     };
 
-    // Mouse click & drag steering / combat
+    // Mouse click & drag steering / combat (left-drag orbits camera cleanly; quick left-click without drag swipes)
+    let mouseDragAccum = 0;
     this.onMouseDownBound = (e: MouseEvent) => {
       if ((e.target as HTMLElement).tagName === 'CANVAS') {
-        this.isDraggingMouse = true;
-        this.lastMouseX = e.clientX;
         if (e.button === 0) {
-          this.executePawSwipe();
+          this.isDraggingMouse = true;
+          this.lastMouseX = e.clientX;
+          mouseDragAccum = 0;
         } else if (e.button === 2) {
           this.executePounce();
         }
@@ -744,12 +745,17 @@ export class GameEngine {
     this.onMouseMoveBound = (e: MouseEvent) => {
       if (this.isDraggingMouse) {
         const deltaX = e.clientX - this.lastMouseX;
+        mouseDragAccum += Math.abs(deltaX);
         this.physics.heading -= deltaX * 0.005;
+        this.physics.prevHeading = this.physics.heading;
         this.lastMouseX = e.clientX;
       }
     };
 
     this.onMouseUpBound = () => {
+      if (this.isDraggingMouse && mouseDragAccum < 6) {
+        this.executePawSwipe();
+      }
       this.isDraggingMouse = false;
     };
 

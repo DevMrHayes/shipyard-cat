@@ -165,6 +165,7 @@ export class PhysicsSubsystem {
         targetSpeed = 4.6;
       }
       if (input.driveInput < 0) targetSpeed *= 0.6; // Reverse
+      targetSpeed *= vitals.getSpeedMultiplier();
     }
 
     const accelRate = targetSpeed > this.currentSpeed ? 22.0 : 28.0;
@@ -200,7 +201,10 @@ export class PhysicsSubsystem {
     this.position.copy(resolvedPos);
 
     // 6. Vertical Platform Floor Evaluation, Damping, Step-Up & Downward Slope Tracking
-    const currentFloor = env.getPlatformFloor(this.position.x, this.position.z, this.position.y);
+    const moveDirProbe = (this.isGrounded && this.currentSpeed > 0.05) ? Math.sign(input.driveInput || 1) : 0;
+    const probeX = moveDirProbe !== 0 ? forward.x * moveDirProbe * 0.42 : 0;
+    const probeZ = moveDirProbe !== 0 ? forward.z * moveDirProbe * 0.42 : 0;
+    const currentFloor = env.getPlatformFloor(this.position.x, this.position.z, this.position.y, probeX, probeZ);
 
     if (this.isGrounded) {
       const heightDiff = currentFloor - this.position.y;
@@ -239,9 +243,9 @@ export class PhysicsSubsystem {
         this.velocity.y = 0;
       }
     } else {
-      // Airborne: Check landing or feline ledge mantle onto platform surface
-      const canMantle = (currentFloor > this.position.y && (currentFloor - this.position.y) <= 0.35 && this.velocity.y <= 2.5);
-      if (this.position.y <= currentFloor || canMantle) {
+      // Airborne: Check landing or feline ledge mantle onto platform surface (only when descending or near apex)
+      const canMantle = (currentFloor > this.position.y && (currentFloor - this.position.y) <= 0.35 && this.velocity.y <= 0.5);
+      if ((this.position.y <= currentFloor && this.velocity.y <= 0) || canMantle) {
         if (this.position.y < currentFloor - 0.25 && !this.isPouncing && typeof window !== 'undefined') {
           RemoteLogger.logClippingIncident({
             type: 'PLATFORM_CLIPPING',

@@ -98,11 +98,39 @@ export class MutantCatEntity {
       this.buildProceduralMutant(proceduralGroup);
     }
 
-    // Eye PointLight (kept allocated for API compatibility but detached from scene to eliminate forward PBR light loop)
+    // Persistent 3D Mutant Identifiers (visible on both GLTF and procedural models: glowing green tapetum eyes + dorsal spines)
+    const mutantIdentifierGroup = new THREE.Group();
+    const spineMat = new THREE.MeshStandardMaterial({
+      color: 0x84cc16,
+      emissive: 0x65a30d,
+      emissiveIntensity: 1.4,
+      roughness: 0.25,
+      metalness: 0.3
+    });
+    const spinePositions = [
+      { z: 0.12, y: 0.56, s: 1.0, tilt: -0.25 },
+      { z: -0.04, y: 0.58, s: 1.15, tilt: -0.35 },
+      { z: -0.20, y: 0.53, s: 0.85, tilt: -0.45 }
+    ];
+    for (const sp of spinePositions) {
+      const spine = new THREE.Mesh(new THREE.ConeGeometry(0.032 * sp.s, 0.14 * sp.s, 5), spineMat);
+      spine.position.set(0, sp.y, sp.z);
+      spine.rotation.x = sp.tilt;
+      mutantIdentifierGroup.add(spine);
+    }
+    const glowEyeGeo = new THREE.SphereGeometry(0.028, 8, 8);
+    const glowEyeL = new THREE.Mesh(glowEyeGeo, spineMat);
+    glowEyeL.position.set(0.07, 0.52, 0.38);
+    const glowEyeR = new THREE.Mesh(glowEyeGeo, spineMat);
+    glowEyeR.position.set(-0.07, 0.52, 0.38);
+    mutantIdentifierGroup.add(glowEyeL, glowEyeR);
+    this.mesh.add(mutantIdentifierGroup);
+
+    // Eye PointLight (kept allocated for API compatibility)
     this.eyeLight = new THREE.PointLight(0x84cc16, 1.2, 5);
     this.eyeLight.position.set(0.5, 0.5, 0);
 
-    // Radioactive Whiskers Aura (Visible in Whiskers Mode with Tier 2+)
+    // Radioactive Whiskers Aura (Subtle 0.12 base opacity so mutants have an unmistakable 3D silhouette, brighter in Whiskers Mode)
     const auraGeo = new THREE.SphereGeometry(0.7, 12, 12);
     const auraMat = new THREE.MeshBasicMaterial({
       color: 0x84cc16,
@@ -301,7 +329,7 @@ export class MutantCatEntity {
       // Melee attack Alba when in range (< 1.4m)
       if (distToPlayer < 1.4 && this.attackCooldown <= 0) {
         this.attackCooldown = 1.2;
-        onAttackPlayer?.(14);
+        onAttackPlayer?.(this.attackDamage);
       }
     } else {
       // Idle patrol around spawn point

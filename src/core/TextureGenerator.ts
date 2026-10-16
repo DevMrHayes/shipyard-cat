@@ -140,7 +140,7 @@ export class TextureGenerator {
   }
 
   /**
-   * 1. WET ASPHALT WITH CONCRETE AGGREGATE & PETROLEUM OIL SHEEN
+   * 1. WEATHERED SHIPYARD ASPHALT & HEAVY INDUSTRIAL CONCRETE APRON SLABS
    */
   public static createAsphaltTexture(): THREE.Texture {
     const cacheKey = 'asphalt_diff';
@@ -156,53 +156,60 @@ export class TextureGenerator {
     canvas.height = 512;
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
-    // Base damp dark charcoal asphalt
-    const grad = ctx.createLinearGradient(0, 0, 512, 512);
-    grad.addColorStop(0, '#2d3748');
-    grad.addColorStop(0.5, '#1e293b');
-    grad.addColorStop(1, '#242f3d');
-    ctx.fillStyle = grad;
+    // Base weathered slate-charcoal industrial concrete/asphalt
+    ctx.fillStyle = '#2b3440';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Aggregate gravel aggregate noise & fine cracks
+    // Subtle tonal slab variation across 2x2 grid (each 256x256 = 5m x 5m shipyard slab)
+    ctx.fillStyle = 'rgba(30, 41, 59, 0.28)';
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.fillRect(256, 256, 256, 256);
+
+    // Fine aggregate stone grain (deterministic pseudo-random look without polka-dot blobs)
     const imgData = ctx.getImageData(0, 0, 512, 512);
     const data = imgData.data;
     for (let i = 0; i < data.length; i += 4) {
-      const noise = (Math.random() - 0.5) * 36;
-      const speck = Math.random() < 0.08 ? (Math.random() * 45 - 20) : 0;
+      const noise = (Math.random() - 0.5) * 18;
+      const speck = Math.random() < 0.05 ? (Math.random() * 20 - 10) : 0;
       data[i] = Math.min(255, Math.max(0, data[i] + noise + speck));
       data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise + speck));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise + speck * 1.2));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise + speck));
     }
     ctx.putImageData(imgData, 0, 0);
 
-    // Subtle asphalt cracks
-    ctx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
+    // Heavy industrial concrete slab expansion joints (at 0 and 256)
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.65)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 1.5); ctx.lineTo(512, 1.5);
+    ctx.moveTo(0, 256); ctx.lineTo(512, 256);
+    ctx.moveTo(1.5, 0); ctx.lineTo(1.5, 512);
+    ctx.moveTo(256, 0); ctx.lineTo(256, 512);
+    ctx.stroke();
+
+    // Subtle highlight bevel along slab seam edges
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
     ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 4); ctx.lineTo(512, 4);
+    ctx.moveTo(0, 259); ctx.lineTo(512, 259);
+    ctx.moveTo(4, 0); ctx.lineTo(4, 512);
+    ctx.moveTo(259, 0); ctx.lineTo(259, 512);
+    ctx.stroke();
+
+    // Hairline stress cracks
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.moveTo(60, 40);
     ctx.lineTo(140, 110);
     ctx.lineTo(210, 100);
-    ctx.lineTo(290, 190);
     ctx.moveTo(340, 310);
     ctx.lineTo(410, 380);
-    ctx.lineTo(470, 430);
     ctx.stroke();
 
-    // Standing water puddle with subtle petroleum iridescent sheen ring
-    const puddleGrad = ctx.createRadialGradient(256, 260, 20, 256, 260, 110);
-    puddleGrad.addColorStop(0, 'rgba(15, 23, 42, 0.6)');
-    puddleGrad.addColorStop(0.6, 'rgba(30, 41, 59, 0.4)');
-    puddleGrad.addColorStop(0.85, 'rgba(56, 189, 248, 0.12)'); // subtle cyan oil sheen
-    puddleGrad.addColorStop(0.95, 'rgba(234, 179, 8, 0.08)');  // subtle amber oil sheen
-    puddleGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = puddleGrad;
-    ctx.beginPath();
-    ctx.ellipse(256, 260, 120, 80, Math.PI / 8, 0, Math.PI * 2);
-    ctx.fill();
-
     const texture = new THREE.CanvasTexture(canvas);
-    this.configureTexture(texture, true, 24, 24);
+    this.configureTexture(texture, true, 1, 1);
     this.textureCache.set(cacheKey, texture);
     return texture;
   }
@@ -226,21 +233,25 @@ export class TextureGenerator {
     const imgData = ctx.getImageData(0, 0, 512, 512);
     const data = imgData.data;
     for (let i = 0; i < data.length; i += 4) {
-      const n = (Math.random() - 0.5) * 60;
+      const n = (Math.random() - 0.5) * 18;
       data[i] = Math.min(255, Math.max(0, 128 + n));
       data[i + 1] = Math.min(255, Math.max(0, 128 + n));
       data[i + 2] = Math.min(255, Math.max(0, 128 + n));
     }
     ctx.putImageData(imgData, 0, 0);
 
-    // Flatten puddle normal (mirror flat water)
-    ctx.fillStyle = '#808080';
+    // Expansion joint recessed grooves in heightmap before Sobel normal pass
+    ctx.strokeStyle = '#404040';
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.ellipse(256, 260, 110, 70, Math.PI / 8, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(0, 2); ctx.lineTo(512, 2);
+    ctx.moveTo(0, 256); ctx.lineTo(512, 256);
+    ctx.moveTo(2, 0); ctx.lineTo(2, 512);
+    ctx.moveTo(256, 0); ctx.lineTo(256, 512);
+    ctx.stroke();
 
-    const norm = this.generateNormalMapFromCanvas(canvas, 2.5);
-    norm.repeat.set(24, 24);
+    const norm = this.generateNormalMapFromCanvas(canvas, 0.85);
+    norm.repeat.set(1, 1);
     this.textureCache.set(cacheKey, norm);
     return norm;
   }
@@ -259,33 +270,22 @@ export class TextureGenerator {
     canvas.height = 512;
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
-    // High roughness (0.85 -> rgb(216,216,216)) for coarse asphalt
-    ctx.fillStyle = '#d8d8d8';
+    // High matte roughness (rgb(224,224,224)) to prevent plastic/bubble-wrap specular glare
+    ctx.fillStyle = '#e0e0e0';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Micro-grit noise
     const imgData = ctx.getImageData(0, 0, 512, 512);
     const data = imgData.data;
     for (let i = 0; i < data.length; i += 4) {
-      const noise = (Math.random() - 0.5) * 40;
-      data[i] = Math.min(255, Math.max(0, data[i] + noise));
+      const noise = (Math.random() - 0.5) * 22;
+      data[i] = Math.min(255, Math.max(185, data[i] + noise));
       data[i + 1] = data[i];
       data[i + 2] = data[i];
     }
     ctx.putImageData(imgData, 0, 0);
 
-    // Glossy wet puddle (low roughness -> rgb(35, 35, 35))
-    const wetGrad = ctx.createRadialGradient(256, 260, 20, 256, 260, 115);
-    wetGrad.addColorStop(0, '#1c1c1c');
-    wetGrad.addColorStop(0.7, '#2a2a2a');
-    wetGrad.addColorStop(1, 'rgba(216, 216, 216, 0)');
-    ctx.fillStyle = wetGrad;
-    ctx.beginPath();
-    ctx.ellipse(256, 260, 120, 80, Math.PI / 8, 0, Math.PI * 2);
-    ctx.fill();
-
     const texture = new THREE.CanvasTexture(canvas);
-    this.configureTexture(texture, false, 24, 24);
+    this.configureTexture(texture, false, 1, 1);
     this.textureCache.set(cacheKey, texture);
     return texture;
   }
@@ -306,18 +306,18 @@ export class TextureGenerator {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Puddle edge occlusion and crack shadowing
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 3;
+    // Slab seam ambient occlusion
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.moveTo(60, 40);
-    ctx.lineTo(140, 110);
-    ctx.lineTo(210, 100);
-    ctx.lineTo(290, 190);
+    ctx.moveTo(0, 2); ctx.lineTo(512, 2);
+    ctx.moveTo(0, 256); ctx.lineTo(512, 256);
+    ctx.moveTo(2, 0); ctx.lineTo(2, 512);
+    ctx.moveTo(256, 0); ctx.lineTo(256, 512);
     ctx.stroke();
 
     const texture = new THREE.CanvasTexture(canvas);
-    this.configureTexture(texture, false, 24, 24);
+    this.configureTexture(texture, false, 1, 1);
     this.textureCache.set(cacheKey, texture);
     return texture;
   }

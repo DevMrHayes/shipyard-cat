@@ -161,9 +161,9 @@ export class CarrierSuperstructure {
     gangwayGroup.name = 'CVN80_FlightDeck_Gangway';
 
     // In local coordinates of cvnGroup (origin = 20.5, -2.5, 32.0):
-    // Dock West rim (yard apron) is at world X = 5.0 (local X = 5.0 - 20.5 = -15.5), world Y = 0.0 (local Y = 2.5), Z = 44.0 (local Z = 12.0)
+    // Dock West apron outside coping curb is at world X = 3.8 (local X = 3.8 - 20.5 = -16.7), world Y = 0.0 (local Y = 2.5), Z = 44.0 (local Z = 12.0)
     // Flight deck edge is at world X = 12.5 (local X = 12.5 - 20.5 = -8.0), world Y = 3.25 (local Y = 5.75), Z = 44.0 (local Z = 12.0)
-    const startLocal = new THREE.Vector3(-15.5, 2.5, 12.0);
+    const startLocal = new THREE.Vector3(-16.7, 2.5, 12.0);
     const endLocal = new THREE.Vector3(-8.0, 5.75, 12.0);
 
     const delta = new THREE.Vector3().subVectors(endLocal, startLocal);
@@ -214,9 +214,9 @@ export class CarrierSuperstructure {
 
     root.add(gangwayGroup);
 
-    // Register climbable ramp platform for smooth cat ascent from yard rim (X=5.0) to deck (X=12.5)
+    // Register climbable ramp platform for smooth cat ascent from yard apron (X=3.8) to deck (X=12.5)
     if (this.registerPlatform) {
-      const worldStartX = this.origin.x + startLocal.x; // 5.0
+      const worldStartX = this.origin.x + startLocal.x; // 3.8
       const worldEndX = this.origin.x + endLocal.x;     // 12.5
       const worldZ = this.origin.z + 12.0;              // 44.0
 
@@ -240,12 +240,12 @@ export class CarrierSuperstructure {
   /**
    * Procedural Tactical Hull Decal Canvas ('80' for CVN-80 Enterprise)
    */
-  private createTacticalDecalMaterial(hullNumber: string): THREE.MeshBasicMaterial {
+  private createTacticalDecalMaterial(hullNumber: string): THREE.MeshStandardMaterial {
     if (typeof document === 'undefined') {
-      return new THREE.MeshBasicMaterial({
-        color: 0xf8fafc,
-        transparent: true,
-        opacity: 0.9
+      return new THREE.MeshStandardMaterial({
+        color: 0x475569,
+        roughness: 0.55,
+        metalness: 0.65
       });
     }
     const canvas = document.createElement('canvas');
@@ -253,10 +253,17 @@ export class CarrierSuperstructure {
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.clearRect(0, 0, 512, 512);
+      // Match Haze Gray island hull background so decal never renders as a floating white box in fog
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Subtle steel panel border
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(8, 8, 496, 496);
 
       // Navy stencil font with tactical shadow
-      ctx.font = '900 300px "Arial Black", Impact, sans-serif';
+      ctx.font = '900 280px "Arial Black", Impact, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
@@ -270,10 +277,10 @@ export class CarrierSuperstructure {
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
 
-    return new THREE.MeshBasicMaterial({
+    return new THREE.MeshStandardMaterial({
       map: texture,
-      transparent: true,
-      depthWrite: false,
+      roughness: 0.55,
+      metalness: 0.5,
       polygonOffset: true,
       polygonOffsetFactor: -2
     });

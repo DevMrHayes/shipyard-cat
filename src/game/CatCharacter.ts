@@ -1017,9 +1017,9 @@ export class CatCharacter {
     const bankLerp = 1.0 - Math.exp(-12.0 * deltaTime);
     this.currentBankRoll += (targetBank - this.currentBankRoll) * Math.min(1.0, bankLerp);
 
-    // Apply pitch (+X ascending / -X descending) and bank roll to active visual root
+    // Apply pitch (+X ascending / -X descending) and bank roll to active visual root (preserving physics renderBank)
     this.mesh.rotation.x = -this.currentSlopePitch;
-    this.mesh.rotation.z = this.currentBankRoll;
+    this.mesh.rotation.z = THREE.MathUtils.clamp(this.mesh.rotation.z + this.currentBankRoll, -0.32, 0.32);
 
     // 3. Dynamic Stride Rate Matching (currentSpeed / baseSpeed) to eliminate foot-sliding
     const referenceBaseSpeed = isSprinting
