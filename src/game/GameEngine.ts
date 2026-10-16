@@ -134,6 +134,7 @@ export class GameEngine {
   private minimapEntityPool: MinimapEntity[] = [];
   private contextualPromptsPool: ContextualPrompt[] = [];
   private activePromptsList: ContextualPrompt[] = [];
+  private ambientIndustrialAudioTimer: number = 0;
 
   // Backward-compatible Event callbacks for UI
   public onVitalsUpdate?: (vitals: CatVitals, radiation: number) => void;
@@ -1838,6 +1839,22 @@ export class GameEngine {
     this.updateRadiationAndHazards(frameDelta);
     this.updateStoryProgression(frameDelta);
     this.environment.update(frameDelta, this.cat.mesh.position, this.physicsInput.isSprinting || this.physics.isPouncing);
+
+    // Periodic 3D ambient industrial sound cues when roaming near Heavy Steel Fab or Dry Dock 2
+    this.ambientIndustrialAudioTimer += frameDelta;
+    if (this.ambientIndustrialAudioTimer > 4.5) {
+      this.ambientIndustrialAudioTimer = 0;
+      const catPos = this.cat.mesh.position;
+      if (catPos.x >= -160 && catPos.x <= -70 && catPos.z >= 180 && catPos.z <= 300) {
+        // Heavy Steel Fab Super-Shop: arc welding bursts or pneumatic rivet guns
+        const soundType = Math.random() > 0.4 ? 'RIVET_GUN' : 'WELDING_SIZZLE';
+        soundEngine.playSpatialSound(soundType, -115 + (Math.random() - 0.5) * 20, 2.0, 240 + (Math.random() - 0.5) * 30);
+      } else if (catPos.x >= -220 && catPos.x <= -140 && catPos.z >= 50 && catPos.z <= 170) {
+        // Dry Dock 2 Virginia Submarine Berth: water lap or resonant yard bell
+        const soundType = Math.random() > 0.5 ? 'WATER_LAP' : 'YARD_BELL';
+        soundEngine.playSpatialSound(soundType, -180, -2.0, 110 + (Math.random() - 0.5) * 30);
+      }
+    }
 
     // Update Stylized Pounce Trajectory Arc Visualizer
     const pounceCandidate = this.findBestPounceTarget();

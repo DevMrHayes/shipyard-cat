@@ -62,6 +62,7 @@ export class ShipyardEnvironment {
   public turnstileWorkerMesh: THREE.Group | null = null;
   public turnstileWorkerCycle: number = 0;
   public turnstileSpindleAngle: number = 0;
+  public industrialExpansion: IndustrialExpansion | null = null;
 
   constructor() {
     this.group = new THREE.Group();
@@ -78,10 +79,10 @@ export class ShipyardEnvironment {
     this.buildWeldingSparks();
     this.buildWhiskersBeacons();
     this.buildPerimeterFencingAndSecurityTurnstiles();
-    const industrialExpansion = new IndustrialExpansion(this.platforms);
-    this.group.add(industrialExpansion.group);
+    this.industrialExpansion = new IndustrialExpansion(this.platforms);
+    this.group.add(this.industrialExpansion.group);
 
-    const expansionColliders = industrialExpansion.getExpansionColliders();
+    const expansionColliders = this.industrialExpansion.getExpansionColliders();
     expansionColliders.forEach((item, idx) => {
       if (item.surfaceType !== 'catwalk' && item.box) {
         this.registerObstacle(
@@ -1135,13 +1136,13 @@ export class ShipyardEnvironment {
     // 3. ARCHED MULTI-PANE INDUSTRIAL WINDOWS WITH WARM AMBER INTERIOR GLOW
     const windowFrameMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6, metalness: 0.8 });
     const warmGlassMat = new THREE.MeshStandardMaterial({
-      color: 0xfef08a,
-      emissive: 0xf59e0b,
-      emissiveIntensity: 0.85,
-      roughness: 0.15,
-      metalness: 0.3,
+      color: 0xd97706,
+      emissive: 0xb45309,
+      emissiveIntensity: 0.38,
+      roughness: 0.4,
+      metalness: 0.2,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.78,
       side: THREE.DoubleSide
     });
 
@@ -3231,6 +3232,7 @@ export class ShipyardEnvironment {
 
   public update(deltaTime: number, catPosition?: THREE.Vector3, isCatSprintingOrPouncing?: boolean) {
     this.envTime += deltaTime;
+    this.industrialExpansion?.update(deltaTime);
 
     // Gate 4 Revolving Turnstile & Shift Worker Animation
     if (this.turnstileSpindles.length > 0) {

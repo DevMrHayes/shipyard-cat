@@ -65,6 +65,12 @@ export class IndustrialExpansion {
     return this.submarineAndFabExpansion ? this.submarineAndFabExpansion.getColliders() : [];
   }
 
+  public update(delta: number): void {
+    if (this.submarineAndFabExpansion) {
+      this.submarineAndFabExpansion.update(delta);
+    }
+  }
+
   /**
    * ZONE 1: Pipe Fabrication & Cable Spool Depot (X in [-95, -45], Z in [-95, -30])
    */

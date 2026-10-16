@@ -196,6 +196,16 @@ export class DiurnalSystem {
     if (this.scene.fog && 'color' in this.scene.fog) {
       (this.scene.fog as any).color.lerpColors(k0.fog, k1.fog, alpha);
     }
+    if (this.scene.fog && 'density' in this.scene.fog) {
+      // Dynamic industrial exponential fog density: 0.0062 at high noon to 0.0088 at night / marine dawn
+      const isLowSun = this.timeOfDay >= 18.5 || this.timeOfDay < 7.0;
+      const targetDensity = isLowSun ? 0.0085 : 0.0065;
+      (this.scene.fog as THREE.FogExp2).density = THREE.MathUtils.lerp(
+        (this.scene.fog as THREE.FogExp2).density,
+        targetDensity,
+        0.05
+      );
+    }
 
     this.sunLight.color.lerpColors(k0.sun, k1.sun, alpha);
     this.sunLight.intensity = THREE.MathUtils.lerp(k0.sunIntensity, k1.sunIntensity, alpha);

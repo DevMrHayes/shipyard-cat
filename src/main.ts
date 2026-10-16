@@ -786,7 +786,8 @@ document.addEventListener('DOMContentLoaded', () => {
       modalWorkorder.classList.toggle('open');
       if (modalWorkorder.classList.contains('open')) renderWorkOrderModal();
     }
-    if (e.code === 'KeyH' && !e.repeat && onboardingCard) {
+    if ((e.code === 'KeyH' || e.code === 'F1') && !e.repeat && onboardingCard) {
+      e.preventDefault();
       onboardingCard.classList.toggle('hidden');
     }
     if (e.code === 'F3' && !e.repeat) {
@@ -801,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
       window.setTimeout(() => {
         onboardingCard.classList.add('hidden');
         try { localStorage.setItem('shipyard_cat_onboarding_dismissed', 'true'); } catch {}
-      }, 2200);
+      }, 1500);
     }
   });
 
@@ -824,7 +825,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch {}
 
+  // Auto-dismiss onboarding banner after 4.5s so it never persistently blocks the yard view
+  window.setTimeout(() => {
+    if (onboardingCard && !onboardingCard.classList.contains('hidden')) {
+      onboardingCard.classList.add('hidden');
+    }
+  }, 4500);
+
   // Onboarding, Utility Drawer, Mission Collapse & Work Order Buttons
+  const btnToggleProtocol = document.getElementById('btn-toggle-protocol');
+  btnToggleProtocol?.addEventListener('click', () => {
+    onboardingCard?.classList.toggle('hidden');
+  });
+
   btnDismissOnboarding?.addEventListener('click', () => {
     onboardingCard?.classList.add('hidden');
     try { localStorage.setItem('shipyard_cat_onboarding_dismissed', 'true'); } catch {}

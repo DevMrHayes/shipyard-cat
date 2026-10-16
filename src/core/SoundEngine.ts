@@ -8,7 +8,9 @@ export type SpatialSoundType =
   | 'WELDING_SIZZLE'
   | 'RAT_SQUEAK'
   | 'WATER_LAP'
-  | 'MACHINE_HUM';
+  | 'MACHINE_HUM'
+  | 'RIVET_GUN'
+  | 'YARD_BELL';
 
 // Procedural Web Audio Sound Engine for Industrial Atmosphere, Feline Vocalizations & Combat FX
 // Zero-Allocation, Non-Blocking, Pre-rendered AudioBuffer Architecture
@@ -666,6 +668,36 @@ export class SoundEngine {
         data[i] = hum * env * 0.4;
       }
       this.spatialBufferCache.set('MACHINE_HUM', buf);
+    }
+
+    // 5. RIVET_GUN (0.35s pneumatic rapid impact burst - 4 hammer hits)
+    {
+      const len = Math.floor(sr * 0.35);
+      const buf = this.ctx.createBuffer(1, len, sr);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const subT = (t % 0.08) / 0.08;
+        const clickEnv = Math.exp(-subT * 28.0);
+        const metallic = Math.sin(2 * Math.PI * 840 * t) * 0.6 + Math.sin(2 * Math.PI * 1420 * t) * 0.4;
+        const hiss = (Math.random() * 2 - 1) * 0.3;
+        data[i] = (metallic * clickEnv + hiss * Math.exp(-t * 8.0)) * 0.45;
+      }
+      this.spatialBufferCache.set('RIVET_GUN', buf);
+    }
+
+    // 6. YARD_BELL (1.4s resonant bronze chime)
+    {
+      const len = Math.floor(sr * 1.4);
+      const buf = this.ctx.createBuffer(1, len, sr);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const env = Math.exp(-t * 2.8);
+        const chime = Math.sin(2 * Math.PI * 440 * t) * 0.5 + Math.sin(2 * Math.PI * 880 * t) * 0.3 + Math.sin(2 * Math.PI * 1320 * t) * 0.2;
+        data[i] = chime * env * 0.5;
+      }
+      this.spatialBufferCache.set('YARD_BELL', buf);
     }
   }
 

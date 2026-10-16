@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FabAndSubFXSystem } from './FabAndSubFXSystem';
 
 export interface ExpansionCollisionItem {
   box: THREE.Box3;
@@ -21,6 +22,7 @@ export class SubmarineAndFabExpansion {
   private group: THREE.Group;
   private colliders: ExpansionCollisionItem[];
   private interactivePoints: SubmarineAndFabResult['interactivePoints'];
+  private fxSystem: FabAndSubFXSystem;
 
   // Shared reusable materials to reduce draw calls and avoid runtime shader recompilation
   private materials: {
@@ -43,6 +45,7 @@ export class SubmarineAndFabExpansion {
     this.group.name = 'SubmarineAndFabExpansion';
     this.colliders = [];
     this.interactivePoints = [];
+    this.fxSystem = new FabAndSubFXSystem(this.group);
 
     this.materials = this.createSharedMaterials();
   }
@@ -58,11 +61,30 @@ export class SubmarineAndFabExpansion {
     const fabShopOrigin = new THREE.Vector3(-115, 0, 240);
     this.buildHeavySteelFabSuperShop(fabShopOrigin);
 
+    // 3. Dynamic Atmospheric Particle & Illumination FX
+    // Active welding stations inside Heavy Steel Fab Super-Shop bays
+    this.fxSystem.createWeldingStation(new THREE.Vector3(-105, 1.8, 225), 100);
+    this.fxSystem.createWeldingStation(new THREE.Vector3(-125, 1.8, 255), 100);
+    this.fxSystem.createWeldingStation(new THREE.Vector3(-110, 1.8, 270), 100);
+
+    // Rising steam vent columns along submarine lines and dock basin
+    this.fxSystem.createSteamVent(new THREE.Vector3(-180, 1.2, 85), 65);
+    this.fxSystem.createSteamVent(new THREE.Vector3(-180, 1.2, 135), 65);
+    this.fxSystem.createSteamVent(new THREE.Vector3(-180, -2.2, 110), 75);
+
     return {
       group: this.group,
       colliders: this.colliders,
       interactivePoints: this.interactivePoints
     };
+  }
+
+  public update(delta: number): void {
+    this.fxSystem.update(delta);
+  }
+
+  public dispose(): void {
+    this.fxSystem.dispose();
   }
 
   private createSharedMaterials() {
@@ -78,10 +100,15 @@ export class SubmarineAndFabExpansion {
       metalness: 0.15
     });
 
+    const anechoicTex = this.fxSystem.generateAnechoicTileTexture(512, 512);
+
     const subHullBlack = new THREE.MeshStandardMaterial({
       color: 0x141619,
-      roughness: 0.35,
-      metalness: 0.8
+      map: anechoicTex,
+      roughness: 0.55,
+      metalness: 0.45,
+      bumpMap: anechoicTex,
+      bumpScale: 0.03
     });
 
     const subHullRed = new THREE.MeshStandardMaterial({
@@ -92,8 +119,11 @@ export class SubmarineAndFabExpansion {
 
     const subSail = new THREE.MeshStandardMaterial({
       color: 0x181a1d,
-      roughness: 0.4,
-      metalness: 0.75
+      map: anechoicTex,
+      roughness: 0.5,
+      metalness: 0.5,
+      bumpMap: anechoicTex,
+      bumpScale: 0.03
     });
 
     const steelDark = new THREE.MeshStandardMaterial({
