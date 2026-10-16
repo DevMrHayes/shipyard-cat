@@ -318,6 +318,7 @@ export class GameEngine {
   public startLoop(): void {
     if (!this.animationFrameId && !this.isDisposed) {
       this.lastFrameTimestamp = 0;
+      this.renderSystem.snapCameraToTarget(this.cat.mesh.position, this.physics.heading);
       this.animationFrameId = requestAnimationFrame(this.animate);
     }
   }
@@ -477,8 +478,8 @@ export class GameEngine {
 
       this.physics.position.copy(tempCatPos);
       this.cat.mesh.position.copy(tempCatPos);
-      this.camera.position.copy(tempCamPos);
-      this.camera.lookAt(this.physics.position.x, this.physics.position.y + 0.4, this.physics.position.z);
+      this.renderSystem.snapCameraToTarget(this.cat.mesh.position, this.physics.heading);
+      this.renderer.render(this.scene, this.camera);
 
       this.rats.forEach((r, idx) => {
         if (ratPositions[idx]) r.mesh.position.copy(ratPositions[idx]);
@@ -1320,10 +1321,10 @@ export class GameEngine {
 
       if ((rat.state as string) !== 'CAUGHT') {
         // Clamp rat elevation to terrain floor (prevents floating across dry dock rims)
-        const floorY = this.environment.getPlatformFloor(rat.mesh.position.x, rat.mesh.position.z, rat.mesh.position.y);
-        rat.mesh.position.y = floorY;
-
-        const dist = rat.mesh.position.distanceTo(catPos);
+        if (dSq <= 400 || (i + this.frameTick) % 4 === 0) {
+          const floorY = this.environment.getPlatformFloor(rat.mesh.position.x, rat.mesh.position.z, rat.mesh.position.y);
+          rat.mesh.position.y = floorY;
+        }
 
         if (rat.isKingpin) {
           // Kingpin Boss Combat:

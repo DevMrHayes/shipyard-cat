@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { CarrierSuperstructure } from './CarrierSuperstructure';
 import { InteriorSpacesBuilder } from './InteriorSpacesBuilder';
+import { SubmarineAndFabExpansion } from './SubmarineAndFabExpansion';
 
 export interface PlatformSurface {
   minX: number;
@@ -31,6 +32,7 @@ export class IndustrialExpansion {
   public group: THREE.Group;
   private platforms: PlatformSurface[];
   private interiorSpacesBuilder: InteriorSpacesBuilder;
+  private submarineAndFabExpansion: SubmarineAndFabExpansion;
 
   constructor(platforms: PlatformSurface[]) {
     this.group = new THREE.Group();
@@ -47,6 +49,15 @@ export class IndustrialExpansion {
     this.group.add(this.interiorSpacesBuilder.group);
     if (this.interiorSpacesBuilder.platforms && this.interiorSpacesBuilder.platforms.length > 0) {
       this.platforms.push(...this.interiorSpacesBuilder.platforms);
+    }
+
+    // Phase 4 Heavy Steel Fab & Dry Dock 2 Virginia Submarine Berth
+    this.submarineAndFabExpansion = new SubmarineAndFabExpansion();
+    const subRes = this.submarineAndFabExpansion.build();
+    this.group.add(subRes.group);
+    const subPlatforms = this.submarineAndFabExpansion.getWalkablePlatforms();
+    if (subPlatforms && subPlatforms.length > 0) {
+      this.platforms.push(...subPlatforms);
     }
   }
 

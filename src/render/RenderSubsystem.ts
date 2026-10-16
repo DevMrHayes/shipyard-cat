@@ -279,11 +279,36 @@ export class RenderSubsystem {
 
     // 7. Initial Camera Placement
     this.currentCameraPos.set(-10.0, 1.6, -24.5);
+    this.currentLookAt.set(-10.0, 0.4, -20.0);
     this.camera.position.copy(this.currentCameraPos);
-    this.camera.lookAt(-10.0, 0.4, -20.0);
+    this.camera.lookAt(this.currentLookAt);
 
     // 8. Load HDRI Environment
     this.loadHDRI(scene);
+  }
+
+  /**
+   * Immediately snap camera and look-at target behind Alba without interpolating across the yard
+   */
+  public snapCameraToTarget(targetPos: THREE.Vector3, catHeading: number): void {
+    const headHeight = 0.45;
+    this.currentLookAt.set(targetPos.x, targetPos.y + headHeight, targetPos.z);
+    this.cameraYaw = 0;
+    this.cameraPitch = 0.15;
+    const cosPitch = Math.cos(this.cameraPitch);
+    const dirX = -Math.sin(catHeading) * cosPitch;
+    const dirY = Math.sin(this.cameraPitch);
+    const dirZ = -Math.cos(catHeading) * cosPitch;
+    const rayDir = RenderSubsystem.scratchRayDir.set(dirX, dirY, dirZ).normalize();
+    this.currentCamDist = RenderSubsystem.DEFAULT_CAM_DIST;
+    this.currentCameraPos.set(
+      this.currentLookAt.x + rayDir.x * this.currentCamDist,
+      Math.max(targetPos.y + 0.45, this.currentLookAt.y + rayDir.y * this.currentCamDist),
+      this.currentLookAt.z + rayDir.z * this.currentCamDist
+    );
+    this.camera.position.copy(this.currentCameraPos);
+    this.camera.lookAt(this.currentLookAt);
+    this.camera.updateMatrixWorld(true);
   }
 
   private loadHDRI(scene: THREE.Scene): void {
@@ -466,25 +491,34 @@ export class RenderSubsystem {
     isFreeLooking: boolean = false,
     obstacleRaycastFn?: (origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number) => number | null
   ): void {
+    if (this.currentLookAt.lengthSq() < 0.001) {
+      this.snapCameraToTarget(targetPos, catHeading);
+    }
+
     if (!isFreeLooking) {
       // Smoothly re-center camera behind Alba with exponential decay
       const yawDecay = 1.0 - Math.exp(-4.5 * deltaTime);
       this.cameraYaw = THREE.MathUtils.lerp(this.cameraYaw, 0, yawDecay);
     }
 
-    // Interior boundary detection: Machine Shop No. 1 & Cat Motel Hub
+    // Interior boundary detection: Machine Shop No. 1, Cat Motel Hub & Heavy Steel Fab Super-Shop
     const isInsideMachineShop = targetPos.x >= -56 && targetPos.x <= -34 && targetPos.z >= -38 && targetPos.z <= -2;
     const isInsideMotel = targetPos.x >= -62 && targetPos.x <= -48 && targetPos.z >= -71 && targetPos.z <= -59;
-    const isIndoors = isInsideMachineShop || isInsideMotel;
+    const isInsideSteelSuperShop = targetPos.x >= -145 && targetPos.x <= -85 && targetPos.z >= 185 && targetPos.z <= 295;
+    const isIndoors = isInsideMachineShop || isInsideMotel || isInsideSteelSuperShop;
 
-    // Full 7-Zone spatial recognition
+    // Comprehensive Shipyard Spatial Facility Recognition
     let currentLocation = 'Shipyard Grounds (South Yard)';
     if (isInsideMachineShop) {
       currentLocation = 'Machine Shop No. 1 (Mezzanine Catwalk)';
     } else if (isInsideMotel) {
       currentLocation = 'Cat Motel Hub Sanctuary';
+    } else if (isInsideSteelSuperShop) {
+      currentLocation = 'Heavy Steel Fabrication Super-Shop';
     } else if (targetPos.x >= 15 && targetPos.x <= 40 && targetPos.z >= -45 && targetPos.z <= -5) {
       currentLocation = 'Historic Dry Dock 1 (Basin)';
+    } else if (targetPos.x >= -205 && targetPos.x <= -155 && targetPos.z >= 35 && targetPos.z <= 185) {
+      currentLocation = 'Dry Dock 2 (Virginia Submarine Berth)';
     } else if (targetPos.x >= 0 && targetPos.x <= 45 && targetPos.z >= 10 && targetPos.z <= 60) {
       currentLocation = 'Dry Dock 12 (Big Blue Gantry Apron)';
     } else if (targetPos.x <= -15 && targetPos.z >= 20) {

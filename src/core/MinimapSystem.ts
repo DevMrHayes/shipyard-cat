@@ -1,4 +1,4 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 
 export interface MinimapEntity {
   pos: THREE.Vector3;
@@ -13,11 +13,18 @@ export class MinimapSystem {
   private radarCtx: CanvasRenderingContext2D | null = null;
   private fullMapCtx: CanvasRenderingContext2D | null = null;
 
-  // Shipyard World Boundaries (-110 to +65 in X, -100 to +90 in Z)
-  private readonly worldMinX = -110;
-  private readonly worldMaxX = 65;
-  private readonly worldMinZ = -100;
-  private readonly worldMaxZ = 90;
+  // Cached Static Blueprint Background Layer to prevent GC thrashing & draw spikes
+  private staticLayerCanvas: HTMLCanvasElement | null = null;
+  private staticLayerCtx: CanvasRenderingContext2D | null = null;
+  private staticCacheValid = false;
+  private lastMapWidth = 0;
+  private lastMapHeight = 0;
+
+  // Expanded Shipyard World Boundaries (-210 to +75 in X, -110 to +290 in Z)
+  private readonly worldMinX = -210;
+  private readonly worldMaxX = 75;
+  private readonly worldMinZ = -110;
+  private readonly worldMaxZ = 290;
 
   constructor() {
     if (typeof document !== 'undefined') {
@@ -41,6 +48,9 @@ export class MinimapSystem {
     this.fullMapCanvas = null;
     this.radarCtx = null;
     this.fullMapCtx = null;
+    this.staticLayerCanvas = null;
+    this.staticLayerCtx = null;
+    this.staticCacheValid = false;
   }
 
   public update(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[], entityCount?: number) {
@@ -227,6 +237,96 @@ export class MinimapSystem {
     ctx.restore();
   }
 
+  private ensureStaticLayerCache(w: number, h: number): void {
+    if (this.staticCacheValid && this.staticLayerCanvas && this.lastMapWidth === w && this.lastMapHeight === h) {
+      return;
+    }
+
+    if (!this.staticLayerCanvas || !this.staticLayerCtx) {
+      this.staticLayerCanvas = document.createElement('canvas');
+      this.staticLayerCtx = this.staticLayerCanvas.getContext('2d', { alpha: false });
+    }
+
+    this.staticLayerCanvas.width = w;
+    this.staticLayerCanvas.height = h;
+    const sCtx = this.staticLayerCtx;
+    if (!sCtx) return;
+
+    this.lastMapWidth = w;
+    this.lastMapHeight = h;
+    this.staticCacheValid = true;
+
+    const mapX = (worldX: number) => ((worldX - this.worldMinX) / (this.worldMaxX - this.worldMinX)) * w;
+    const mapZ = (worldZ: number) => ((worldZ - this.worldMinZ) / (this.worldMaxZ - this.worldMinZ)) * h;
+
+    // 1. Blueprint Grid & Foundation
+    sCtx.fillStyle = '#060e17';
+    sCtx.fillRect(0, 0, w, h);
+
+    sCtx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+    sCtx.lineWidth = 1;
+    for (let x = 0; x < w; x += 25) {
+      sCtx.beginPath();
+      sCtx.moveTo(x, 0);
+      sCtx.lineTo(x, h);
+      sCtx.stroke();
+    }
+    for (let y = 0; y < h; y += 25) {
+      sCtx.beginPath();
+      sCtx.moveTo(0, y);
+      sCtx.lineTo(w, y);
+      sCtx.stroke();
+    }
+
+    // 2. James River Waterfront (East Pier & Deepwater Basin)
+    const riverLeft = mapX(55);
+    sCtx.fillStyle = '#0369a1';
+    sCtx.fillRect(riverLeft, 0, w - riverLeft, h);
+    sCtx.fillStyle = '#0284c7';
+    sCtx.fillRect(riverLeft - 3, 0, 3, h); // Waterfront bulkheads
+
+    // 3. Complete Yard Facility Polygons
+    const facilities = [
+      { name: 'DRY DOCK 1 (CVN BASIN)', xMin: 15, xMax: 45, zMin: -35, zMax: -20, fill: 'rgba(180, 83, 9, 0.35)', stroke: '#f59e0b' },
+      { name: 'TUGBOAT DOROTHY', xMin: -23, xMax: -17, zMin: -32, zMax: -18, fill: '#991b1b', stroke: '#ef4444' },
+      { name: 'DRY DOCK 12 / BIG BLUE', xMin: 3.5, xMax: 36.5, zMin: -10, zMax: 70, fill: 'rgba(71, 85, 105, 0.45)', stroke: '#38bdf8' },
+      { name: 'CVN-80 SUPERSTRUCTURE', xMin: 8, xMax: 32, zMin: 10, zMax: 65, fill: 'rgba(59, 130, 246, 0.35)', stroke: '#60a5fa' },
+      { name: 'MACHINE SHOP NO. 1', xMin: -56, xMax: -34, zMin: -38, zMax: -2, fill: 'rgba(153, 27, 27, 0.4)', stroke: '#ef4444' },
+      { name: 'SUBMARINE MOF FAB', xMin: -45, xMax: -15, zMin: 30, zMax: 65, fill: 'rgba(30, 41, 59, 0.6)', stroke: '#f59e0b' },
+      { name: 'RCOH NUCLEAR VAULT', xMin: 37, xMax: 53, zMin: -68, zMax: -52, fill: 'rgba(168, 85, 247, 0.25)', stroke: '#a855f7' },
+      { name: 'CAT MOTEL SANCTUARY', xMin: -62, xMax: -48, zMin: -71, zMax: -59, fill: 'rgba(34, 197, 94, 0.25)', stroke: '#22c55e' },
+      { name: 'JMAF ASSEMBLY SHOP', xMin: -65, xMax: -45, zMin: -15, zMax: 5, fill: 'rgba(217, 119, 6, 0.35)', stroke: '#d97706' },
+      { name: 'THE APPRENTICE SCHOOL', xMin: -65, xMax: -45, zMin: -60, zMax: -40, fill: 'rgba(14, 165, 233, 0.25)', stroke: '#0ea5e9' },
+      { name: 'PIPE FAB & SPOOL DEPOT', xMin: -95, xMax: -45, zMin: -95, zMax: -30, fill: 'rgba(100, 116, 139, 0.35)', stroke: '#94a3b8' },
+      { name: 'PLATE BENDING & BLAST', xMin: -95, xMax: -50, zMin: -15, zMax: 30, fill: 'rgba(120, 53, 15, 0.35)', stroke: '#b45309' },
+      { name: 'RAIL MARSHALING YARD', xMin: -65, xMax: 30, zMin: 65, zMax: 100, fill: 'rgba(51, 65, 85, 0.45)', stroke: '#64748b' },
+      { name: 'DRY DOCK 2 (VIRGINIA SUB)', xMin: -200, xMax: -160, zMin: 40, zMax: 180, fill: 'rgba(15, 43, 53, 0.75)', stroke: '#22d3ee' },
+      { name: 'HEAVY STEEL FAB SUPER-SHOP', xMin: -140, xMax: -90, zMin: 190, zMax: 290, fill: 'rgba(88, 28, 135, 0.45)', stroke: '#c084fc' }
+    ];
+
+    for (const fac of facilities) {
+      const left = mapX(fac.xMin);
+      const top = mapZ(fac.zMin);
+      const fw = mapX(fac.xMax) - left;
+      const fh = mapZ(fac.zMax) - top;
+
+      sCtx.fillStyle = fac.fill;
+      sCtx.fillRect(left, top, fw, fh);
+
+      sCtx.strokeStyle = fac.stroke;
+      sCtx.lineWidth = 1.5;
+      sCtx.strokeRect(left, top, fw, fh);
+
+      sCtx.font = 'bold 8.5px monospace';
+      sCtx.fillStyle = '#f8fafc';
+      sCtx.fillText(fac.name, left + 4, top + 12);
+    }
+
+    sCtx.font = 'bold 10px monospace';
+    sCtx.fillStyle = '#bae6fd';
+    sCtx.fillText('JAMES RIVER CHANNEL', mapX(58), h * 0.5);
+  }
+
   private renderFullTacticalMap(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[], count: number) {
     if (!this.fullMapCtx || !this.fullMapCanvas) return;
     const ctx = this.fullMapCtx;
@@ -234,96 +334,14 @@ export class MinimapSystem {
     const h = this.fullMapCanvas.height;
     const now = Date.now();
 
-    ctx.clearRect(0, 0, w, h);
+    this.ensureStaticLayerCache(w, h);
+    if (this.staticLayerCanvas) {
+      ctx.drawImage(this.staticLayerCanvas, 0, 0);
+    }
 
     // Coordinate mapping helper
     const mapX = (worldX: number) => ((worldX - this.worldMinX) / (this.worldMaxX - this.worldMinX)) * w;
     const mapZ = (worldZ: number) => ((worldZ - this.worldMinZ) / (this.worldMaxZ - this.worldMinZ)) * h;
-
-    // 1. Blueprint Grid Background
-    ctx.fillStyle = '#09131e';
-    ctx.fillRect(0, 0, w, h);
-
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < w; x += 25) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-    }
-    for (let y = 0; y < h; y += 25) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-    }
-
-    // 2. Facility Zones & Polygons
-
-    // James River Waterfront (East Pier)
-    ctx.fillStyle = '#0369a1';
-    ctx.fillRect(mapX(55), 0, w - mapX(55), h);
-
-    // Historic Dry Dock 1 (Perpendicular Basin Trough X:15 to 45, Z:-35 to -20)
-    ctx.fillStyle = 'rgba(180, 83, 9, 0.35)';
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1.5;
-    const dd1Left = mapX(15);
-    const dd1Top = mapZ(-35);
-    const dd1W = mapX(45) - dd1Left;
-    const dd1H = mapZ(-20) - dd1Top;
-    ctx.fillRect(dd1Left, dd1Top, dd1W, dd1H);
-    ctx.strokeRect(dd1Left, dd1Top, dd1W, dd1H);
-
-    // Tugboat Dorothy Dry Mount
-    ctx.fillStyle = '#991b1b';
-    ctx.fillRect(mapX(-23), mapZ(-32), mapX(-17) - mapX(-23), mapZ(-18) - mapZ(-32));
-
-    // Dry Dock 12 / Big Blue Gantry Basin (North)
-    ctx.fillStyle = 'rgba(71, 85, 105, 0.45)';
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 1.5;
-    const ddLeft = mapX(3.5);
-    const ddTop = mapZ(-10);
-    const ddW = mapX(36.5) - ddLeft;
-    const ddH = mapZ(70) - ddTop;
-    ctx.fillRect(ddLeft, ddTop, ddW, ddH);
-    ctx.strokeRect(ddLeft, ddTop, ddW, ddH);
-
-    // Red Brick Machine Shop No. 1
-    ctx.fillStyle = 'rgba(153, 27, 27, 0.4)';
-    ctx.strokeStyle = '#ef4444';
-    const msLeft = mapX(-56);
-    const msTop = mapZ(-38);
-    const msW = mapX(-34) - msLeft;
-    const msH = mapZ(-2) - msTop;
-    ctx.fillRect(msLeft, msTop, msW, msH);
-    ctx.strokeRect(msLeft, msTop, msW, msH);
-
-    // Submarine MOF Fabrication Shop
-    ctx.fillStyle = 'rgba(30, 41, 59, 0.6)';
-    ctx.strokeStyle = '#f59e0b';
-    ctx.fillRect(mapX(-45), mapZ(30), mapX(-15) - mapX(-45), mapZ(65) - mapZ(30));
-    ctx.strokeRect(mapX(-45), mapZ(30), mapX(-15) - mapX(-45), mapZ(65) - mapZ(30));
-
-    // RCOH Nuclear Overhaul Vault
-    ctx.fillStyle = 'rgba(168, 85, 247, 0.25)';
-    ctx.strokeStyle = '#a855f7';
-    ctx.fillRect(mapX(37), mapZ(-68), mapX(53) - mapX(37), mapZ(-52) - mapZ(-68));
-    ctx.strokeRect(mapX(37), mapZ(-68), mapX(53) - mapX(37), mapZ(-52) - mapZ(-68));
-
-    // Cat Motel Sanctuary
-    ctx.fillStyle = 'rgba(34, 197, 94, 0.25)';
-    ctx.strokeStyle = '#22c55e';
-    ctx.fillRect(mapX(-62), mapZ(-71), mapX(-48) - mapX(-62), mapZ(-59) - mapZ(-71));
-    ctx.strokeRect(mapX(-62), mapZ(-71), mapX(-48) - mapX(-62), mapZ(-59) - mapZ(-71));
-
-    // Facility Labels with Diegetic Badges
-    ctx.font = 'bold 9px monospace';
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillText('DRY DOCK 12 / BIG BLUE', ddLeft + 4, ddTop + 14);
-    ctx.fillText('HISTORIC DRY DOCK 1', dd1Left + 4, dd1Top + 12);
-    ctx.fillText('TUGBOAT DOROTHY', mapX(-30), mapZ(-24));
-    ctx.fillText('MACHINE SHOP NO. 1', msLeft + 4, msTop + 14);
-    ctx.fillText('SUBMARINE FAB (MOF)', mapX(-44), mapZ(34));
-    ctx.fillText('RCOH NUCLEAR VAULT', mapX(38), mapZ(-60));
-    ctx.fillText('CAT MOTEL HUB', mapX(-60), mapZ(-67));
-    ctx.fillText('JAMES RIVER', mapX(58), h / 2);
 
     // 3. Render Entities on Map
     for (let i = 0; i < count; i++) {
