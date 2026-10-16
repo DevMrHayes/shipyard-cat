@@ -1,7 +1,5 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
-import { TextureGenerator } from '../core/TextureGenerator';
-import { ModelManager } from '../core/ModelManager';
 import { DiurnalSystem, ShiftInfo } from '../systems/DiurnalSystem';
 
 export interface ScreenProjection {
@@ -31,6 +29,7 @@ export class RenderSubsystem {
   public currentCameraPos: THREE.Vector3 = new THREE.Vector3();
   public currentLookAt: THREE.Vector3 = new THREE.Vector3();
   public cameraShakeIntensity: number = 0;
+  private isCameraInitialized: boolean = false;
 
   // Impact Sparks Particle System & Dynamic Hit Flash Light
   public sparkPoints: THREE.Points;
@@ -57,77 +56,23 @@ export class RenderSubsystem {
   public isNightMode: boolean = false;
   public diurnalSystem!: DiurnalSystem;
 
-  public updateDiurnal(deltaTime: number): ShiftInfo {
-    const info = this.diurnalSystem.update(deltaTime);
-    this.isNightMode = info.isNight;
-    return info;
-  }
-
-  public setNightMode(isNight: boolean, scene: THREE.Scene): void {
-    this.isNightMode = isNight;
-    if (isNight) {
-      this.hemiLight.color.setHex(0x1e293b);
-      this.hemiLight.groundColor.setHex(0x020617);
-      this.hemiLight.intensity = 0.35;
-      if (this.ambientLight) this.ambientLight.intensity = 0.2;
-
-      this.sunLight.color.setHex(0x60a5fa);
-      this.sunLight.intensity = 0.35;
-
-      this.fillLight.color.setHex(0x1e293b);
-      this.fillLight.intensity = 0.15;
-
-      this.riverFlood.intensity = 0.35;
-
-      // High-mast stadium floodlights burn brightly on night shift
-      this.southYardFlood.intensity = 6.5;
-      this.dryDockFlood.intensity = 7.5;
-      this.subShopFlood.intensity = 6.5;
-
-      const nightBg = new THREE.Color(0x020617);
-      scene.background = nightBg;
-      scene.fog = new THREE.FogExp2(0x020617, 0.008);
-      this.renderer.toneMappingExposure = 0.95;
-    } else {
-      this.hemiLight.color.setHex(0xcbd5e1);
-      this.hemiLight.groundColor.setHex(0x1e293b);
-      this.hemiLight.intensity = 1.35;
-
-      this.sunLight.color.setHex(0xfff4e0);
-      this.sunLight.intensity = 2.45;
-
-      this.fillLight.color.setHex(0x38bdf8);
-      this.fillLight.intensity = 1.4;
-
-      this.riverFlood.intensity = 1.7;
-
-      this.southYardFlood.intensity = 2.4;
-      this.dryDockFlood.intensity = 2.8;
-      this.subShopFlood.intensity = 2.4;
-
-      scene.background = RenderSubsystem.normalBgColor;
-      scene.fog = this.normalFog;
-      this.renderer.toneMappingExposure = 1.05;
-    }
-  }
-
-  // --- Whiskers Vision Sonar Pulse Wave & Thermal Signature Properties ---
+  // Whiskers Vision Sonar Pulse Wave & Thermal Signature Properties
   public sonarWaveRing!: THREE.Mesh;
   public sonarWaveMaterial!: THREE.MeshBasicMaterial;
   public sonarWaveActive: boolean = false;
   public sonarWaveElapsed: number = 0;
-  public static readonly SONAR_WAVE_DURATION = 1.2; // 1.2s expansion to 35m
+  public static readonly SONAR_WAVE_DURATION = 1.2;
   public static readonly SONAR_WAVE_MAX_RADIUS = 35.0;
   private lastPreyWhiskersMode: boolean = false;
 
   public static readonly THERMAL_COLORS = {
-    PREY_AMBER: new THREE.Color(0xff9500),       // Warm high-contrast amber/orange for mice & rats
-    KINGPIN_CRIMSON: new THREE.Color(0x991b1b),  // Deep menacing crimson silhouette for Rat Kingpin (replaces bright yellow)
-    MUTANT_VIOLET: new THREE.Color(0xc026d3),    // Radioactive vibrant violet for mutants
-    NEUTRAL_CYAN: new THREE.Color(0x06b6d4)      // Cool blueprint cyan
+    PREY_AMBER: new THREE.Color(0xff9500),
+    KINGPIN_CRIMSON: new THREE.Color(0x991b1b),
+    MUTANT_VIOLET: new THREE.Color(0xc026d3),
+    NEUTRAL_CYAN: new THREE.Color(0x06b6d4)
   };
 
-  // --- Spring-Arm Camera Collision State & Zero-Allocation Scratch Buffers ---
+  // Spring-Arm Camera Collision State & Zero-Allocation Scratch Buffers
   private currentCamDist: number = 3.8;
   private static readonly DEFAULT_CAM_DIST = 3.8;
   private static readonly MIN_CAM_DIST = 1.2;
@@ -146,9 +91,8 @@ export class RenderSubsystem {
   private lastLocationNotificationTime: number = -4000;
   private currentLocationString: string = 'Shipyard Grounds (South Yard)';
 
-  public getCurrentLocationName(): string {
-    return this.currentLocationString;
-  }
+  // Cached DOM elements to prevent querySelector thrashing in per-frame rendering
+  private whiskersReticleEl: HTMLElement | null = null;
 
   public events: RenderEvents = {};
 
@@ -162,7 +106,12 @@ export class RenderSubsystem {
     );
 
     // 2. Setup WebGL Renderer (AAA Grade Pipeline)
-    this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      powerPreference: 'high-performance',
+      stencil: false,
+      depth: true
+    });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
     this.renderer.shadowMap.enabled = true;
@@ -179,11 +128,9 @@ export class RenderSubsystem {
     scene.fog = this.normalFog;
 
     // 4. Setup Lighting
-    // Golden-hour sky & Slate navy ground bounce
     this.hemiLight = new THREE.HemisphereLight(0xcbd5e1, 0x1e293b, 1.35);
     scene.add(this.hemiLight);
 
-    // Calibrated golden sunset sun with crisp shadow cascade tracking
     this.sunLight = new THREE.DirectionalLight(0xfff4e0, 2.45);
     this.sunLight.position.set(45, 48, 25);
     this.sunLight.castShadow = true;
@@ -199,12 +146,10 @@ export class RenderSubsystem {
     this.sunLight.shadow.camera.bottom = -80;
     scene.add(this.sunLight);
 
-    // Cool maritime river fill light
     this.fillLight = new THREE.DirectionalLight(0x38bdf8, 1.4);
     this.fillLight.position.set(-60, 45, -45);
     scene.add(this.fillLight);
 
-    // High-mast floodlights (Tightly scoped cones & distances to prevent full-scene fragment shading overlap)
     this.southYardFlood = new THREE.SpotLight(0xff9922, 2.4, 42, Math.PI / 4, 0.45, 1.2);
     this.southYardFlood.position.set(-20, 18, -15);
     this.southYardFlood.target.position.set(-20, 0, -25);
@@ -261,7 +206,7 @@ export class RenderSubsystem {
     this.hitFlashLight = new THREE.PointLight(0xf59e0b, 0, 10);
     scene.add(this.hitFlashLight);
 
-    // 6B. Expanding Radial Sonar Ripple Ring (0 -> 35m over 1.2s)
+    // 6B. Expanding Radial Sonar Ripple Ring
     const ringGeo = new THREE.RingGeometry(0.88, 1.0, 64);
     ringGeo.rotateX(-Math.PI / 2);
     this.sonarWaveMaterial = new THREE.MeshBasicMaterial({
@@ -282,22 +227,126 @@ export class RenderSubsystem {
     this.camera.position.copy(this.currentCameraPos);
     this.camera.lookAt(-10.0, 0.4, -20.0);
 
+    // Cache sensory reticle element reference
+    this.whiskersReticleEl = document.getElementById('whiskers-sensory-reticle');
+
     // 8. Load HDRI Environment
     this.loadHDRI(scene);
   }
 
+  /**
+   * Pre-compile all WebGL materials and shaders in the scene to completely eliminate
+   * runtime JIT shader compilation stutter / freeze spikes on initial encounters.
+   */
+  public prewarmShaders(scene: THREE.Scene): void {
+    try {
+      this.renderer.compile(scene, this.camera);
+    } catch (e) {
+      console.warn('Shader pre-warming encountered a non-fatal warning:', e);
+    }
+  }
+
+  /**
+   * Explicitly set the initial camera anchor to the cat's actual spawn location
+   * before the first render loop ticks, preventing startup snap and camera warping.
+   */
+  public initializeCameraPosition(targetPos: THREE.Vector3, catHeading: number): void {
+    const headHeight = 0.45;
+    this.currentLookAt.set(targetPos.x, targetPos.y + headHeight, targetPos.z);
+    this.currentCamDist = RenderSubsystem.DEFAULT_CAM_DIST;
+
+    const totalHeading = catHeading + this.cameraYaw;
+    const cosPitch = Math.cos(this.cameraPitch);
+    const dirX = -Math.sin(totalHeading) * cosPitch;
+    const dirY = Math.sin(this.cameraPitch);
+    const dirZ = -Math.cos(totalHeading) * cosPitch;
+
+    this.currentCameraPos.set(
+      this.currentLookAt.x + dirX * this.currentCamDist,
+      Math.max(targetPos.y + 0.45, this.currentLookAt.y + dirY * this.currentCamDist),
+      this.currentLookAt.z + dirZ * this.currentCamDist
+    );
+
+    this.camera.position.copy(this.currentCameraPos);
+    this.camera.lookAt(this.currentLookAt);
+
+    this.sunLight.target.position.set(targetPos.x, 0, targetPos.z);
+    this.sunLight.position.set(targetPos.x + 45, 48, targetPos.z + 25);
+    this.sunLight.target.updateMatrixWorld();
+
+    this.isCameraInitialized = true;
+  }
+
+  public updateDiurnal(deltaTime: number): ShiftInfo {
+    const info = this.diurnalSystem.update(deltaTime);
+    this.isNightMode = info.isNight;
+    return info;
+  }
+
+  public setNightMode(isNight: boolean, scene: THREE.Scene): void {
+    this.isNightMode = isNight;
+    if (isNight) {
+      this.hemiLight.color.setHex(0x1e293b);
+      this.hemiLight.groundColor.setHex(0x020617);
+      this.hemiLight.intensity = 0.35;
+      if (this.ambientLight) this.ambientLight.intensity = 0.2;
+
+      this.sunLight.color.setHex(0x60a5fa);
+      this.sunLight.intensity = 0.35;
+
+      this.fillLight.color.setHex(0x1e293b);
+      this.fillLight.intensity = 0.15;
+
+      this.riverFlood.intensity = 0.35;
+
+      this.southYardFlood.intensity = 6.5;
+      this.dryDockFlood.intensity = 7.5;
+      this.subShopFlood.intensity = 6.5;
+
+      const nightBg = new THREE.Color(0x020617);
+      scene.background = nightBg;
+      scene.fog = new THREE.FogExp2(0x020617, 0.008);
+      this.renderer.toneMappingExposure = 0.95;
+    } else {
+      this.hemiLight.color.setHex(0xcbd5e1);
+      this.hemiLight.groundColor.setHex(0x1e293b);
+      this.hemiLight.intensity = 1.35;
+
+      this.sunLight.color.setHex(0xfff4e0);
+      this.sunLight.intensity = 2.45;
+
+      this.fillLight.color.setHex(0x38bdf8);
+      this.fillLight.intensity = 1.4;
+
+      this.riverFlood.intensity = 1.7;
+
+      this.southYardFlood.intensity = 2.4;
+      this.dryDockFlood.intensity = 2.8;
+      this.subShopFlood.intensity = 2.4;
+
+      scene.background = RenderSubsystem.normalBgColor;
+      scene.fog = this.normalFog;
+      this.renderer.toneMappingExposure = 1.05;
+    }
+  }
+
   private loadHDRI(scene: THREE.Scene): void {
     const hdrLoader = new RGBELoader();
-    hdrLoader.load('/environment/evening_sky_1k.hdr', (texture: THREE.DataTexture) => {
-      texture.mapping = THREE.EquirectangularReflectionMapping;
-      this.hdrSkyTexture = texture;
-      scene.environment = texture;
-      if (!this.isWhiskersMode) {
-        scene.background = texture;
+    hdrLoader.load(
+      '/environment/evening_sky_1k.hdr',
+      (texture: THREE.DataTexture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        this.hdrSkyTexture = texture;
+        scene.environment = texture;
+        if (!this.isWhiskersMode) {
+          scene.background = texture;
+        }
+      },
+      undefined,
+      (err: unknown) => {
+        console.warn('HDRI load note:', err);
       }
-    }, undefined, (err: unknown) => {
-      console.warn('HDRI load note:', err);
-    });
+    );
   }
 
   /**
@@ -310,7 +359,6 @@ export class RenderSubsystem {
       scene.background = RenderSubsystem.sonarBgColor;
       scene.fog = this.sonarFog;
 
-      // Trigger expanding radial sonar ripple wave from Alba's coordinates
       this.sonarWaveActive = true;
       this.sonarWaveElapsed = 0;
       this.sonarWaveRing.visible = true;
@@ -330,15 +378,17 @@ export class RenderSubsystem {
       this.sonarWaveRing.visible = false;
     }
 
-    const reticleEl = document.getElementById('whiskers-sensory-reticle');
-    if (reticleEl) {
-      reticleEl.classList.toggle('active', active);
+    if (!this.whiskersReticleEl) {
+      this.whiskersReticleEl = document.getElementById('whiskers-sensory-reticle');
+    }
+    if (this.whiskersReticleEl) {
+      this.whiskersReticleEl.classList.toggle('active', active);
     }
   }
 
   /**
    * Updates expanding 35m radial sonar wave and applies high-contrast thermal
-   * emissive signatures to prey (amber), Kingpin (gold), and mutants (violet).
+   * emissive signatures to prey (amber), Kingpin (crimson), and mutants (violet).
    */
   public updateWhiskersSonarWave(
     deltaTime: number,
@@ -348,7 +398,6 @@ export class RenderSubsystem {
     if (this.sonarWaveActive) {
       this.sonarWaveElapsed += deltaTime;
       const t = Math.min(1.0, this.sonarWaveElapsed / RenderSubsystem.SONAR_WAVE_DURATION);
-      // Ease-out cubic expansion to 35m
       const eased = 1.0 - Math.pow(1.0 - t, 3);
       const radius = Math.max(0.1, eased * RenderSubsystem.SONAR_WAVE_MAX_RADIUS);
 
@@ -437,7 +486,7 @@ export class RenderSubsystem {
           this.sparkPositions[pIdx] += this.sparkVelocities[pIdx] * deltaTime;
           this.sparkPositions[pIdx + 1] += this.sparkVelocities[pIdx + 1] * deltaTime;
           this.sparkPositions[pIdx + 2] += this.sparkVelocities[pIdx + 2] * deltaTime;
-          this.sparkVelocities[pIdx + 1] -= 12.0 * deltaTime; // Gravity
+          this.sparkVelocities[pIdx + 1] -= 12.0 * deltaTime;
           activeSparks = true;
         } else {
           const pIdx = i * 3;
@@ -457,7 +506,7 @@ export class RenderSubsystem {
 
   /**
    * Spring-Arm Camera Update with obstacle collision avoidance, indoor/outdoor room clamping,
-   * camera shake, and exponential decay smoothing.
+   * camera shake, and exponential decay smoothing. Includes all expanded facility regions.
    */
   public updateCamera(
     deltaTime: number,
@@ -466,33 +515,45 @@ export class RenderSubsystem {
     isFreeLooking: boolean = false,
     obstacleRaycastFn?: (origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number) => number | null
   ): void {
+    if (!this.isCameraInitialized) {
+      this.initializeCameraPosition(targetPos, catHeading);
+    }
+
     if (!isFreeLooking) {
-      // Smoothly re-center camera behind Alba with exponential decay
       const yawDecay = 1.0 - Math.exp(-4.5 * deltaTime);
       this.cameraYaw = THREE.MathUtils.lerp(this.cameraYaw, 0, yawDecay);
     }
 
-    // Interior boundary detection: Machine Shop No. 1 & Cat Motel Hub
+    // Interior boundary detection: Machine Shop, Steel Super-Shop, and Cat Motel Hub
     const isInsideMachineShop = targetPos.x >= -56 && targetPos.x <= -34 && targetPos.z >= -38 && targetPos.z <= -2;
     const isInsideMotel = targetPos.x >= -62 && targetPos.x <= -48 && targetPos.z >= -71 && targetPos.z <= -59;
-    const isIndoors = isInsideMachineShop || isInsideMotel;
+    const isInsideSteelSuperShop = targetPos.x >= -70 && targetPos.x <= -30 && targetPos.z >= -105 && targetPos.z <= -65;
+    const isIndoors = isInsideMachineShop || isInsideMotel || isInsideSteelSuperShop;
 
-    // Full 7-Zone spatial recognition
+    // Comprehensive Shipyard Spatial Facility Recognition
     let currentLocation = 'Shipyard Grounds (South Yard)';
     if (isInsideMachineShop) {
       currentLocation = 'Machine Shop No. 1 (Mezzanine Catwalk)';
     } else if (isInsideMotel) {
       currentLocation = 'Cat Motel Hub Sanctuary';
+    } else if (isInsideSteelSuperShop) {
+      currentLocation = 'Heavy Steel Fab Super-Shop';
     } else if (targetPos.x >= 15 && targetPos.x <= 40 && targetPos.z >= -45 && targetPos.z <= -5) {
-      currentLocation = 'Historic Dry Dock 1 (Basin)';
+      currentLocation = 'Historic Dry Dock 1 (Carrier Basin)';
+    } else if (targetPos.x >= 12 && targetPos.x <= 38 && targetPos.z >= -105 && targetPos.z <= -55) {
+      currentLocation = 'Dry Dock 2 (Virginia Sub Berth)';
     } else if (targetPos.x >= 0 && targetPos.x <= 45 && targetPos.z >= 10 && targetPos.z <= 60) {
       currentLocation = 'Dry Dock 12 (Big Blue Gantry Apron)';
     } else if (targetPos.x <= -15 && targetPos.z >= 20) {
       currentLocation = 'Submarine MOF (Modular Outfitting)';
     } else if (targetPos.x >= 35 && targetPos.z >= -10 && targetPos.z <= 40) {
       currentLocation = 'East Pier Boardwalk & James River';
+    } else if (targetPos.x >= 30 && targetPos.z <= -110) {
+      currentLocation = 'North Pier Deepwater Outfitting';
     } else if (targetPos.x >= 30 && targetPos.z <= -45) {
       currentLocation = 'RCOH Nuclear Overhaul Vault';
+    } else if (targetPos.x <= -40 && targetPos.z >= -65 && targetPos.z <= -40) {
+      currentLocation = 'Foundry & Pipe Fabrication Annex';
     }
 
     this.currentLocationString = currentLocation;
@@ -534,8 +595,6 @@ export class RenderSubsystem {
       }
     }
 
-    // Asymmetric exponential spring damping:
-    // Smooth pull-in on obstacle occlusion (lambda=14), gentle restoration when clear (lambda=6)
     const distLambda = targetAllowedDist < this.currentCamDist ? 14.0 : 6.0;
     const distLerp = 1.0 - Math.exp(-distLambda * deltaTime);
     this.currentCamDist += (targetAllowedDist - this.currentCamDist) * Math.min(1.0, distLerp);
@@ -546,11 +605,15 @@ export class RenderSubsystem {
       rawLookTarget.z + rayDir.z * this.currentCamDist
     );
 
-    // Indoor Machine Shop room boundary clamping
+    // Indoor room boundary clamping
     if (isInsideMachineShop) {
       desiredCameraPos.x = Math.max(-55.0, Math.min(-35.0, desiredCameraPos.x));
       desiredCameraPos.z = Math.max(-37.0, Math.min(-3.0, desiredCameraPos.z));
       desiredCameraPos.y = Math.max(0.4, Math.min(6.5, desiredCameraPos.y));
+    } else if (isInsideSteelSuperShop) {
+      desiredCameraPos.x = Math.max(-68.5, Math.min(-31.5, desiredCameraPos.x));
+      desiredCameraPos.z = Math.max(-103.5, Math.min(-66.5, desiredCameraPos.z));
+      desiredCameraPos.y = Math.max(0.4, Math.min(14.0, desiredCameraPos.y));
     }
 
     // Frame-rate independent exponential spring-arm smoothing
@@ -564,82 +627,4 @@ export class RenderSubsystem {
       this.camera.position.z = this.currentCameraPos.z + (Math.random() - 0.5) * this.cameraShakeIntensity;
       this.cameraShakeIntensity = Math.max(0, this.cameraShakeIntensity - deltaTime * 3.5);
     } else {
-      this.camera.position.copy(this.currentCameraPos);
-    }
-
-    // Smooth look-at target tracking
-    const lookLerpFactor = 1.0 - Math.exp(-16.0 * deltaTime);
-    this.currentLookAt.lerp(rawLookTarget, Math.min(1.0, lookLerpFactor));
-    this.camera.lookAt(this.currentLookAt);
-
-    // Keep sunlight shadow camera centered on Alba's quadrant with discrete texel snapping to eliminate shadow edge shimmering
-    const shadowTexelSnap = 0.25;
-    const snappedX = Math.round(targetPos.x / shadowTexelSnap) * shadowTexelSnap;
-    const snappedZ = Math.round(targetPos.z / shadowTexelSnap) * shadowTexelSnap;
-    this.sunLight.target.position.set(snappedX, 0, snappedZ);
-    this.sunLight.position.set(snappedX + 45, 48, snappedZ + 25);
-    this.sunLight.target.updateMatrixWorld();
-  }
-
-  /**
-   * Fast GPU Screen Coordinate Projection for 3D In-World UI Elements (Zero-Allocation)
-   */
-  public projectPoint(pos: THREE.Vector3, heightOffset: number): ScreenProjection {
-    const v = RenderSubsystem.scratchProjectVec.copy(pos);
-    v.y += heightOffset;
-    v.project(this.camera);
-
-    if (v.z < 1.0) {
-      const screenX = (v.x * 0.5 + 0.5) * window.innerWidth;
-      const screenY = (-(v.y * 0.5) + 0.5) * window.innerHeight;
-      if (screenX >= 20 && screenX <= window.innerWidth - 20 && screenY >= 20 && screenY <= window.innerHeight - 20) {
-        RenderSubsystem.scratchScreenProj.screenX = screenX;
-        RenderSubsystem.scratchScreenProj.screenY = screenY;
-        RenderSubsystem.scratchScreenProj.visible = true;
-        return RenderSubsystem.scratchScreenProj;
-      }
-    }
-
-    RenderSubsystem.scratchScreenProj.screenX = 0;
-    RenderSubsystem.scratchScreenProj.screenY = 0;
-    RenderSubsystem.scratchScreenProj.visible = false;
-    return RenderSubsystem.scratchScreenProj;
-  }
-
-  /**
-   * Handle viewport resize
-   */
-  public resize(): void {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
-  }
-
-  /**
-   * Render frame pass
-   */
-  public render(scene: THREE.Scene): void {
-    this.renderer.render(scene, this.camera);
-  }
-
-  /**
-   * Dispose all WebGL resources, geometries, materials, and canvas elements
-   */
-  public dispose(): void {
-    if (this.sparkPoints) {
-      this.sparkPoints.geometry.dispose();
-      (this.sparkPoints.material as THREE.Material).dispose();
-    }
-
-    if (this.hdrSkyTexture) {
-      this.hdrSkyTexture.dispose();
-      this.hdrSkyTexture = null;
-    }
-
-    this.renderer.dispose();
-    if (this.renderer.domElement && this.renderer.domElement.parentElement) {
-      this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);
-    }
-  }
-}
+      this.camera.
