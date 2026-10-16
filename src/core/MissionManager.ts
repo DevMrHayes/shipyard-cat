@@ -7,6 +7,12 @@ export interface CollectibleItem {
   description: string;
 }
 
+export interface ShiftBonusCondition {
+  requiredShift?: 'DAY' | 'NIGHT' | 'DUSK' | 'DAWN' | 'ANY';
+  bonusXP: number;
+  bonusTitle?: string;
+}
+
 export interface MissionObjective {
   id: string;
   description: string;
@@ -14,10 +20,12 @@ export interface MissionObjective {
   requiredCount?: number;
   currentCount?: number;
   targetPosition?: { x: number; y: number; z: number };
+  triggerRadius?: number;
   hint?: string;
   zoneName?: string;
   isOptional?: boolean;
   rewardBonusXP?: number;
+  shiftBonus?: ShiftBonusCondition;
 }
 
 export interface Mission {
@@ -83,14 +91,21 @@ export class MissionManager {
           requiredCount: 2,
           currentCount: 0,
           targetPosition: { x: -25, y: 0, z: -15 },
+          triggerRadius: 4.5,
           hint: "Sneak [C/Ctrl] near mice and strike with Paw Swipe [J] or Pounce [F]",
-          zoneName: "South Yard Rail Spurs"
+          zoneName: "South Yard Rail spurs",
+          shiftBonus: {
+            requiredShift: 'DAWN',
+            bonusXP: 50,
+            bonusTitle: 'Early Bird Rigger'
+          }
         },
         {
           id: "climb_dorothy",
           description: "Go onto the river boardwalk and climb down crates into Dry Dock 1",
           isCompleted: false,
           targetPosition: { x: 41, y: 0.5, z: -22.5 },
+          triggerRadius: 3.5,
           hint: "Walk up the sloped gangway to the boardwalk [X:45], then step down the crates [Y:-2.0m]",
           zoneName: "Historic Dry Dock 1 Rim"
         },
@@ -99,6 +114,7 @@ export class MissionManager {
           description: "Pounce and defeat the 'Dockyard Kingpin' in Dry Dock 1",
           isCompleted: false,
           targetPosition: { x: 28, y: -2.0, z: -27.5 },
+          triggerRadius: 3.5,
           hint: "Engage the Kingpin inside the trough! Use 3-hit Claw Flurry [J/R] or Pounce [F]",
           zoneName: "Dry Dock 1 Basin Floor"
         }
@@ -134,6 +150,7 @@ export class MissionManager {
           description: "Climb onto the foredeck of Tugboat Dorothy (Y: +2.2m)",
           isCompleted: false,
           targetPosition: { x: -20, y: 2.2, z: -25 },
+          triggerRadius: 3.0,
           hint: "Leap from the tool chests onto Dorothy's wooden gunwale and foredeck",
           zoneName: "Tugboat Dorothy Foredeck"
         },
@@ -142,8 +159,14 @@ export class MissionManager {
           description: "Investigate behind the wheelhouse and clear the cable snarl",
           isCompleted: false,
           targetPosition: { x: -21, y: 2.2, z: -28 },
+          triggerRadius: 2.5,
           hint: "Swipe [J] at the fouled mooring cable to free the capstan drum",
-          zoneName: "Dorothy Wheelhouse"
+          zoneName: "Dorothy Wheelhouse",
+          shiftBonus: {
+            requiredShift: 'DAY',
+            bonusXP: 60,
+            bonusTitle: 'Steamline Restorer'
+          }
         }
       ]
     },
@@ -158,9 +181,9 @@ export class MissionManager {
       title: "Tide Rising in Dry Dock 12",
       subtitle: "CVN Carrier Keel Flooding & Catwalk Escape",
       location: "Dry Dock 12 Basin (CVN Supercarrier Berth)",
-      briefing: "Gantry's insurgents sabotaged the emergency sluice gate! The James River is rushing into Dry Dock 12. Navigate to the rim of Dry Dock 12, leap across floating wooden pallets as water rises, and climb the yellow staging ladder to safety before the basin completely floods.",
+      briefing: "Gantry's insurgents sabotaged the emergency sluice gate! The James River is rushing into Dry Dock 12. Navigate across the basin floor, scale the CVN-80 Enterprise flight deck and island bridge, and climb the yellow staging catwalk to safety before the basin completely floods.",
       dialogueSpeaker: "Tripod Toby (Colony Veteran Cat)",
-      dialogueText: "Listen to that roaring water, Alba! The basin's filling up fast! Keep your paws dry—hop across the floating pallets and climb the staging ladders!",
+      dialogueText: "Listen to that roaring water, Alba! The basin's filling up fast! Keep your paws dry—hop across the floating pallets, clear the carrier flight deck, and climb the staging ladders!",
       isUnlocked: false,
       isCompleted: false,
       assistIdReward: "CRANE_SAFETY_TRIP",
@@ -173,6 +196,14 @@ export class MissionManager {
           position: { x: 22, y: 1.5, z: 32 },
           isCollected: false,
           description: "High-tensile steel fastener from the nuclear supercarrier modular assembly berth."
+        },
+        {
+          id: "RIVET_CVN80_ISLAND",
+          name: "CVN-80 Enterprise Island Mast Rivet",
+          category: "RIVET",
+          position: { x: 20, y: 3.25, z: 44 },
+          isCollected: false,
+          description: "Radar mast titanium fastener salvaged from the elevated carrier island superstructure."
         }
       ],
       objectives: [
@@ -181,6 +212,7 @@ export class MissionManager {
           description: "Navigate to the rim of Dry Dock 12",
           isCompleted: false,
           targetPosition: { x: 14, y: 0, z: 18 },
+          triggerRadius: 4.0,
           hint: "Head north past the crane staging area towards Big Blue's blue gantry legs",
           zoneName: "Dry Dock 12 South Rim"
         },
@@ -191,14 +223,31 @@ export class MissionManager {
           requiredCount: 3,
           currentCount: 0,
           targetPosition: { x: 20, y: 1.5, z: 30 },
+          triggerRadius: 3.2,
           hint: "Time your jumps [Space] across the floating wooden pallets in the flooding basin",
           zoneName: "Flooding Carrier Basin"
+        },
+        {
+          id: "inspect_flight_deck",
+          description: "Scale CVN-80 Enterprise flight deck and inspect the Island (Y: +3.25m)",
+          isCompleted: false,
+          targetPosition: { x: 20, y: 3.25, z: 44 },
+          triggerRadius: 3.5,
+          hint: "Mantle from the carrier hull staging ramp directly onto the elevated flight deck island superstructure",
+          zoneName: "CVN-80 Enterprise Flight Deck & Island",
+          rewardBonusXP: 100,
+          shiftBonus: {
+            requiredShift: 'DUSK',
+            bonusXP: 80,
+            bonusTitle: 'Carrier Twilight Sentinel'
+          }
         },
         {
           id: "escape_flood",
           description: "Climb the yellow scaffolding staging ladder to safety",
           isCompleted: false,
           targetPosition: { x: 32, y: 3.5, z: 48 },
+          triggerRadius: 3.0,
           hint: "Mantle onto the elevated scaffolding platform on the east wall",
           zoneName: "Big Blue Staging Catwalk"
         }
@@ -234,6 +283,7 @@ export class MissionManager {
           description: "Hop into the crane lift staging basket in Dry Dock 12",
           isCompleted: false,
           targetPosition: { x: 18, y: 3.5, z: 35 },
+          triggerRadius: 3.2,
           hint: "Curl up inside the yellow crane lift container to initiate the 200ft ascent",
           zoneName: "Dry Dock 12 Staging Area"
         },
@@ -242,8 +292,14 @@ export class MissionManager {
           description: "Mantle onto the upper trolley bridge and trip the emergency safety breaker",
           isCompleted: false,
           targetPosition: { x: 20, y: 36, z: 25 },
+          triggerRadius: 2.8,
           hint: "Walk across the narrow I-beam and swipe [J] the breaker switch",
-          zoneName: "Big Blue Trolley Bridge"
+          zoneName: "Big Blue Trolley Bridge",
+          shiftBonus: {
+            requiredShift: 'NIGHT',
+            bonusXP: 90,
+            bonusTitle: 'Nightshift Highwire Acrobat'
+          }
         }
       ]
     },
@@ -258,9 +314,9 @@ export class MissionManager {
       title: "Mutants in the Machine Shop",
       subtitle: "Submarine Nuclear Vault Infiltration",
       location: "Machine Shop No. 1 & Scrap Staging Yard",
-      briefing: "Investigate severed fiber optic cables in Machine Shop No. 1. Enter through the roll-up doorway, execute claw swipe combos to defeat Gantry's mutant scout cats, engage Whiskers Vision to scan the radioactive conduit trail, and confront Gantry's vanguard in the staging yard.",
+      briefing: "Investigate severed fiber optic cables in Machine Shop No. 1. Infiltrate the shop interior, scale the SMOF Submarine upper catwalk crossover bridge (Y: +4.50m) to monitor assembly modules, engage Whiskers Vision to scan the radioactive conduit trail, and confront Gantry's vanguard in the staging yard.",
       dialogueSpeaker: "Dr. Elena Vance (EH&S Animal Management)",
-      dialogueText: "Alba, look at these bite marks—they aren't from normal rats. Those are six-toed mutant cat claws. Gantry's pack is moving on the machine shop.",
+      dialogueText: "Alba, look at these bite marks—they aren't from normal rats. Those are six-toed mutant cat claws. Gantry's pack is moving across the SMOF submarine upper catwalks.",
       isUnlocked: false,
       isCompleted: false,
       assistIdReward: "CONDUIT_PULL_STRING",
@@ -273,6 +329,14 @@ export class MissionManager {
           position: { x: -30, y: 0, z: 45 },
           isCollected: false,
           description: "High-yield pressure hull fastener from the fast-attack submarine assembly shop."
+        },
+        {
+          id: "RIVET_SMOF_CATWALK",
+          name: "SMOF Bridge Safety Clamp Rivet",
+          category: "RIVET",
+          position: { x: -30, y: 4.5, z: 45 },
+          isCollected: false,
+          description: "Stainless steel structural clamp retrieved from the SMOF submarine crossover bridge."
         }
       ],
       objectives: [
@@ -283,14 +347,31 @@ export class MissionManager {
           requiredCount: 2,
           currentCount: 0,
           targetPosition: { x: -34, y: 0, z: -20 },
+          triggerRadius: 4.5,
           hint: "Enter Machine Shop No. 1 and strike mutant cats with Paw Swipes [J] and Tail Sweep [K]",
           zoneName: "Machine Shop No. 1 Interior"
+        },
+        {
+          id: "scout_smof_catwalk",
+          description: "Ascend to SMOF Submarine Upper Catwalk & Crossover Bridge (Y: +4.50m)",
+          isCompleted: false,
+          targetPosition: { x: -30, y: 4.5, z: 45 },
+          triggerRadius: 3.5,
+          hint: "Climb the yellow spiral stairs or conduit pipe at SMOF exterior to reach the elevated crossover bridge",
+          zoneName: "SMOF Submarine Upper Catwalk",
+          rewardBonusXP: 120,
+          shiftBonus: {
+            requiredShift: 'NIGHT',
+            bonusXP: 100,
+            bonusTitle: 'Ghost of the Reactor Bay'
+          }
         },
         {
           id: "identify_radioactivity",
           description: "Use Whiskers Vision [Q] to scan the radioactive conduit trail",
           isCompleted: false,
           targetPosition: { x: -30, y: 0, z: 45 },
+          triggerRadius: 4.0,
           hint: "Press [Q] for Whiskers Vision near the Submarine MOF shop to reveal the violet isotopic trace",
           zoneName: "Submarine MOF Yard"
         },
@@ -299,6 +380,7 @@ export class MissionManager {
           description: "Survive the clash with Gantry's vanguard in the scrap yard",
           isCompleted: false,
           targetPosition: { x: 38, y: 0, z: -52 },
+          triggerRadius: 4.0,
           hint: "Head to the scrap staging yard near the RCOH vault and defeat Lieutenant Cobalt",
           zoneName: "Scrap Staging Yard"
         }
@@ -334,6 +416,7 @@ export class MissionManager {
           description: "Engage Whiskers Vision to track radioactive conduit traces",
           isCompleted: false,
           targetPosition: { x: 45, y: 0, z: -60 },
+          triggerRadius: 4.0,
           hint: "Press [Q] to illuminate gamma conduit traces and dosimeter safety corridors",
           zoneName: "RCOH Containment Tent"
         },
@@ -342,14 +425,21 @@ export class MissionManager {
           description: "Cross the containment vault keeping radiation below 5.0 mSv",
           isCompleted: false,
           targetPosition: { x: 45, y: 0, z: -60 },
+          triggerRadius: 3.5,
           hint: "Stay behind lead-shielded barrier blocks and sneak [C/Ctrl] across hotspots",
-          zoneName: "Reactor Core Vault"
+          zoneName: "Reactor Core Vault",
+          shiftBonus: {
+            requiredShift: 'NIGHT',
+            bonusXP: 80,
+            bonusTitle: 'Radiological Ghost'
+          }
         },
         {
           id: "defeat_lieutenant",
           description: "Defeat Lieutenant Cobalt and trip the coolant emergency valve",
           isCompleted: false,
           targetPosition: { x: 38, y: 0, z: -52 },
+          triggerRadius: 3.5,
           hint: "Use Tail Sweep [K] to stun Cobalt, then finish with Claw Flurry [J]",
           zoneName: "Coolant Valve Station"
         }
@@ -390,6 +480,7 @@ export class MissionManager {
           requiredCount: 4,
           currentCount: 0,
           targetPosition: { x: -55, y: 0, z: -65 },
+          triggerRadius: 5.0,
           hint: "Fight off mutant prowlers on the Cat Motel front porch using your full combat arsenal",
           zoneName: "Cat Motel Sanctuary Porch"
         },
@@ -398,8 +489,14 @@ export class MissionManager {
           description: "Check on the cardboard condo nursery inside the clinic",
           isCompleted: false,
           targetPosition: { x: -55, y: 0, z: -60 },
+          triggerRadius: 3.0,
           hint: "Enter the cardboard condo nests and meow [E] to soothe the orphaned kittens",
-          zoneName: "Clinic Nursery"
+          zoneName: "Clinic Nursery",
+          shiftBonus: {
+            requiredShift: 'ANY',
+            bonusXP: 75,
+            bonusTitle: 'Sanctuary Guardian'
+          }
         }
       ]
     },
@@ -433,6 +530,7 @@ export class MissionManager {
           description: "Ascend to the top trolley bridge of Big Blue (Y: 36m / 200ft)",
           isCompleted: false,
           targetPosition: { x: 20, y: 36, z: 50 },
+          triggerRadius: 4.0,
           hint: "Climb the east leg maintenance ladder and step onto the high gantry catwalk",
           zoneName: "Big Blue East Catwalk"
         },
@@ -441,14 +539,34 @@ export class MissionManager {
           description: "Defeat Gantry atop Big Blue Gantry crane to save the carrier",
           isCompleted: false,
           targetPosition: { x: 20, y: 36, z: 52.5 },
+          triggerRadius: 4.0,
           hint: "Dodge Gantry's static aura and finish with Claw Flurry [J] or Shadow Finisher [F]!",
-          zoneName: "Big Blue Apex Trolley Bridge"
+          zoneName: "Big Blue Apex Trolley Bridge",
+          shiftBonus: {
+            requiredShift: 'DUSK',
+            bonusXP: 150,
+            bonusTitle: 'Apex Sunset Champion'
+          }
         }
       ]
     }
   ];
 
   private currentMissionIndex: number = 0;
+  private currentShift: 'DAY' | 'NIGHT' | 'DUSK' | 'DAWN' = 'DAY';
+  private totalBonusXPEarned: number = 0;
+
+  public setShipyardShift(shift: 'DAY' | 'NIGHT' | 'DUSK' | 'DAWN'): void {
+    this.currentShift = shift;
+  }
+
+  public getShipyardShift(): 'DAY' | 'NIGHT' | 'DUSK' | 'DAWN' {
+    return this.currentShift;
+  }
+
+  public getTotalBonusXPEarned(): number {
+    return this.totalBonusXPEarned;
+  }
 
   public getCurrentMission(): Mission {
     return this.missions[this.currentMissionIndex];
@@ -487,6 +605,43 @@ export class MissionManager {
     return null;
   }
 
+  public evaluateProximityTriggers(playerPos: { x: number; y: number; z: number }): { objectiveCompleted: boolean; objectiveId?: string; bonusGranted?: number } {
+    const active = this.getActiveObjective();
+    if (!active || !active.targetPosition || active.requiredCount) {
+      return { objectiveCompleted: false };
+    }
+
+    const radius = active.triggerRadius || 3.5;
+    const dx = playerPos.x - active.targetPosition.x;
+    const dy = playerPos.y - active.targetPosition.y;
+    const dz = playerPos.z - active.targetPosition.z;
+    const distSq = dx * dx + dy * dy + dz * dz;
+
+    if (distSq <= radius * radius) {
+      const bonusXP = this.calculateShiftBonus(active);
+      this.completeObjective(active.id);
+      return {
+        objectiveCompleted: true,
+        objectiveId: active.id,
+        bonusGranted: bonusXP
+      };
+    }
+
+    return { objectiveCompleted: false };
+  }
+
+  private calculateShiftBonus(obj: MissionObjective): number {
+    let earned = obj.rewardBonusXP || 0;
+    if (obj.shiftBonus) {
+      const match = obj.shiftBonus.requiredShift === 'ANY' || obj.shiftBonus.requiredShift === this.currentShift;
+      if (match) {
+        earned += obj.shiftBonus.bonusXP;
+      }
+    }
+    this.totalBonusXPEarned += earned;
+    return earned;
+  }
+
   public updateCountObjective(objectiveId: string, delta: number = 1): boolean {
     const current = this.getCurrentMission();
     const obj = current.objectives.find(o => o.id === objectiveId);
@@ -494,6 +649,7 @@ export class MissionManager {
       obj.currentCount = Math.min(obj.requiredCount, (obj.currentCount || 0) + delta);
       if (obj.currentCount >= obj.requiredCount) {
         obj.isCompleted = true;
+        this.calculateShiftBonus(obj);
       }
       this.checkMissionCompletion();
       return true;
@@ -509,6 +665,7 @@ export class MissionManager {
       if (obj.requiredCount) {
         obj.currentCount = obj.requiredCount;
       }
+      this.calculateShiftBonus(obj);
       this.checkMissionCompletion();
       return true;
     }

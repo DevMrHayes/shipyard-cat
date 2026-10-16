@@ -47,4 +47,3 @@ if (failed > 0 || playtestSessions.some(s => !s.passed)) {
 } else {
   process.exit(0);
 }
-
