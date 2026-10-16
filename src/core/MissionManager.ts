@@ -209,11 +209,11 @@ export class MissionManager {
       act: 2,
       actTitle: "Act 2: Gantry's Feline Insurgency",
       title: "Big Blue's High-Wire Superlift",
-      subtitle: "200ft Crane Module Lift & Aerial Panorama",
-      location: "Goliath Gantry Crane Catwalks (200ft Elevation)",
-      briefing: "Big Blue is preparing for a 1,050-ton carrier deckhouse superlift. Climb into the rigger lift basket, ride the hoist to the upper trolley bridge, and trip the emergency brake to prevent a runaway cable snag.",
+      subtitle: "CVN-80 Enterprise Flight Deck Ascent & Island Island Walk",
+      location: "CVN-80 Flight Deck & Goliath Gantry Catwalks",
+      briefing: "Big Blue is preparing for a 1,050-ton carrier deckhouse superlift directly onto the CVN-80 Enterprise. Scale the scaffolding ramps onto the CVN-80 flight deck (Y: 10.0m), patrol the catapult trench, climb into the crane hoist basket to reach the upper trolley bridge, and trip the emergency safety breaker.",
       dialogueSpeaker: "Frank 'Sarge' Miller (Heavy Rigging Foreman)",
-      dialogueText: "Big Blue's hoisting 900 tons of flight deck today, little supervisor! Keep your balance on the catwalk and watch the 480V third rail!",
+      dialogueText: "CVN-80 Enterprise is taking shape on the slipway, Alba! Scale the staging tower to the flight deck, sprint past Catapult One, and ride the rigger lift basket all the way to Big Blue's trolley bridge!",
       isUnlocked: false,
       isCompleted: false,
       assistIdReward: "CRANE_SAFETY_TRIP",
@@ -226,15 +226,39 @@ export class MissionManager {
           position: { x: 20, y: 36, z: 25 },
           isCollected: false,
           description: "Foreman Sarge Miller's certified heavy lift rigging inspector badge."
+        },
+        {
+          id: "RIVET_ENTERPRISE_FLIGHTDECK",
+          name: "CVN-80 Enterprise Non-Skid Fastener",
+          category: "RIVET",
+          position: { x: 24, y: 10.0, z: 34 },
+          isCollected: false,
+          description: "Titanium deck tie-down cup recovered from Catapult No. 1 on CVN-80 Enterprise."
         }
       ],
       objectives: [
         {
-          id: "enter_crane_lift",
-          description: "Hop into the crane lift staging basket in Dry Dock 12",
+          id: "board_cvn80_deck",
+          description: "Mantle onto the CVN-80 Enterprise Flight Deck (Y: 10.0m)",
           isCompleted: false,
-          targetPosition: { x: 18, y: 3.5, z: 35 },
-          hint: "Curl up inside the yellow crane lift container to initiate the 200ft ascent",
+          targetPosition: { x: 22, y: 10.0, z: 28 },
+          hint: "Climb the staging tower gangway on the western rim up to the carrier flight deck surface",
+          zoneName: "CVN-80 Flight Deck - Bow"
+        },
+        {
+          id: "patrol_catapult_island",
+          description: "Patrol along Catapult 1 to the carrier island structure",
+          isCompleted: false,
+          targetPosition: { x: 26, y: 10.0, z: 42 },
+          hint: "Sprint down the marked launch track towards the island superstructure",
+          zoneName: "CVN-80 Catapult Track"
+        },
+        {
+          id: "enter_crane_lift",
+          description: "Board the heavy rigging basket at the flight deck crane terminal",
+          isCompleted: false,
+          targetPosition: { x: 18, y: 10.0, z: 46 },
+          hint: "Curl up inside the yellow crane lift container to initiate the high-wire ascent",
           zoneName: "Dry Dock 12 Staging Area"
         },
         {
@@ -242,7 +266,7 @@ export class MissionManager {
           description: "Mantle onto the upper trolley bridge and trip the emergency safety breaker",
           isCompleted: false,
           targetPosition: { x: 20, y: 36, z: 25 },
-          hint: "Walk across the narrow I-beam and swipe [J] the breaker switch",
+          hint: "Walk across the narrow I-beam at 200ft elevation and swipe [J] the breaker switch",
           zoneName: "Big Blue Trolley Bridge"
         }
       ]
@@ -256,11 +280,11 @@ export class MissionManager {
       act: 3,
       actTitle: "Act 3: Nuclear Submarine Keel",
       title: "Mutants in the Machine Shop",
-      subtitle: "Submarine Nuclear Vault Infiltration",
-      location: "Machine Shop No. 1 & Scrap Staging Yard",
-      briefing: "Investigate severed fiber optic cables in Machine Shop No. 1. Enter through the roll-up doorway, execute claw swipe combos to defeat Gantry's mutant scout cats, engage Whiskers Vision to scan the radioactive conduit trail, and confront Gantry's vanguard in the staging yard.",
+      subtitle: "Submarine Nuclear Vault Infiltration & SMOF Catwalks",
+      location: "Machine Shop No. 1, JMAF & SMOF Elevated Catwalks",
+      briefing: "Severed telemetry cables have paralyzed the Submarine Outfitting Facility (SMOF). Defeat mutant cats inside Machine Shop No. 1, enter the SMOF facility, leap onto the overhead gantry catwalks (Y: 6.8m) overlooking Virginia-class attack sub modules, scan the isotopic conduit trail, and confront Gantry's vanguard.",
       dialogueSpeaker: "Dr. Elena Vance (EH&S Animal Management)",
-      dialogueText: "Alba, look at these bite marks—they aren't from normal rats. Those are six-toed mutant cat claws. Gantry's pack is moving on the machine shop.",
+      dialogueText: "Alba, Gantry's pack has penetrated the SMOF sub module assembly bay. Scale the overhead crane catwalks to track their radiation signature from above!",
       isUnlocked: false,
       isCompleted: false,
       assistIdReward: "CONDUIT_PULL_STRING",
@@ -273,6 +297,14 @@ export class MissionManager {
           position: { x: -30, y: 0, z: 45 },
           isCollected: false,
           description: "High-yield pressure hull fastener from the fast-attack submarine assembly shop."
+        },
+        {
+          id: "BADGE_SMOF_QUALITY",
+          name: "SMOF Nuclear Hull Inspector Badge",
+          category: "BADGE",
+          position: { x: -32, y: 6.8, z: 42 },
+          isCollected: false,
+          description: "Official radiological QA stamp dropped from the SMOF overhead gantry crane catwalk."
         }
       ],
       objectives: [
@@ -287,19 +319,27 @@ export class MissionManager {
           zoneName: "Machine Shop No. 1 Interior"
         },
         {
-          id: "identify_radioactivity",
-          description: "Use Whiskers Vision [Q] to scan the radioactive conduit trail",
+          id: "climb_smof_catwalk",
+          description: "Climb the yellow spiral stairs to SMOF overhead catwalk (Y: 6.8m)",
           isCompleted: false,
-          targetPosition: { x: -30, y: 0, z: 45 },
-          hint: "Press [Q] for Whiskers Vision near the Submarine MOF shop to reveal the violet isotopic trace",
+          targetPosition: { x: -32, y: 6.8, z: 38 },
+          hint: "Ascend the industrial maintenance staircase inside the SMOF hull bay",
+          zoneName: "SMOF Overhead Catwalk Bay"
+        },
+        {
+          id: "identify_radioactivity",
+          description: "Use Whiskers Vision [Q] to scan the radioactive conduit trail along the sub hull",
+          isCompleted: false,
+          targetPosition: { x: -30, y: 6.8, z: 45 },
+          hint: "Press [Q] for Whiskers Vision on the catwalk to illuminate the violet isotopic trace",
           zoneName: "Submarine MOF Yard"
         },
         {
           id: "confront_gantry",
-          description: "Survive the clash with Gantry's vanguard in the scrap yard",
+          description: "Survive the clash with Gantry's vanguard in the scrap staging yard",
           isCompleted: false,
           targetPosition: { x: 38, y: 0, z: -52 },
-          hint: "Head to the scrap staging yard near the RCOH vault and defeat Lieutenant Cobalt",
+          hint: "Drop down to the scrap staging yard near the RCOH vault and defeat Lieutenant Cobalt",
           zoneName: "Scrap Staging Yard"
         }
       ]
@@ -520,7 +560,6 @@ export class MissionManager {
     const allDone = current.objectives.every(o => o.isCompleted);
     if (allDone && !current.isCompleted) {
       current.isCompleted = true;
-      // Unlock next mission
       if (this.currentMissionIndex + 1 < this.missions.length) {
         this.missions[this.currentMissionIndex + 1].isUnlocked = true;
       }

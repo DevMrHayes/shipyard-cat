@@ -11,10 +11,13 @@
  *  - Zone 4: Aircraft Carrier (CVN-80 Enterprise) Modular Superstructure in Dry Dock 12
  *      * Carrier lower hull module block on concrete keel blocks
  *      * Angled flight deck sponson staging with feline parkour catwalks
+ *  - Phase 3 Interior Environments:
+ *      * Joint Manufacturing Assembly Facility (JMAF) & Apprentice School interior rooms
  */
 
 import * as THREE from 'three';
 import { CarrierSuperstructure } from './CarrierSuperstructure';
+import { InteriorSpacesBuilder } from './InteriorSpacesBuilder';
 
 export interface PlatformSurface {
   minX: number;
@@ -27,6 +30,7 @@ export interface PlatformSurface {
 export class IndustrialExpansion {
   public group: THREE.Group;
   private platforms: PlatformSurface[];
+  private interiorSpacesBuilder: InteriorSpacesBuilder;
 
   constructor(platforms: PlatformSurface[]) {
     this.group = new THREE.Group();
@@ -37,6 +41,10 @@ export class IndustrialExpansion {
     this.buildPlateBendingAndBlastShed();
     this.buildRailMarshalingYard();
     this.buildAircraftCarrierModularZone();
+
+    // Phase 3 World Interactivity & Interior Environments
+    this.interiorSpacesBuilder = new InteriorSpacesBuilder(this.platforms);
+    this.group.add(this.interiorSpacesBuilder.group);
   }
 
   /**
@@ -55,7 +63,7 @@ export class IndustrialExpansion {
     const rackLength = 34;
     const rackTiers = [1.8, 3.6];
 
-    rackZPositions.forEach((zPos, idx) => {
+    rackZPositions.forEach((zPos) => {
       // Walkable Grated Catwalk Spine on each level
       rackTiers.forEach((yLevel) => {
         const catwalk = new THREE.Mesh(new THREE.BoxGeometry(rackLength, 0.12, 3.6), gratingMat);
