@@ -16,9 +16,12 @@ export class CatCharacter {
   public whiskers: THREE.LineSegments[] = [];
   public neckBone: THREE.Bone | null = null;
 
+  // Zero-allocation scratch math structures to eliminate garbage collection freeze spikes
   private static readonly scratchBonePos = new THREE.Vector3();
   private static readonly scratchBoneQuat = new THREE.Quaternion();
   private static readonly scratchMeshQuat = new THREE.Quaternion();
+  private static readonly scratchBBox = new THREE.Box3();
+  private static readonly scratchBBoxSize = new THREE.Vector3();
 
   public gltfModel: THREE.Group | null = null;
   private mixer: THREE.AnimationMixer | null = null;
@@ -41,6 +44,15 @@ export class CatCharacter {
   public isCrouching: boolean = false;
   public isPouncing: boolean = false;
 
+  // Cached materials for zero runtime reallocation
+  private static sharedTuxedoMaterial: THREE.MeshStandardMaterial | null = null;
+  private static sharedBlackFurMaterial: THREE.MeshStandardMaterial | null = null;
+  private static sharedWhiteFurMaterial: THREE.MeshStandardMaterial | null = null;
+  private static sharedPinkInnerMaterial: THREE.MeshStandardMaterial | null = null;
+  private static sharedGreenEyeMaterial: THREE.MeshStandardMaterial | null = null;
+  private static sharedBrassMaterial: THREE.MeshStandardMaterial | null = null;
+  private static sharedOrangeCollarMaterial: THREE.MeshStandardMaterial | null = null;
+
   // Diagnostic Flags for Debugger / Sandbox inspection
   public static diagnosticFlags = {
     gltfFetchAttempted: false,
@@ -57,7 +69,7 @@ export class CatCharacter {
     boundingBoxSize: { x: 0, y: 0, z: 0 },
     modelRootY: 0,
     computedWorldPos: { x: 0, y: 0, z: 0 },
-    currentScale: 0.018,
+    currentScale: 1.8,
     isWireframeOverride: false,
     isBrightMagentaShader: false
   };
@@ -74,217 +86,78 @@ export class CatCharacter {
     // Initialize foundational procedural animation clips & skeletal mixer
     this.initProceduralAnimations();
 
-    // 1. Load Real 3D Quadruped Cat GLB Model
-    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-      CatCharacter.diagnosticFlags.gltfFetchAttempted = true;
-      this.readyPromise = ModelManager.loadCatModel().then((gltf) => {
-        this.gltfModel = gltf.scene;
-        CatCharacter.diagnosticFlags.gltfLoadSuccess = true;
-        CatCharacter.diagnosticFlags.gltfChildCount = gltf.scene.children.length;
-        CatCharacter.diagnosticFlags.activeMeshMode = 'GLTF';
-
-        // Cat model authored scale adjusted by 1.8x to make Alba a proud, full-sized shipyard master mouser
-        this.gltfModel.scale.set(1.8, 1.8, 1.8);
-        this.gltfModel.position.set(0, 0, 0);
-        this.gltfModel.rotation.y = 0; // Face forward (+Z direction)
-        CatCharacter.diagnosticFlags.currentScale = 1.8;
-
-        // Traverse to enable shadows, disable frustum culling, and apply authentic Velvet Tuxedo Fur Materials
-        let meshCnt = 0;
-        let vertCnt = 0;
-        let boneCnt = 0;
-        let hasSkinned = false;
-        let hasTex = false;
-
-        const velvetFurTex = TextureGenerator.createVelvetFurTexture();
-        const furNorTex = TextureGenerator.createFurNormalTexture();
-        const furRoughTex = TextureGenerator.createFurRoughnessTexture();
-
-        const tuxedoFurMat = new THREE.MeshStandardMaterial({
-          color: 0x121214, // Sleek deep velvet obsidian black tuxedo coat
-          map: velvetFurTex,
-          normalMap: furNorTex,
-          roughnessMap: furRoughTex,
-          roughness: 0.75,
-          metalness: 0.08,
-          side: THREE.DoubleSide
-        });
-
-        this.gltfModel.traverse((child) => {
-          if ((child as THREE.Bone).isBone) {
-            boneCnt++;
-            const name = child.name;
-            if (name === 'RigNeck1_00' || name === 'RigNeck2_014' || name.toLowerCase().includes('neck')) {
-              if (!this.neckBone || name === 'RigNeck1_00') {
-                this.neckBone = child as THREE.Bone;
-              }
-            }
-          }
-          if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
-            hasSkinned = true;
-          }
-          if ((child as THREE.Mesh).isMesh) {
-            meshCnt++;
-            const mesh = child as THREE.Mesh;
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            mesh.frustumCulled = false; // CRITICAL: Prevents skinned mesh dropping out of camera frustum
-            
-            if (mesh.geometry) {
-              mesh.geometry.computeBoundingBox();
-              mesh.geometry.computeBoundingSphere();
-              if (mesh.geometry.attributes.position) {
-                vertCnt += mesh.geometry.attributes.position.count;
-              }
-            }
-
-            // Apply high-contrast rich tuxedo black coat to the raw white GLTF geometry
-            if (mesh.material) {
-              mesh.material = tuxedoFurMat;
-            }
-          }
-        });
-
-        CatCharacter.diagnosticFlags.meshCount = meshCnt;
-        CatCharacter.diagnosticFlags.totalVertices = vertCnt;
-        CatCharacter.diagnosticFlags.boneCount = boneCnt;
-        CatCharacter.diagnosticFlags.hasSkinnedMesh = hasSkinned;
-        CatCharacter.diagnosticFlags.hasTextures = hasTex;
-        CatCharacter.diagnosticFlags.modelRootY = this.gltfModel.position.y;
-
-        // Bind Skeletal Animation Mixer with exact GLTF In-Place Animation Clip Names
-        if (gltf.animations && gltf.animations.length > 0) {
-          this.mixer = new THREE.AnimationMixer(this.gltfModel);
-          gltf.animations.forEach((clip) => {
-            const action = this.mixer!.clipAction(clip);
-            this.animations[clip.name] = action;
-            this.animations[clip.name.toLowerCase()] = action;
-          });
-
-          // Precision Animation Clip Aliases (using clean -IP in-place clips without root displacement)
-          this.animations['stand'] = this.animations['Cat|Idle_00-IP'] || this.animations['Cat|A_Idle_00'] || Object.values(this.animations)[0];
-          this.animations['idle'] = this.animations['stand'];
-          this.animations['sit'] = this.animations['Cat|Sitting_00-IP'] || this.animations['Cat|Sitting_00'] || this.animations['stand'];
-          
-          // Pure Forward Walk (straight spine & head forward)
-          this.animations['walk_straight'] = this.animations['Cat|Walk-IP'] || this.animations['Cat|Walk'] || this.animations['stand'];
-          this.animations['walk'] = this.animations['walk_straight'];
-
-          // Turning Left / Right while walking
-          this.animations['turn_left'] = this.animations['Cat|Walk_L-IP'] || this.animations['Cat|Walk_L'] || this.animations['walk_straight'];
-          this.animations['turn_right'] = this.animations['Cat|Walk_R-IP'] || this.animations['Cat|Walk_R'] || this.animations['walk_straight'];
-
-          // High Speed Sprint & Gallop
-          this.animations['run'] = this.animations['Cat|Run-IP'] || this.animations['Cat|Sprint-IP'] || this.animations['Cat|Run'] || this.animations['walk_straight'];
-
-          // True Jump (Airborne leap) & Combat Pounce (Fast predatory bound)
-          this.animations['jump'] = this.animations['Cat|Jump_Trot-IP'] || this.animations['Cat|Jump_Up-IP'] || this.animations['Cat|Jump_Up'] || this.animations['run'];
-          this.animations['pounce'] = this.animations['Cat|Jump_Run-IP'] || this.animations['Cat|Jump_Run'] || this.animations['jump'];
-
-          // Attack & Strike Combos
-          this.animations['attack'] = this.animations['Cat|Attack_Agressive_Legs_01-IP'] || this.animations['Cat|Attack_Left-IP'] || this.animations['Cat|Attack_Right-IP'] || this.animations['stand'];
-
-          // Eating & Chewing
-          this.animations['eat'] = this.animations['Cat|Eating_01-IP'] || this.animations['Cat|Eating_02-IP'] || this.animations['Cat|Eating_01'] || this.animations['stand'];
-
-          // Ensure all animation clips are active, enabled, and weighted to full 1.0 (no frozen statues)
-          const actionKeys = ['stand', 'idle', 'sit', 'walk_straight', 'walk', 'turn_left', 'turn_right', 'run', 'jump', 'pounce', 'attack', 'eat'];
-          actionKeys.forEach(key => {
-            const action = this.animations[key];
-            if (action) {
-              action.enabled = true;
-              action.setEffectiveWeight(1.0);
-              action.play();
-            }
-          });
-
-          // Pre-evaluate 1 mixer tick to bind all bone tracks & skinning interpolators ahead of gameplay
-          this.mixer.update(0.016);
-
-          actionKeys.forEach(key => {
-            const action = this.animations[key];
-            if (action && key !== 'stand' && key !== 'idle') {
-              action.stop();
-            }
-          });
-
-          // Default state: Pure alert standing pose
-          const initialAction = this.animations['stand'];
-          if (initialAction) {
-            initialAction.enabled = true;
-            initialAction.setEffectiveWeight(1.0);
-            initialAction.play();
-            this.currentAction = initialAction;
-            this.currentActionName = 'stand';
-            this.actionDwellTime = 0;
-            this.mixer.update(0);
-          }
-        }
-
-        this.mesh.add(this.gltfModel);
-
-        // Remove procedural fallback geometry completely once GLTF is attached
-        if (this.gltfModel && this.gltfModel.children.length > 0) {
-          this.mesh.remove(this.proceduralGroup);
-          this.proceduralGroup.visible = false;
-
-          // Attach Alba's signature fitted Safety-Orange Collar and OLED Dosimeter Tag to GLTF rig
-          if (this.collarGroup) {
-            this.collarGroup.scale.set(1.85, 1.85, 1.85);
-            this.mesh.add(this.collarGroup);
-          }
-        }
-
-        // Measure bounding box for diagnostics
-        const bbox = new THREE.Box3().setFromObject(this.mesh);
-        const sz = new THREE.Vector3();
-        bbox.getSize(sz);
-        CatCharacter.diagnosticFlags.boundingBoxSize = { x: sz.x, y: sz.y, z: sz.z };
-      }).catch((err: unknown) => {
-        console.warn('GLTF Cat load fallback note:', err);
-        CatCharacter.diagnosticFlags.gltfError = err instanceof Error ? err.message : String(err);
-        CatCharacter.diagnosticFlags.activeMeshMode = 'PROCEDURAL';
-        this.proceduralGroup.visible = true;
+    // Cache / initialize materials up front to eliminate startup shader compilation hitches
+    if (!CatCharacter.sharedBlackFurMaterial) {
+      CatCharacter.sharedBlackFurMaterial = new THREE.MeshStandardMaterial({
+        color: 0x111113,
+        map: TextureGenerator.createVelvetFurTexture(),
+        normalMap: TextureGenerator.createFurNormalTexture(),
+        roughnessMap: TextureGenerator.createFurRoughnessTexture(),
+        roughness: 0.8,
+        metalness: 0.05
       });
     }
 
-    // Material definitions (Tuxedo Cat: Sleek velvety black fur with white bib and white paws)
-    const blackFurMat = new THREE.MeshStandardMaterial({
-      color: 0x111113,
-      map: TextureGenerator.createVelvetFurTexture(),
-      normalMap: TextureGenerator.createFurNormalTexture(),
-      roughnessMap: TextureGenerator.createFurRoughnessTexture(),
-      roughness: 0.8,
-      metalness: 0.05
-    });
+    if (!CatCharacter.sharedWhiteFurMaterial) {
+      CatCharacter.sharedWhiteFurMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        roughness: 0.85,
+        metalness: 0.02
+      });
+    }
 
-    const whiteFurMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc,
-      roughness: 0.85,
-      metalness: 0.02
-    });
+    if (!CatCharacter.sharedPinkInnerMaterial) {
+      CatCharacter.sharedPinkInnerMaterial = new THREE.MeshStandardMaterial({
+        color: 0xfb7185,
+        roughness: 0.55
+      });
+    }
 
-    const pinkInnerMat = new THREE.MeshStandardMaterial({
-      color: 0xfb7185,
-      roughness: 0.55
-    });
+    if (!CatCharacter.sharedGreenEyeMaterial) {
+      CatCharacter.sharedGreenEyeMaterial = new THREE.MeshStandardMaterial({
+        color: 0x10b981,
+        emissive: 0x059669,
+        emissiveIntensity: 0.55,
+        roughness: 0.08,
+        metalness: 0.1
+      });
+    }
 
-    const greenEyeMat = new THREE.MeshStandardMaterial({
-      color: 0x10b981,
-      emissive: 0x059669,
-      emissiveIntensity: 0.55,
-      roughness: 0.08,
-      metalness: 0.1
-    });
+    if (!CatCharacter.sharedBrassMaterial) {
+      CatCharacter.sharedBrassMaterial = new THREE.MeshStandardMaterial({
+        color: 0xfacc15,
+        metalness: 0.95,
+        roughness: 0.15
+      });
+    }
 
-    const brassTagMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15,
-      metalness: 0.95,
-      roughness: 0.15
-    });
+    if (!CatCharacter.sharedOrangeCollarMaterial) {
+      CatCharacter.sharedOrangeCollarMaterial = new THREE.MeshStandardMaterial({
+        color: 0xea580c,
+        roughness: 0.45,
+        metalness: 0.1
+      });
+    }
+
+    if (!CatCharacter.sharedTuxedoMaterial) {
+      CatCharacter.sharedTuxedoMaterial = new THREE.MeshStandardMaterial({
+        color: 0x121214,
+        map: TextureGenerator.createVelvetFurTexture(),
+        normalMap: TextureGenerator.createFurNormalTexture(),
+        roughnessMap: TextureGenerator.createFurRoughnessTexture(),
+        roughness: 0.75,
+        metalness: 0.08,
+        side: THREE.DoubleSide
+      });
+    }
+
+    const blackFurMat = CatCharacter.sharedBlackFurMaterial;
+    const whiteFurMat = CatCharacter.sharedWhiteFurMaterial;
+    const pinkInnerMat = CatCharacter.sharedPinkInnerMaterial;
+    const greenEyeMat = CatCharacter.sharedGreenEyeMaterial;
+    const brassTagMat = CatCharacter.sharedBrassMaterial;
 
     // 1. Anatomical Feline Spine & Muscular Torso (Tapered ribcage + muscular rear haunches)
-    // Chest / Ribcage
     const ribcageGeo = new THREE.SphereGeometry(0.14, 16, 16);
     ribcageGeo.scale(0.9, 1.0, 1.25);
     const ribcage = new THREE.Mesh(ribcageGeo, blackFurMat);
@@ -292,7 +165,6 @@ export class CatCharacter {
     ribcage.castShadow = true;
     proceduralGroup.add(ribcage);
 
-    // Mid-Spine & Slender Flank
     const spineGeo = new THREE.CylinderGeometry(0.11, 0.13, 0.28, 12);
     spineGeo.rotateX(Math.PI / 2);
     this.body = new THREE.Mesh(spineGeo, blackFurMat);
@@ -300,7 +172,6 @@ export class CatCharacter {
     this.body.castShadow = true;
     proceduralGroup.add(this.body);
 
-    // Rear Pelvis & Muscular Haunches
     const pelvisGeo = new THREE.SphereGeometry(0.135, 16, 16);
     pelvisGeo.scale(0.95, 1.05, 1.15);
     const pelvis = new THREE.Mesh(pelvisGeo, blackFurMat);
@@ -308,7 +179,6 @@ export class CatCharacter {
     pelvis.castShadow = true;
     proceduralGroup.add(pelvis);
 
-    // White Tuxedo Chest / Belly Patch
     const chestGeo = new THREE.SphereGeometry(0.115, 12, 12);
     chestGeo.scale(0.75, 1.05, 0.6);
     const chestMesh = new THREE.Mesh(chestGeo, whiteFurMat);
@@ -325,7 +195,6 @@ export class CatCharacter {
     headMesh.castShadow = true;
     this.head.add(headMesh);
 
-    // White Muzzle Pad (Cheeks)
     const muzzleL = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), whiteFurMat);
     muzzleL.position.set(-0.035, -0.04, 0.11);
     muzzleL.scale.set(0.9, 0.7, 0.9);
@@ -334,14 +203,12 @@ export class CatCharacter {
     muzzleR.scale.set(0.9, 0.7, 0.9);
     this.head.add(muzzleL, muzzleR);
 
-    // Pink Leather Nose
     const noseGeo = new THREE.ConeGeometry(0.018, 0.02, 4);
     noseGeo.rotateX(Math.PI / 2);
     const noseMesh = new THREE.Mesh(noseGeo, pinkInnerMat);
     noseMesh.position.set(0, -0.025, 0.155);
     this.head.add(noseMesh);
 
-    // Realistic Green Feline Eyes with Dark Almond Contours
     const eyeGeo = new THREE.SphereGeometry(0.025, 8, 8);
     const leftEye = new THREE.Mesh(eyeGeo, greenEyeMat);
     leftEye.position.set(-0.048, 0.022, 0.115);
@@ -349,7 +216,6 @@ export class CatCharacter {
     rightEye.position.set(0.048, 0.022, 0.115);
     this.head.add(leftEye, rightEye);
 
-    // Whiskers (6 White Filament Lines on Snout)
     const whiskerMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
     const createWhiskers = (isLeft: boolean) => {
       const dir = isLeft ? -1 : 1;
@@ -366,7 +232,6 @@ export class CatCharacter {
     };
     this.head.add(createWhiskers(true), createWhiskers(false));
 
-    // Sculpted Triangular Ears with Pink Inner Shell
     const earGeo = new THREE.ConeGeometry(0.05, 0.1, 4);
     const earInnerGeo = new THREE.ConeGeometry(0.035, 0.075, 4);
 
@@ -388,27 +253,18 @@ export class CatCharacter {
     proceduralGroup.add(this.head);
 
     // 3. Vibrant Safety-Orange Shipyard Collar with Digital Backlit LCD Dosimeter
-    const orangeCollarMat = new THREE.MeshStandardMaterial({
-      color: 0xea580c, // High-visibility shipyard safety orange (#ea580c)
-      roughness: 0.45,
-      metalness: 0.1
-    });
-
     this.collarGroup = new THREE.Group();
 
-    // Snug Collar Ring (Fitted around cat neck vertebrae)
     const collarGeo = new THREE.CylinderGeometry(0.052, 0.055, 0.024, 24, 1, true);
-    this.collar = new THREE.Mesh(collarGeo, orangeCollarMat);
+    this.collar = new THREE.Mesh(collarGeo, CatCharacter.sharedOrangeCollarMaterial);
     this.collar.castShadow = true;
     this.collarGroup.add(this.collar);
 
-    // Brass Collar Buckle at front throat
     const buckleMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.2 });
     const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.022, 0.008), buckleMat);
     buckle.position.set(0, -0.003, 0.049);
     this.collarGroup.add(buckle);
 
-    // Brass dosimeter medal tag (NNS Medallion)
     const tagGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.003, 12);
     tagGeo.rotateX(Math.PI / 2);
     this.dosimeterTag = new THREE.Mesh(tagGeo, brassTagMat);
@@ -416,7 +272,6 @@ export class CatCharacter {
     this.dosimeterTag.castShadow = true;
     this.collarGroup.add(this.dosimeterTag);
 
-    // Working Digital Collar Dosimeter Screen (Mounted on nape of neck facing player camera)
     const screenMat = new THREE.MeshStandardMaterial({
       color: 0x06b6d4,
       emissive: 0x06b6d4,
@@ -427,7 +282,7 @@ export class CatCharacter {
 
     const housing = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.018, 0.012), housingMat);
     housing.position.set(0, 0.005, -0.049);
-    housing.rotateX(Math.PI); // Facing rearwards toward third person camera
+    housing.rotateX(Math.PI);
 
     this.dosimeterScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.028, 0.012), screenMat);
     this.dosimeterScreen.position.set(0, 0, -0.007);
@@ -435,7 +290,6 @@ export class CatCharacter {
     housing.add(this.dosimeterScreen);
     this.collarGroup.add(housing);
 
-    // Subtle localized collar dosimeter glow
     this.dosimeterLight = new THREE.PointLight(0x06b6d4, 0.4, 0.8);
     this.dosimeterLight.position.set(0, 0.01, -0.052);
     this.collarGroup.add(this.dosimeterLight);
@@ -467,14 +321,12 @@ export class CatCharacter {
       const zOffset = isFront ? 0.22 : -0.22;
       legGroup.position.set(xOffset, 0.28, zOffset);
 
-      // Upper Leg (Slender, lean)
       const upperGeo = new THREE.CylinderGeometry(0.028, 0.024, 0.24, 8);
       const upperMesh = new THREE.Mesh(upperGeo, blackFurMat);
       upperMesh.position.set(0, -0.1, 0);
       upperMesh.castShadow = true;
       legGroup.add(upperMesh);
 
-      // White Paw (Mitten)
       const pawGeo = new THREE.SphereGeometry(0.035, 8, 8);
       pawGeo.scale(0.85, 0.55, 1.1);
       const pawMesh = new THREE.Mesh(pawGeo, whiteFurMat);
@@ -495,8 +347,141 @@ export class CatCharacter {
 
     this.mesh.scale.set(1.15, 1.15, 1.15);
 
-    // Initialize foundational procedural animation actions & mixer
-    this.initProceduralAnimations();
+    // 6. Load Real 3D Quadruped Cat GLB Model
+    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      CatCharacter.diagnosticFlags.gltfFetchAttempted = true;
+      this.readyPromise = ModelManager.loadCatModel().then((gltf) => {
+        this.gltfModel = gltf.scene;
+        CatCharacter.diagnosticFlags.gltfLoadSuccess = true;
+        CatCharacter.diagnosticFlags.gltfChildCount = gltf.scene.children.length;
+        CatCharacter.diagnosticFlags.activeMeshMode = 'GLTF';
+
+        this.gltfModel.scale.set(1.8, 1.8, 1.8);
+        this.gltfModel.position.set(0, 0, 0);
+        this.gltfModel.rotation.y = 0;
+        CatCharacter.diagnosticFlags.currentScale = 1.8;
+
+        let meshCnt = 0;
+        let vertCnt = 0;
+        let boneCnt = 0;
+        let hasSkinned = false;
+
+        this.gltfModel.traverse((child) => {
+          if ((child as THREE.Bone).isBone) {
+            boneCnt++;
+            const name = child.name;
+            if (name === 'RigNeck1_00' || name === 'RigNeck2_014' || name.toLowerCase().includes('neck')) {
+              if (!this.neckBone || name === 'RigNeck1_00') {
+                this.neckBone = child as THREE.Bone;
+              }
+            }
+          }
+          if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
+            hasSkinned = true;
+          }
+          if ((child as THREE.Mesh).isMesh) {
+            meshCnt++;
+            const mesh = child as THREE.Mesh;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.frustumCulled = false;
+
+            if (mesh.geometry && mesh.geometry.attributes.position) {
+              vertCnt += mesh.geometry.attributes.position.count;
+            }
+
+            // Bind high-contrast velvet tuxedo coat and eliminate any white box material glitch
+            if (mesh.material && CatCharacter.sharedTuxedoMaterial) {
+              mesh.material = CatCharacter.sharedTuxedoMaterial;
+            }
+          }
+        });
+
+        CatCharacter.diagnosticFlags.meshCount = meshCnt;
+        CatCharacter.diagnosticFlags.totalVertices = vertCnt;
+        CatCharacter.diagnosticFlags.boneCount = boneCnt;
+        CatCharacter.diagnosticFlags.hasSkinnedMesh = hasSkinned;
+        CatCharacter.diagnosticFlags.modelRootY = this.gltfModel.position.y;
+
+        if (gltf.animations && gltf.animations.length > 0) {
+          this.mixer = new THREE.AnimationMixer(this.gltfModel);
+          gltf.animations.forEach((clip) => {
+            const action = this.mixer!.clipAction(clip);
+            this.animations[clip.name] = action;
+            this.animations[clip.name.toLowerCase()] = action;
+          });
+
+          this.animations['stand'] = this.animations['Cat|Idle_00-IP'] || this.animations['Cat|A_Idle_00'] || Object.values(this.animations)[0];
+          this.animations['idle'] = this.animations['stand'];
+          this.animations['sit'] = this.animations['Cat|Sitting_00-IP'] || this.animations['Cat|Sitting_00'] || this.animations['stand'];
+          this.animations['walk_straight'] = this.animations['Cat|Walk-IP'] || this.animations['Cat|Walk'] || this.animations['stand'];
+          this.animations['walk'] = this.animations['walk_straight'];
+          this.animations['turn_left'] = this.animations['Cat|Walk_L-IP'] || this.animations['Cat|Walk_L'] || this.animations['walk_straight'];
+          this.animations['turn_right'] = this.animations['Cat|Walk_R-IP'] || this.animations['Cat|Walk_R'] || this.animations['walk_straight'];
+          this.animations['run'] = this.animations['Cat|Run-IP'] || this.animations['Cat|Sprint-IP'] || this.animations['Cat|Run'] || this.animations['walk_straight'];
+          this.animations['jump'] = this.animations['Cat|Jump_Trot-IP'] || this.animations['Cat|Jump_Up-IP'] || this.animations['Cat|Jump_Up'] || this.animations['run'];
+          this.animations['pounce'] = this.animations['Cat|Jump_Run-IP'] || this.animations['Cat|Jump_Run'] || this.animations['jump'];
+          this.animations['attack'] = this.animations['Cat|Attack_Agressive_Legs_01-IP'] || this.animations['Cat|Attack_Left-IP'] || this.animations['Cat|Attack_Right-IP'] || this.animations['stand'];
+          this.animations['eat'] = this.animations['Cat|Eating_01-IP'] || this.animations['Cat|Eating_02-IP'] || this.animations['Cat|Eating_01'] || this.animations['stand'];
+
+          const actionKeys = ['stand', 'idle', 'sit', 'walk_straight', 'walk', 'turn_left', 'turn_right', 'run', 'jump', 'pounce', 'attack', 'eat'];
+          actionKeys.forEach(key => {
+            const action = this.animations[key];
+            if (action) {
+              action.enabled = true;
+              action.setEffectiveWeight(1.0);
+              action.play();
+            }
+          });
+
+          this.mixer.update(0.016);
+
+          actionKeys.forEach(key => {
+            const action = this.animations[key];
+            if (action && key !== 'stand' && key !== 'idle') {
+              action.stop();
+            }
+          });
+
+          const initialAction = this.animations['stand'];
+          if (initialAction) {
+            initialAction.enabled = true;
+            initialAction.setEffectiveWeight(1.0);
+            initialAction.play();
+            this.currentAction = initialAction;
+            this.currentActionName = 'stand';
+            this.actionDwellTime = 0;
+            this.mixer.update(0);
+          }
+        }
+
+        this.mesh.add(this.gltfModel);
+
+        if (this.gltfModel && this.gltfModel.children.length > 0) {
+          this.mesh.remove(this.proceduralGroup);
+          this.proceduralGroup.visible = false;
+
+          if (this.collarGroup) {
+            this.collarGroup.scale.set(1.85, 1.85, 1.85);
+            this.mesh.add(this.collarGroup);
+          }
+        }
+
+        // Bounding box calculation using scratch allocation
+        CatCharacter.scratchBBox.setFromObject(this.mesh);
+        CatCharacter.scratchBBox.getSize(CatCharacter.scratchBBoxSize);
+        CatCharacter.diagnosticFlags.boundingBoxSize = {
+          x: CatCharacter.scratchBBoxSize.x,
+          y: CatCharacter.scratchBBoxSize.y,
+          z: CatCharacter.scratchBBoxSize.z
+        };
+      }).catch((err: unknown) => {
+        console.warn('GLTF Cat load fallback note:', err);
+        CatCharacter.diagnosticFlags.gltfError = err instanceof Error ? err.message : String(err);
+        CatCharacter.diagnosticFlags.activeMeshMode = 'PROCEDURAL';
+        this.proceduralGroup.visible = true;
+      });
+    }
   }
 
   // Locomotion & State Timers
@@ -525,7 +510,7 @@ export class CatCharacter {
 
   public triggerRest(duration: number = 3.5) {
     this.restTimer = duration;
-    this.wellRestedTimer = 600; // 10 minutes buff
+    this.wellRestedTimer = 600;
   }
 
   public get isWellRested(): boolean {
@@ -535,9 +520,8 @@ export class CatCharacter {
   public animate(deltaTime: number, speed: number, isGrounded: boolean, turnInput: number = 0) {
     this.animTime += deltaTime;
 
-    // Locomotion & Idle State Machine
     if (speed > 0.05) {
-      this.idleTimer = 0; // Reset idle timer whenever moving
+      this.idleTimer = 0;
     } else {
       this.idleTimer += deltaTime;
     }
@@ -553,7 +537,7 @@ export class CatCharacter {
     if (this.mixer) {
       this.mixer.update(deltaTime);
 
-      let targetName = 'stand'; // Default: Alert standing posture
+      let targetName = 'stand';
       let isHighPriorityAction = false;
 
       if (this.attackTimer > 0 && this.animations['attack']) {
@@ -572,22 +556,17 @@ export class CatCharacter {
         targetName = 'jump';
         isHighPriorityAction = true;
       } else {
-        // Locomotion state resolution with speed & steering deadzone hysteresis
         const currentLoco = this.currentActionName;
-
-        // Run vs Walk hysteresis (Deadband: enter run > 5.2 m/s, exit run < 4.6 m/s)
         const isRunning = (currentLoco === 'run') ? (speed > 4.6) : (speed > 5.2);
 
         if (isRunning) {
           targetName = 'run';
         } else {
-          // Walk vs Stand hysteresis (Deadband: enter walk > 0.20 m/s, exit walk < 0.08 m/s)
           const isWalking = (currentLoco === 'walk_straight' || currentLoco === 'turn_left' || currentLoco === 'turn_right')
             ? (speed > 0.08)
             : (speed > 0.20);
 
           if (isWalking) {
-            // Directional steering hysteresis (Deadband: enter turn at ±0.30, maintain turn until ±0.15)
             if (currentLoco === 'turn_left') {
               targetName = (turnInput > 0.15) ? 'turn_left' : 'walk_straight';
             } else if (currentLoco === 'turn_right') {
@@ -602,7 +581,6 @@ export class CatCharacter {
               }
             }
           } else {
-            // Idle Posture: Stand alert for the first 12s, then transition to sitting down
             if (this.idleTimer >= 12.0) {
               targetName = 'sit';
             } else {
@@ -612,7 +590,6 @@ export class CatCharacter {
         }
       }
 
-      // Transition animation clip with minimum 150ms dwell time protection (high-priority combat/jumps and recovery bypass dwell)
       if (targetName !== this.currentActionName) {
         const isExitingSpecialAction = (this.currentActionName === 'pounce' || this.currentActionName === 'jump' || this.currentActionName === 'attack' || this.currentActionName === 'eat');
         if (isHighPriorityAction || isExitingSpecialAction || this.actionDwellTime >= CatCharacter.MIN_ACTION_DWELL_TIME) {
@@ -642,399 +619,9 @@ export class CatCharacter {
     // Dynamic Pounce & Jump Posture Tilt for 3D model
     if (this.gltfModel) {
       if (this.isPouncing) {
-        // Dynamic leap trajectory pitch (nose forward, paws extended)
         this.gltfModel.rotation.x = THREE.MathUtils.lerp(this.gltfModel.rotation.x, -0.35, deltaTime * 14);
         this.gltfModel.position.y = THREE.MathUtils.lerp(this.gltfModel.position.y, 0.1, deltaTime * 14);
       } else if (!isGrounded) {
         this.gltfModel.rotation.x = THREE.MathUtils.lerp(this.gltfModel.rotation.x, -0.15, deltaTime * 8);
       } else if (this.isCrouching) {
-        // Low-profile stealth prowl
-        this.gltfModel.position.y = THREE.MathUtils.lerp(this.gltfModel.position.y, -0.06, deltaTime * 10);
-        this.gltfModel.rotation.x = THREE.MathUtils.lerp(this.gltfModel.rotation.x, 0, deltaTime * 8);
-      } else {
-        this.gltfModel.position.y = THREE.MathUtils.lerp(this.gltfModel.position.y, 0, deltaTime * 10);
-        this.gltfModel.rotation.x = THREE.MathUtils.lerp(this.gltfModel.rotation.x, 0, deltaTime * 8);
-      }
-    }
-
-    // Dynamic Skeletal Socket Tracking: Keeps Alba's safety collar & dosimeter locked to her neck bone
-    if (this.neckBone && this.collarGroup) {
-      if (this.gltfModel) {
-        this.gltfModel.updateMatrixWorld(true);
-      }
-      this.neckBone.getWorldPosition(CatCharacter.scratchBonePos);
-      this.neckBone.getWorldQuaternion(CatCharacter.scratchBoneQuat);
-
-      this.mesh.worldToLocal(CatCharacter.scratchBonePos);
-      this.collarGroup.position.copy(CatCharacter.scratchBonePos);
-
-      this.mesh.getWorldQuaternion(CatCharacter.scratchMeshQuat);
-      this.collarGroup.quaternion.copy(CatCharacter.scratchMeshQuat.invert().multiply(CatCharacter.scratchBoneQuat));
-    }
-
-    // 1. Combat Strike Animation Overrides
-    if (this.attackTimer > 0) {
-      const totalDuration = this.attackType === 'TAIL_SWEEP' ? 0.45 : 0.4;
-      const progress = Math.max(0, Math.min(1.0, 1.0 - (this.attackTimer / totalDuration)));
-
-      if (this.attackType === 'SWIPE_L') {
-        const swipeArc = Math.sin(progress * Math.PI) * 1.6;
-        this.legs.fl.rotation.x = -swipeArc;
-        this.legs.fl.rotation.z = -swipeArc * 0.6;
-        this.head.rotation.y = swipeArc * 0.3;
-      } else if (this.attackType === 'SWIPE_R') {
-        const swipeArc = Math.sin(progress * Math.PI) * 1.6;
-        this.legs.fr.rotation.x = -swipeArc;
-        this.legs.fr.rotation.z = swipeArc * 0.6;
-        this.head.rotation.y = -swipeArc * 0.3;
-      } else if (this.attackType === 'TAIL_SWEEP') {
-        const spinArc = progress * Math.PI * 2;
-        this.body.rotation.y = Math.sin(spinArc) * 0.8;
-        for (let i = 0; i < this.tailSegments.length; i++) {
-          this.tailSegments[i].rotation.y = Math.sin(spinArc + i) * 1.8;
-        }
-      }
-
-      if (this.attackTimer <= 0) {
-        this.attackType = null;
-        this.legs.fl.rotation.z = 0;
-        this.legs.fr.rotation.z = 0;
-        this.head.rotation.y = 0;
-        this.body.rotation.y = 0;
-      }
-    }
-
-    if (this.attackType === null) {
-      if (this.eatTimer > 0) {
-        // Eating / chewing animation: head dips to ground and bobs
-        const chewBob = Math.sin((1.2 - this.eatTimer) * 14) * 0.04;
-        this.head.position.y = 0.28 + chewBob;
-        this.head.rotation.x = 0.38 + chewBob * 1.2;
-        this.body.position.y = 0.28;
-        this.legs.fl.rotation.x = THREE.MathUtils.lerp(this.legs.fl.rotation.x, 0, deltaTime * 8);
-        this.legs.fr.rotation.x = THREE.MathUtils.lerp(this.legs.fr.rotation.x, 0, deltaTime * 8);
-        this.legs.bl.rotation.x = THREE.MathUtils.lerp(this.legs.bl.rotation.x, 0, deltaTime * 8);
-        this.legs.br.rotation.x = THREE.MathUtils.lerp(this.legs.br.rotation.x, 0, deltaTime * 8);
-      } else if (!isGrounded || this.isPouncing) {
-        // Mid-Air Jump & Pounce Posture
-        const pounceExt = this.isPouncing ? 0.2 : 0;
-        this.legs.fl.rotation.x = THREE.MathUtils.lerp(this.legs.fl.rotation.x, 0.45 + pounceExt, deltaTime * 14);
-        this.legs.fr.rotation.x = THREE.MathUtils.lerp(this.legs.fr.rotation.x, 0.45 + pounceExt, deltaTime * 14);
-        this.legs.bl.rotation.x = THREE.MathUtils.lerp(this.legs.bl.rotation.x, -0.55 - pounceExt, deltaTime * 14);
-        this.legs.br.rotation.x = THREE.MathUtils.lerp(this.legs.br.rotation.x, -0.55 - pounceExt, deltaTime * 14);
-        this.body.position.y = THREE.MathUtils.lerp(this.body.position.y, 0.35, deltaTime * 12);
-        this.head.position.y = THREE.MathUtils.lerp(this.head.position.y, 0.46, deltaTime * 12);
-        this.head.rotation.x = THREE.MathUtils.lerp(this.head.rotation.x, this.isPouncing ? -0.2 : 0, deltaTime * 12);
-      } else if (speed > 0.08) {
-        // Locomotion: Gallop (speed > 4.6) vs Walk/Trot (0.08 < speed <= 4.6)
-        const isRunning = speed > 4.6;
-        const cycleSpeed = this.isCrouching ? 4.5 : (isRunning ? 9.5 : 7.5);
-        this.walkCycle += deltaTime * speed * cycleSpeed;
-
-        if (isRunning) {
-          // Gallop Gait: high-speed leaping strides
-          const gallopLead = Math.sin(this.walkCycle) * 0.65;
-          const gallopRear = Math.sin(this.walkCycle - 0.4) * 0.70;
-          this.legs.fl.rotation.x = gallopLead;
-          this.legs.fr.rotation.x = gallopLead * 0.9;
-          this.legs.bl.rotation.x = -gallopRear;
-          this.legs.br.rotation.x = -gallopRear * 0.9;
-
-          const bobAmount = 0.04;
-          this.body.position.y = 0.32 + Math.abs(Math.sin(this.walkCycle * 2)) * bobAmount;
-          this.head.position.y = 0.46 + Math.abs(Math.sin(this.walkCycle * 2)) * (bobAmount * 0.85);
-          this.head.rotation.x = Math.sin(this.walkCycle * 2) * 0.08;
-        } else {
-          // Diagonal 4-beat Trot / Walk Gait
-          const swing = Math.sin(this.walkCycle) * (this.isCrouching ? 0.22 : 0.45);
-          this.legs.fl.rotation.x = swing;
-          this.legs.br.rotation.x = swing;
-          this.legs.fr.rotation.x = -swing;
-          this.legs.bl.rotation.x = -swing;
-
-          const bobAmount = this.isCrouching ? 0.01 : 0.025;
-          const baseBodyY = this.isCrouching ? 0.18 : 0.32;
-          this.body.position.y = baseBodyY + Math.abs(Math.sin(this.walkCycle * 2)) * bobAmount;
-          this.head.position.y = (this.isCrouching ? 0.32 : 0.46) + Math.abs(Math.sin(this.walkCycle * 2)) * (bobAmount * 0.8);
-          this.head.rotation.x = THREE.MathUtils.lerp(this.head.rotation.x, 0, deltaTime * 8);
-        }
-      } else {
-        // Idle Posture: Sitting (>= 12s) vs Alert Standing (< 12s)
-        this.legs.fl.rotation.x = THREE.MathUtils.lerp(this.legs.fl.rotation.x, 0, deltaTime * 8);
-        this.legs.fr.rotation.x = THREE.MathUtils.lerp(this.legs.fr.rotation.x, 0, deltaTime * 8);
-        this.legs.bl.rotation.x = THREE.MathUtils.lerp(this.legs.bl.rotation.x, 0, deltaTime * 8);
-        this.legs.br.rotation.x = THREE.MathUtils.lerp(this.legs.br.rotation.x, 0, deltaTime * 8);
-
-        if (this.idleTimer >= 12.0) {
-          // Alert Sitting Pose: lowered rear pelvis, upright forelegs, alert head tilt
-          const sitProgress = Math.min(1.0, (this.idleTimer - 12.0) * 2.0);
-          this.body.position.y = THREE.MathUtils.lerp(0.32, 0.20, sitProgress);
-          this.head.position.y = THREE.MathUtils.lerp(0.46, 0.38, sitProgress);
-          this.head.rotation.x = THREE.MathUtils.lerp(0, -0.15, sitProgress);
-        } else {
-          // Standing Alert Breathing Pose
-          const baseBodyY = this.isCrouching ? 0.18 : 0.32;
-          this.body.position.y = baseBodyY + Math.sin(this.animTime * 3.0) * 0.006;
-          this.head.position.y = (this.isCrouching ? 0.32 : 0.46) + Math.sin(this.animTime * 3.0) * 0.004;
-          this.head.rotation.x = THREE.MathUtils.lerp(this.head.rotation.x, 0, deltaTime * 8);
-        }
-      }
-    }
-
-    // Dynamic Tail Physics / Low tail during stealth
-    this.tailWagPhase += deltaTime * (speed > 0.1 ? (this.isCrouching ? 2.5 : 6.0) : 2.0);
-    for (let i = 0; i < this.tailSegments.length; i++) {
-      const seg = this.tailSegments[i];
-      const phaseOffset = i * 0.35;
-      const wagIntensity = this.isCrouching ? 0.04 : (0.15 + i * 0.06);
-      seg.rotation.y = Math.sin(this.tailWagPhase + phaseOffset) * wagIntensity;
-      seg.rotation.z = Math.cos(this.tailWagPhase * 0.5 + phaseOffset) * (this.isCrouching ? 0.02 : 0.08);
-      if (this.isCrouching) {
-        seg.rotation.x = -0.4; // Low tail tucked to the ground
-      } else {
-        seg.rotation.x = -0.78; // Normal alert tail angle
-      }
-    }
-  }
-
-  public updateDosimeterRadiation(radDose: number) {
-    let colorHex = 0x06b6d4; // Cyan (normal safe zone < 1.0 mSv)
-    let intensity = 0.6;
-    if (radDose > 8.0) {
-      colorHex = 0xd946ef; // Bright ionizing magenta/purple hotspot
-      intensity = 1.8 + Math.sin(this.animTime * 15.0) * 0.8;
-    } else if (radDose > 2.0) {
-      colorHex = 0xf59e0b; // Amber radiation caution
-      intensity = 1.0 + Math.sin(this.animTime * 8.0) * 0.4;
-    }
-    if (this.dosimeterScreen && this.dosimeterScreen.material instanceof THREE.MeshStandardMaterial) {
-      this.dosimeterScreen.material.color.setHex(colorHex);
-      this.dosimeterScreen.material.emissive.setHex(colorHex);
-      this.dosimeterScreen.material.emissiveIntensity = intensity;
-    }
-    if (this.dosimeterLight) {
-      this.dosimeterLight.color.setHex(colorHex);
-      this.dosimeterLight.intensity = intensity * 0.8;
-    }
-  }
-
-  /**
-   * Initializes foundational procedural animation clips & skeletal mixer
-   * providing full action playback, weight blending, and timeline advancement in headless and pre-load states.
-   */
-  private initProceduralAnimations(): void {
-    this.mixer = new THREE.AnimationMixer(this.mesh);
-    const clipDefs: { name: string; duration: number }[] = [
-      { name: 'stand', duration: 2.0 },
-      { name: 'idle', duration: 2.0 },
-      { name: 'sit', duration: 2.0 },
-      { name: 'walk_straight', duration: 1.0 },
-      { name: 'walk', duration: 1.0 },
-      { name: 'turn_left', duration: 1.0 },
-      { name: 'turn_right', duration: 1.0 },
-      { name: 'run', duration: 0.6 },
-      { name: 'jump', duration: 0.8 },
-      { name: 'pounce', duration: 0.5 },
-      { name: 'attack', duration: 0.4 },
-      { name: 'eat', duration: 1.2 }
-    ];
-
-    clipDefs.forEach(({ name, duration }) => {
-      const track = new THREE.NumberKeyframeTrack(
-        '.position[y]',
-        [0, duration * 0.5, duration],
-        [0, 0.02, 0]
-      );
-      const clip = new THREE.AnimationClip(name, duration, [track]);
-      const action = this.mixer!.clipAction(clip);
-      action.enabled = true;
-      action.setEffectiveWeight(1.0);
-      this.animations[name] = action;
-      this.animations[name.toLowerCase()] = action;
-    });
-
-    const initialAction = this.animations['stand'];
-    if (initialAction) {
-      initialAction.enabled = true;
-      initialAction.setEffectiveWeight(1.0);
-      initialAction.play();
-      this.currentAction = initialAction;
-      this.currentActionName = 'stand';
-      this.actionDwellTime = 0;
-      this.mixer.update(0);
-    }
-  }
-
-  public getMixer(): THREE.AnimationMixer | null {
-    return this.mixer;
-  }
-
-  public getAnimations(): { [key: string]: THREE.AnimationAction } {
-    return this.animations;
-  }
-
-  public getAnimationAction(name: string): THREE.AnimationAction | undefined {
-    return this.animations[name] || this.animations[name.toLowerCase()];
-  }
-
-  public getCurrentAction(): THREE.AnimationAction | null {
-    return this.currentAction;
-  }
-
-  public getCurrentActionName(): string {
-    return this.currentActionName;
-  }
-
-  public cyclePrewarmAction(actionKey: string): void {
-    if (!this.mixer) return;
-    const action = this.animations[actionKey];
-    if (action) {
-      action.reset();
-      action.enabled = true;
-      action.setEffectiveWeight(1.0);
-      action.play();
-      this.currentAction = action;
-      this.currentActionName = actionKey;
-      this.mixer.update(0.016);
-    }
-    if (this.gltfModel) {
-      this.gltfModel.updateMatrixWorld(true);
-    }
-    if (this.neckBone && this.collarGroup) {
-      this.neckBone.getWorldPosition(CatCharacter.scratchBonePos);
-      this.neckBone.getWorldQuaternion(CatCharacter.scratchBoneQuat);
-      this.mesh.worldToLocal(CatCharacter.scratchBonePos);
-      this.collarGroup.position.copy(CatCharacter.scratchBonePos);
-      this.mesh.getWorldQuaternion(CatCharacter.scratchMeshQuat);
-      this.collarGroup.quaternion.copy(CatCharacter.scratchMeshQuat.invert().multiply(CatCharacter.scratchBoneQuat));
-      this.collarGroup.rotateX(0.42);
-    }
-  }
-
-  public resetToStand(): void {
-    if (!this.mixer) return;
-    Object.values(this.animations).forEach(a => {
-      if (a) a.stop();
-    });
-    const initialAction = this.animations['stand'];
-    if (initialAction) {
-      initialAction.reset();
-      initialAction.enabled = true;
-      initialAction.setEffectiveWeight(1.0);
-      initialAction.play();
-      this.currentAction = initialAction;
-      this.currentActionName = 'stand';
-    }
-    this.mixer.update(0);
-  }
-
-  public prewarmAnimations(): void {
-    if (!this.mixer) return;
-    const actionKeys = ['stand', 'idle', 'sit', 'walk_straight', 'walk', 'turn_left', 'turn_right', 'run', 'jump', 'pounce', 'attack', 'eat'];
-    actionKeys.forEach(key => {
-      const action = this.animations[key];
-      if (action) {
-        action.enabled = true;
-        action.setEffectiveWeight(1.0);
-        action.play();
-      }
-    });
-    this.mixer.update(0.016);
-    actionKeys.forEach(key => {
-      const action = this.animations[key];
-      if (action && key !== 'stand' && key !== 'idle') {
-        action.stop();
-      }
-    });
-    const initialAction = this.animations['stand'];
-    if (initialAction) {
-      initialAction.play();
-      this.currentAction = initialAction;
-      this.currentActionName = 'stand';
-    }
-    this.mixer.update(0);
-  }
-
-  /**
-   * Aligns Alba's spine/body pitch (+X ascending, -X descending) with the ground forward slope gradient,
-   * adds subtle cornering bank roll, and scales skeletal/procedural stride rate to eliminate foot-sliding.
-   *
-   * @param deltaTime Frame delta in seconds
-   * @param currentHorizontalSpeed Instantaneous planar velocity magnitude (m/s)
-   * @param isSprinting Whether sprint state is active
-   * @param isGrounded Whether Alba's paws are on a surface
-   * @param sampleGroundHeightFn Callback `(x: number, z: number) => number` returning terrain/ramp height
-   */
-  public updateSlopePitchAndStride(
-    deltaTime: number,
-    currentHorizontalSpeed: number,
-    isSprinting: boolean,
-    isGrounded: boolean,
-    sampleGroundHeightFn?: (x: number, z: number) => number
-  ): void {
-    // 1. Dynamic Slope Pitch Calculation along forward heading vector
-    let targetPitch = 0;
-    if (isGrounded && sampleGroundHeightFn) {
-      const probeDist = 0.35; // Half body-length forward/aft probe
-      const fwdX = Math.sin(this.mesh.rotation.y);
-      const fwdZ = Math.cos(this.mesh.rotation.y);
-
-      const hFront = sampleGroundHeightFn(
-        this.mesh.position.x + fwdX * probeDist,
-        this.mesh.position.z + fwdZ * probeDist
-      );
-      const hBack = sampleGroundHeightFn(
-        this.mesh.position.x - fwdX * probeDist,
-        this.mesh.position.z - fwdZ * probeDist
-      );
-
-      const deltaH = hFront - hBack;
-      // On stairs and stepped platforms, feline spines remain largely level while paws handle the risers.
-      // On ramps, apply subtle natural forward slope inclination (max ~7 deg).
-      const isSteppedRiser = Math.abs(deltaH) > 0.12;
-      const slopeScale = isSteppedRiser ? 0.12 : 0.28;
-      const maxAllowedPitch = isSteppedRiser ? 0.05 : 0.12; // ~2.8 deg on stairs, 6.9 deg on smooth ramps
-
-      const rawSlopeAngle = Math.atan2(deltaH, probeDist * 2.0);
-      targetPitch = Math.max(
-        -maxAllowedPitch,
-        Math.min(maxAllowedPitch, rawSlopeAngle * slopeScale)
-      );
-    }
-
-    const pitchLerp = 1.0 - Math.exp(-8.0 * deltaTime);
-    this.currentSlopePitch += (targetPitch - this.currentSlopePitch) * Math.min(1.0, pitchLerp);
-
-    // 2. Subtle Feline Cornering Bank Roll
-    let yawDelta = this.mesh.rotation.y - this.previousYaw;
-    while (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
-    while (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
-    this.previousYaw = this.mesh.rotation.y;
-
-    const yawRate = deltaTime > 0.0001 ? yawDelta / deltaTime : 0;
-    const speedFactor = Math.min(1.0, currentHorizontalSpeed / CatCharacter.BASE_RUN_SPEED);
-    const targetBank = Math.max(-0.22, Math.min(0.22, -yawRate * 0.045 * speedFactor));
-    const bankLerp = 1.0 - Math.exp(-12.0 * deltaTime);
-    this.currentBankRoll += (targetBank - this.currentBankRoll) * Math.min(1.0, bankLerp);
-
-    // Apply pitch (+X ascending / -X descending) and bank roll to active visual root (preserving physics renderBank)
-    this.mesh.rotation.x = -this.currentSlopePitch;
-    this.mesh.rotation.z = THREE.MathUtils.clamp(this.mesh.rotation.z + this.currentBankRoll, -0.32, 0.32);
-
-    // 3. Dynamic Stride Rate Matching (currentSpeed / baseSpeed) to eliminate foot-sliding
-    const referenceBaseSpeed = isSprinting
-      ? CatCharacter.BASE_RUN_SPEED
-      : CatCharacter.BASE_WALK_SPEED;
-
-    const strideTimeScale =
-      currentHorizontalSpeed > 0.08
-        ? Math.max(0.45, Math.min(2.15, currentHorizontalSpeed / referenceBaseSpeed))
-        : 1.0;
-
-    if (this.currentAction) {
-      this.currentAction.timeScale = strideTimeScale;
-    }
-  }
-}
-
-
+        this.gltfModel.position.y = THREE.MathUtils.lerp(this.gltfModel.

@@ -20,7 +20,7 @@ import { MinimapSystem, MinimapEntity } from '../core/MinimapSystem';
 import { PounceTrajectoryVisualizer } from '../graphics/PounceTrajectoryVisualizer';
 import { GameEventBus, gameEventBus } from '../core/events/GameEventBus';
 import { PhysicsSubsystem, PhysicsInputState } from '../physics/PhysicsSubsystem';
-import { RenderSubsystem } from '../render/RenderSubsystem';
+import { RenderSubsystem, SonarPreyEntry } from '../render/RenderSubsystem';
 
 export interface ContextualPrompt {
   id: string;
@@ -112,11 +112,19 @@ export class GameEngine {
   private animationFrameId: number | null = null;
 
   // Static Preallocated Scratch Objects (Zero GC in Hot Animation / Physics Loop)
+  private static readonly SPAWN_POS = new THREE.Vector3(-10.0, 0, -20.0);
   private static readonly scratchForward = new THREE.Vector3();
   private static readonly scratchPounce = new THREE.Vector3();
   private static readonly scratchRatPrevPos = new THREE.Vector3();
   private static readonly DOROTHY_PROXIMITY_TARGET = new THREE.Vector3(-20, 2, -25);
+  private static readonly DOROTHY_DECK_TARGET = new THREE.Vector3(-20, 2.2, -25);
+  private static readonly DOROTHY_WHEELHOUSE_TARGET = new THREE.Vector3(-21, 2.2, -28);
   private static readonly CAT_MOTEL_PROXIMITY_TARGET = new THREE.Vector3(-55, 0, -65);
+  private static readonly CAT_HAVEN_CUSHION_POS = new THREE.Vector3(-55, 0.28, -66.5);
+  private static readonly CAT_HAVEN_TELEPORT_POS = new THREE.Vector3(-55.0, 0.33, -66.5);
+  private static readonly GATE4_TURNSTILE_POS = new THREE.Vector3(-104.5, 0.4, -1.0);
+  private static readonly CRANE_LIFT_POS = new THREE.Vector3(18, 3.5, 35);
+  private static readonly CRANE_BREAKER_POS = new THREE.Vector3(20, 36, 25);
   private static readonly SUB_TARGET_POS = new THREE.Vector3(-30, 0, 45);
   private static readonly SCRAP_TARGET_POS = new THREE.Vector3(38, 0, -52);
   private static readonly VAULT_TARGET_POS = new THREE.Vector3(45, 0, -60);
@@ -129,6 +137,11 @@ export class GameEngine {
     name: '',
     dist: 0
   };
+
+  // Pre-bound Zero-Allocation Callbacks for Hot Frame Loop
+  private readonly raycastObstaclesBound: (origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number) => number | null;
+  private readonly getPlatformFloorForCatBound: (x: number, z: number) => number;
+  private sonarPreyPool: SonarPreyEntry[] = [];
 
   // Reusable Minimap and Prompt Pools to Eliminate Allocation Spikes
   private minimapEntityPool: MinimapEntity[] = [];
@@ -222,19 +235,25 @@ export class GameEngine {
     this.camera = this.renderSystem.camera;
     this.renderer = this.renderSystem.renderer;
 
-    // 3. Initialize PhysicsSubsystem
-    this.physics = new PhysicsSubsystem(new THREE.Vector3(-10.0, 0, -20.0), 0);
+    // 3. Initialize PhysicsSubsystem at exact spawn coordinates
+    this.physics = new PhysicsSubsystem(GameEngine.SPAWN_POS.clone(), 0);
     this.setupPhysicsEvents();
 
     // 4. Build Environment & Characters
     this.environment = new ShipyardEnvironment();
     this.scene.add(this.environment.group);
 
+    // Pre-bind hot-loop closures once at construction (Zero GC per frame)
+    this.raycastObstaclesBound = (orig: THREE.Vector3, dir: THREE.Vector3, maxDist: number) =>
+      this.environment.raycastObstacles(orig, dir, maxDist);
+    this.getPlatformFloorForCatBound = (x: number, z: number) =>
+      this.environment.getPlatformFloor(x, z, this.physics.position.y);
+
     this.trajectoryVisualizer = new PounceTrajectoryVisualizer();
     this.scene.add(this.trajectoryVisualizer.group);
 
     this.cat = new CatCharacter();
-    this.cat.mesh.position.set(-10.0, 0, -20.0);
+    this.cat.mesh.position.copy(GameEngine.SPAWN_POS);
     this.cat.mesh.rotation.set(0, 0, 0);
     
     // Alba's Feline Vision / Personal Worksite Light
@@ -244,11 +263,20 @@ export class GameEngine {
 
     this.scene.add(this.cat.mesh);
 
+    // Immediately snap camera to Alba's spawn position before first render frame
+    this.renderSystem.snapCameraToTarget(GameEngine.SPAWN_POS, 0);
+
     // 5. Spawn Entities: Rats, Colony NPCs, and Mutant Cats
     this.spawnRats();
     this.spawnColonyNPCs();
     this.spawnShipbuilders();
     this.spawnMutantCats();
+
+    // Pre-populate zero-allocation sonar prey pool
+    this.sonarPreyPool = this.rats.map((r) => ({
+      mesh: r.mesh,
+      type: (r.isKingpin ? 'kingpin' : 'prey') as 'kingpin' | 'prey'
+    }));
 
     // 6. Pre-Warm All Shaders & Compile Scene Graph Ahead of Time
     if (this.renderer && typeof this.renderer.compile === 'function') {
@@ -298,9 +326,9 @@ export class GameEngine {
       this.eventBus.emit('location:change', { location, isIndoors });
 
       // Dynamic Acoustic Zone Transitions with convolution reverb
-      if (location.includes('Machine Shop')) {
+      if (location.includes('Machine Shop') || location.includes('Steel Fab')) {
         soundEngine.setAcousticZone('MACHINE_SHOP');
-      } else if (location.includes('Dry Dock 1') || location.includes('Dry Dock 12')) {
+      } else if (location.includes('Dry Dock 1') || location.includes('Dry Dock 2') || location.includes('Dry Dock 12')) {
         soundEngine.setAcousticZone('DRY_DOCK_BASIN');
       } else if (location.includes('Vault')) {
         soundEngine.setAcousticZone('RADIATION_VAULT');
@@ -317,6 +345,8 @@ export class GameEngine {
 
   public startLoop(): void {
     if (!this.animationFrameId && !this.isDisposed) {
+      // Ensure camera is locked to Alba's exact position and heading on loop start
+      this.renderSystem.snapCameraToTarget(this.cat.mesh.position, this.physics.heading);
       this.lastFrameTimestamp = 0;
       this.animationFrameId = requestAnimationFrame(this.animate);
     }
@@ -396,30 +426,11 @@ export class GameEngine {
     this.camera.updateProjectionMatrix();
 
     // Compile entire scene graph (prefer compileAsync for parallel driver compilation)
-    if (this.renderer && typeof (this.renderer as any).compileAsync === 'function') {
-      await (this.renderer as any).compileAsync(this.scene, this.camera);
-    } else if (this.renderer && typeof this.renderer.compile === 'function') {
-      this.renderer.compile(this.scene, this.camera);
-    }
+    await this.renderSystem.prewarmShaders(this.scene);
 
     // 5. Run Warmup Render Passes across all major shipyard zones, elevations, and 360-degree orientations
     try {
-      const tempCamPos = this.camera.position.clone();
       const tempCatPos = this.physics.position.clone();
-      const zonePositions = [
-        new THREE.Vector3(-10, 0, -20),   // South Yard & Dorothy Tugboat
-        new THREE.Vector3(-45, 0, -30),   // Machine Shop Interior & Mezzanine
-        new THREE.Vector3(-45, 3.5, -20), // Machine Shop High Catwalk
-        new THREE.Vector3(25, -2, -25),   // Historic Dry Dock 1 Sunken Basin
-        new THREE.Vector3(20, 0, 35),     // Big Blue Gantry & Dry Dock 12
-        new THREE.Vector3(20, -2.5, 35),  // Dry Dock 12 Basin Floor
-        new THREE.Vector3(-30, 0, 45),    // Submarine MOF Outfitting
-        new THREE.Vector3(-14.6, 0, 16.2),// Submarine MOF Interior & Piping
-        new THREE.Vector3(-3.1, 0, 36.7), // Dry Dock 12 / MOF Border
-        new THREE.Vector3(52, 0, 10),     // East Pier Boardwalk & James River
-        new THREE.Vector3(45, 0, -60)     // RCOH Radiation Vault
-      ];
-
       const catActions = ['stand', 'sit', 'walk', 'run', 'jump', 'pounce', 'attack', 'eat'];
       const ratPositions = this.rats.map((r) => r.mesh.position.clone());
       const mutantPositions = this.mutantCats.map((m) => m.mesh.position.clone());
@@ -442,11 +453,7 @@ export class GameEngine {
       for (let i = 0; i < this.mutantCats.length; i++) this.mutantCats[i].setWhiskersAura(true, true);
       this.environment.setWhiskersMode(true);
 
-      if (typeof (this.renderer as any).compileAsync === 'function') {
-        await (this.renderer as any).compileAsync(this.scene, this.camera);
-      } else if (typeof this.renderer.compile === 'function') {
-        this.renderer.compile(this.scene, this.camera);
-      }
+      await this.renderSystem.prewarmShaders(this.scene);
       this.renderer.render(this.scene, this.camera);
       await new Promise(r => setTimeout(r, 16));
 
@@ -475,10 +482,11 @@ export class GameEngine {
       this.trajectoryVisualizer.setVisible(false);
       this.trajectoryVisualizer.setTargetLock(false);
 
+      // Ensure impact particles are reset after pre-warm
+      this.renderSystem.updateParticles(2.0);
+
       this.physics.position.copy(tempCatPos);
       this.cat.mesh.position.copy(tempCatPos);
-      this.camera.position.copy(tempCamPos);
-      this.camera.lookAt(this.physics.position.x, this.physics.position.y + 0.4, this.physics.position.z);
 
       this.rats.forEach((r, idx) => {
         if (ratPositions[idx]) r.mesh.position.copy(ratPositions[idx]);
@@ -488,6 +496,10 @@ export class GameEngine {
       });
 
       this.cat.resetToStand();
+
+      // Snap camera cleanly to Alba's spawn and render one clean initial frame
+      this.renderSystem.snapCameraToTarget(this.cat.mesh.position, this.physics.heading);
+      this.renderer.render(this.scene, this.camera);
 
       const totalPrograms = this.renderer.info?.programs?.length ?? 0;
       console.log(`🚀 [PRE-WARM] WebGL Pipeline Ready: ${totalPrograms} compiled shader programs linked to GPU driver ahead of gameplay.`);
@@ -780,7 +792,7 @@ export class GameEngine {
     let interacted = false;
 
     // 0. Check Cat Haven Sanctuary Orthopedic Cushion Bed
-    const distToHavenCushion = catPos.distanceTo(new THREE.Vector3(-55, 0.28, -66.5));
+    const distToHavenCushion = catPos.distanceTo(GameEngine.CAT_HAVEN_CUSHION_POS);
     if (distToHavenCushion < 2.5) {
       soundEngine.playPurr();
       this.cat.triggerRest(3.5);
@@ -868,7 +880,7 @@ export class GameEngine {
     }
 
     // 4. Check Tugboat Dorothy Wheelhouse Capstan Winch
-    if (!interacted && catPos.distanceTo(new THREE.Vector3(-21, 2.2, -28)) < 3.5) {
+    if (!interacted && catPos.distanceTo(GameEngine.DOROTHY_WHEELHOUSE_TARGET) < 3.5) {
       soundEngine.playSuccess();
       this.missionManager.completeObjective('clear_wheelhouse');
       this.assistanceEngine.triggerAssist('DOROTHY_CAPSTAN_UNJAM');
@@ -1284,6 +1296,8 @@ export class GameEngine {
     const maxActiveDistanceSq = 60 * 60;
 
     let minRatDist = 999;
+    let missionObjectiveDirty = false;
+
     for (let i = 0; i < this.rats.length; i++) {
       const rat = this.rats[i];
       if (rat.state === 'CAUGHT') continue;
@@ -1323,13 +1337,12 @@ export class GameEngine {
         const floorY = this.environment.getPlatformFloor(rat.mesh.position.x, rat.mesh.position.z, rat.mesh.position.y);
         rat.mesh.position.y = floorY;
 
-        const dist = rat.mesh.position.distanceTo(catPos);
+        const currentDist = rat.mesh.position.distanceTo(catPos);
 
         if (rat.isKingpin) {
           // Kingpin Boss Combat:
           // Contact Damage: Kingpin strikes Alba if close (< 1.6m) and not stunned
-          // (Alba cannot damage Kingpin by merely touching him; she must actively strike with Paw Swipe [J] or Tail Sweep [K]!)
-          if (dist < 1.6 && !rat.isStunned && rat.attackCooldown <= 0) {
+          if (currentDist < 1.6 && !rat.isStunned && rat.attackCooldown <= 0) {
             rat.attackCooldown = 1.8;
             this.vitals.takeDamage(12);
             soundEngine.playCatHiss();
@@ -1339,7 +1352,7 @@ export class GameEngine {
         } else {
           // Standard Vermin Hunting (Mice / Small Rats)
           const catchThreshold = this.physics.isPouncing ? 2.4 : 1.3;
-          if (dist < catchThreshold && (this.physics.isPouncing || dist < 1.3)) {
+          if (currentDist < catchThreshold && (this.physics.isPouncing || currentDist < 1.3)) {
             this.triggerHitFeedback(rat.mesh.position, false);
             rat.state = 'CAUGHT';
             rat.mesh.visible = false;
@@ -1361,12 +1374,17 @@ export class GameEngine {
 
             this.showNotification('Prey Caught!', `Caught a ${rat.name}! +${xpEarned} XP (+${rat.nutritionValue} Hunger refilled).`, 'info');
             this.missionManager.updateCountObjective('hunt_mice', 1);
+            missionObjectiveDirty = true;
           }
-          this.onMissionObjectiveUpdated?.();
-          this.eventBus.emit('mission:objectiveUpdated', undefined);
         }
       }
     }
+
+    if (missionObjectiveDirty) {
+      this.onMissionObjectiveUpdated?.();
+      this.eventBus.emit('mission:objectiveUpdated', undefined);
+    }
+
     this.flightRecorder.setNearestRatDistance(minRatDist);
   }
 
@@ -1407,10 +1425,9 @@ export class GameEngine {
     let count = 0;
 
     // 0. Check Cat Haven Sanctuary Orthopedic Cushion Bed (< 3.2m)
-    const havenPos = new THREE.Vector3(-55, 0.28, -66.5);
-    const distToHaven = catPos.distanceTo(havenPos);
+    const distToHaven = catPos.distanceTo(GameEngine.CAT_HAVEN_CUSHION_POS);
     if (distToHaven < 3.2) {
-      const proj = this.renderSystem.projectPoint(havenPos, 0.45);
+      const proj = this.renderSystem.projectPoint(GameEngine.CAT_HAVEN_CUSHION_POS, 0.45);
       if (proj.visible) {
         count = this.addContextualPrompt(
           count,
@@ -1517,10 +1534,9 @@ export class GameEngine {
     }
 
     // 5. Check Gate 4 Main Security Turnstile (< 7.0m)
-    const turnstilePos = new THREE.Vector3(-104.5, 0.4, -1.0);
-    const distToTurnstile = turnstilePos.distanceTo(catPos);
+    const distToTurnstile = GameEngine.GATE4_TURNSTILE_POS.distanceTo(catPos);
     if (distToTurnstile < 7.0) {
-      const proj = this.renderSystem.projectPoint(turnstilePos, 1.4);
+      const proj = this.renderSystem.projectPoint(GameEngine.GATE4_TURNSTILE_POS, 1.4);
       if (proj.visible) {
         count = this.addContextualPrompt(
           count,
@@ -1551,8 +1567,6 @@ export class GameEngine {
     const radData = this.radiationSystem.calculateRadiationAtPoint(this.cat.mesh.position);
 
     // Dynamic Mutant Cat Proximity Radiation
-    // Active radioactive mutants emit an isotopic signature (up to 3.5 mSv/hr within 8m)
-    // Friendly Colony Cats (Calico Belle, Tripod Toby, Barnaby, etc.) emit 0.0 mSv/hr
     let mutantDose = 0;
     const catPos = this.cat.mesh.position;
     for (let i = 0; i < this.mutantCats.length; i++) {
@@ -1560,7 +1574,6 @@ export class GameEngine {
       if (!mutant.isDefeated && mutant.state !== 'DEFEATED') {
         const dist = catPos.distanceTo(mutant.mesh.position);
         if (dist < 8.0) {
-          // Inverse linear falloff from 3.5 mSv/hr at contact down to 0 at 8m
           mutantDose += (1.0 - dist / 8.0) * 3.5;
         }
       }
@@ -1618,7 +1631,7 @@ export class GameEngine {
         }
       }
     }
-    if (!prompt && catPos.distanceTo(new THREE.Vector3(-21, 2.2, -28)) < 3.5) {
+    if (!prompt && catPos.distanceTo(GameEngine.DOROTHY_WHEELHOUSE_TARGET) < 3.5) {
       prompt = `[E] Clear Dorothy Winch Snarl`;
     }
     this.onInteractionPrompt?.(prompt);
@@ -1641,7 +1654,7 @@ export class GameEngine {
     // Mission 2: Dorothy's Historic Steamline
     else if (mission.id === 2) {
       if (mission.objectives[0] && !mission.objectives[0].isCompleted) {
-        const distToDorothyDeck = catPos.distanceTo(new THREE.Vector3(-20, 2.2, -25));
+        const distToDorothyDeck = catPos.distanceTo(GameEngine.DOROTHY_DECK_TARGET);
         if (distToDorothyDeck < 4.5 && catPos.y >= 1.4) {
           this.missionManager.completeObjective('board_dorothy');
           soundEngine.playSuccess();
@@ -1651,7 +1664,7 @@ export class GameEngine {
         }
       }
       if (mission.objectives[1] && !mission.objectives[1].isCompleted) {
-        const distToWheelhouse = catPos.distanceTo(new THREE.Vector3(-21, 2.2, -28));
+        const distToWheelhouse = catPos.distanceTo(GameEngine.DOROTHY_WHEELHOUSE_TARGET);
         if (distToWheelhouse < 3.5) {
           this.missionManager.completeObjective('clear_wheelhouse');
           soundEngine.playSuccess();
@@ -1690,7 +1703,7 @@ export class GameEngine {
     // Mission 4: Big Blue's High-Wire Superlift
     else if (mission.id === 4) {
       if (mission.objectives[0] && !mission.objectives[0].isCompleted) {
-        if (catPos.distanceTo(new THREE.Vector3(18, 3.5, 35)) < 4.5) {
+        if (catPos.distanceTo(GameEngine.CRANE_LIFT_POS) < 4.5) {
           this.missionManager.completeObjective('enter_crane_lift');
           soundEngine.playSuccess();
           this.showNotification('🏗️ CRANE HOIST ASCENT!', "Alba rode the rigger lift basket to the 200ft trolley bridge! Cross the I-beam to trip the breaker.", 'success');
@@ -1699,7 +1712,7 @@ export class GameEngine {
         }
       }
       if (mission.objectives[1] && !mission.objectives[1].isCompleted) {
-        if (catPos.y >= 30.0 && catPos.distanceTo(new THREE.Vector3(20, 36, 25)) < 6.0) {
+        if (catPos.y >= 30.0 && catPos.distanceTo(GameEngine.CRANE_BREAKER_POS) < 6.0) {
           this.missionManager.completeObjective('trip_crane_breaker');
           soundEngine.playSuccess();
           this.showNotification('⚡ CRANE BREAKER TRIPPED!', "Runaway hoist halted! Chapter 4 complete. Chapter 5 unlocked!", 'success');
@@ -1847,7 +1860,7 @@ export class GameEngine {
       this.physics.currentSpeed,
       this.isDoubleTapSprint,
       this.physics.isGrounded,
-      (x, z) => this.environment.getPlatformFloor(x, z, this.physics.position.y)
+      this.getPlatformFloorForCatBound
     );
     this.flightRecorder.endSection('cat_character_anim');
 
@@ -1874,12 +1887,12 @@ export class GameEngine {
       this.cat.mesh.position,
       renderYaw,
       isFreeLooking,
-      (orig, dir, maxDist) => this.environment.raycastObstacles(orig, dir, maxDist)
+      this.raycastObstaclesBound
     );
     this.renderSystem.updateWhiskersSonarWave(
       frameDelta,
       this.cat.mesh.position,
-      this.rats.map((r) => ({ mesh: r.mesh, type: (r.isKingpin ? 'kingpin' : 'prey') as 'kingpin' | 'prey' }))
+      this.sonarPreyPool
     );
 
     // Update Web Audio 3D Positional Listener coordinates & forward heading (Zero-allocation)
@@ -1925,7 +1938,13 @@ export class GameEngine {
     this.flightRecorder.startSection('rats_ai');
     this.updateRatsAndHunting(frameDelta);
     if (this.frameTick % 10 === 0) {
-      const kingpin = this.rats.find((r) => r.isKingpin && r.state !== 'CAUGHT');
+      let kingpin: RatEntity | undefined;
+      for (let i = 0; i < this.rats.length; i++) {
+        if (this.rats[i].isKingpin && this.rats[i].state !== 'CAUGHT') {
+          kingpin = this.rats[i];
+          break;
+        }
+      }
       const catPos = this.cat?.mesh?.position;
       const inDryDock1Arena = !!(
         catPos &&
@@ -2067,9 +2086,6 @@ export class GameEngine {
   }
 
   /**
-   * Cleanly dispose of all WebGL renderer, textures, materials, and scene graphs
-   */
-  /**
    * Sequence when Alba reaches 0 HP:
    * Collapses, fades to black, tradesmen & Dr. Vance rescue Alba to Cat Haven heated bed, 100% restored.
    */
@@ -2087,9 +2103,10 @@ export class GameEngine {
     // 2. Blackout transition
     setTimeout(() => {
       // 3. Teleport to Cat Haven heated orthopedic bed (height: 0.33)
-      this.physics.teleport(new THREE.Vector3(-55.0, 0.33, -66.5), 0.0);
-      this.cat.mesh.position.set(-55.0, 0.33, -66.5);
+      this.physics.teleport(GameEngine.CAT_HAVEN_TELEPORT_POS, 0.0);
+      this.cat.mesh.position.copy(GameEngine.CAT_HAVEN_TELEPORT_POS);
       this.cat.mesh.rotation.y = 0.0;
+      this.renderSystem.snapCameraToTarget(GameEngine.CAT_HAVEN_TELEPORT_POS, 0.0);
       this.cat.triggerRest(4.0);
 
       // Restore vitals 100%
@@ -2109,6 +2126,9 @@ export class GameEngine {
     }, 2500);
   }
 
+  /**
+   * Cleanly dispose of all WebGL renderer, textures, materials, and scene graphs
+   */
   public dispose(): void {
     this.isDisposed = true;
 

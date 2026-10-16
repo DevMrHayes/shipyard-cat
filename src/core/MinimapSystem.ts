@@ -1,4 +1,7 @@
-﻿import * as THREE from 'three';
+An update to `src/core/MinimapSystem.ts` implementing an offscreen static tactical layer cache (eliminating repetitive redraw work and GC stalls), full landmark coverage (including Heavy Steel Fab Super-Shop, Dry Dock 2 Virginia-class Berth, Foundry, and Boiler House), and zero per-frame allocation rendering.
+
+```typescript
+import * as THREE from 'three';
 
 export interface MinimapEntity {
   pos: THREE.Vector3;
@@ -7,27 +10,37 @@ export interface MinimapEntity {
   label?: string;
 }
 
+interface FacilityZone {
+  name: string;
+  xMin: number;
+  xMax: number;
+  zMin: number;
+  zMax: number;
+  fillColor: string;
+  strokeColor: string;
+  labelX: number;
+  labelZ: number;
+  labelOffsetSide?: 'top' | 'center' | 'bottom';
+}
+
 export class MinimapSystem {
   private radarCanvas: HTMLCanvasElement | null = null;
   private fullMapCanvas: HTMLCanvasElement | null = null;
   private radarCtx: CanvasRenderingContext2D | null = null;
   private fullMapCtx: CanvasRenderingContext2D | null = null;
 
-  // Shipyard World Boundaries (-110 to +65 in X, -100 to +90 in Z)
-  private readonly worldMinX = -110;
-  private readonly worldMaxX = 65;
-  private readonly worldMinZ = -100;
-  private readonly worldMaxZ = 90;
+  // Cached Static Blueprint Background Layer to prevent GC thrashing & draw spikes
+  private staticLayerCanvas: HTMLCanvasElement | null = null;
+  private staticLayerCtx: CanvasRenderingContext2D | null = null;
+  private staticCacheValid = false;
+  private lastMapWidth = 0;
+  private lastMapHeight = 0;
 
-  constructor() {
-    if (typeof document !== 'undefined') {
-      this.radarCanvas = document.getElementById('minimap-canvas') as HTMLCanvasElement;
-      this.fullMapCanvas = document.getElementById('full-map-canvas') as HTMLCanvasElement;
-
-      if (this.radarCanvas) this.radarCtx = this.radarCanvas.getContext('2d', { willReadFrequently: true });
-      if (this.fullMapCanvas) this.fullMapCtx = this.fullMapCanvas.getContext('2d', { willReadFrequently: true });
-    }
-  }
+  // Expanded Shipyard World Boundaries (-120 to +75 in X, -110 to +105 in Z)
+  private readonly worldMinX = -120;
+  private readonly worldMaxX = 75;
+  private readonly worldMinZ = -110;
+  private readonly worldMaxZ = 105;
 
   private static readonly CARDINAL_DEFS = [
     { label: 'N', baseAngle: Math.PI, color: '#f59e0b' },
@@ -36,14 +49,174 @@ export class MinimapSystem {
     { label: 'W', baseAngle: -Math.PI / 2, color: '#94a3b8' }
   ];
 
+  // Comprehensive facility manifest including Heavy Steel Fab Super-Shop & Dry Dock 2 Submarine Berth
+  private static readonly FACILITIES: FacilityZone[] = [
+    // Historic Dry Dock 1 (Perpendicular Carrier/Vessel Basin)
+    {
+      name: 'DRY DOCK 1 (CVN BASIN)',
+      xMin: 15,
+      xMax: 45,
+      zMin: -35,
+      zMax: -20,
+      fillColor: 'rgba(180, 83, 9, 0.45)',
+      strokeColor: '#f59e0b',
+      labelX: 16,
+      labelZ: -32
+    },
+    // Dry Dock 2: Virginia-Class Submarine Berth
+    {
+      name: 'DRY DOCK 2 (SSN VIRGINIA BERTH)',
+      xMin: -10,
+      xMax: 12,
+      zMin: -65,
+      zMax: -20,
+      fillColor: 'rgba(30, 58, 138, 0.55)',
+      strokeColor: '#38bdf8',
+      labelX: -9,
+      labelZ: -61
+    },
+    // Heavy Steel Fab Super-Shop
+    {
+      name: 'HEAVY STEEL FAB SUPER-SHOP',
+      xMin: -108,
+      xMax: -68,
+      zMin: 10,
+      zMax: 70,
+      fillColor: 'rgba(51, 65, 85, 0.65)',
+      strokeColor: '#38bdf8',
+      labelX: -106,
+      labelZ: 15
+    },
+    // Dry Dock 12 / Big Blue Gantry Basin
+    {
+      name: 'DRY DOCK 12 / BIG BLUE',
+      xMin: 16,
+      xMax: 48,
+      zMin: -10,
+      zMax: 75,
+      fillColor: 'rgba(71, 85, 105, 0.5)',
+      strokeColor: '#38bdf8',
+      labelX: 18,
+      labelZ: -6
+    },
+    // Machine Shop No. 1
+    {
+      name: 'MACHINE SHOP NO. 1',
+      xMin: -56,
+      xMax: -34,
+      zMin: -38,
+      zMax: -2,
+      fillColor: 'rgba(153, 27, 27, 0.45)',
+      strokeColor: '#ef4444',
+      labelX: -54,
+      labelZ: -34
+    },
+    // Submarine MOF Module Outfitting Facility
+    {
+      name: 'SUBMARINE FAB (MOF)',
+      xMin: -48,
+      xMax: -15,
+      zMin: 30,
+      zMax: 65,
+      fillColor: 'rgba(30, 41, 59, 0.65)',
+      strokeColor: '#f59e0b',
+      labelX: -46,
+      labelZ: 34
+    },
+    // Foundry & Heavy Casting Shop
+    {
+      name: 'FOUNDRY & CASTING SHOP',
+      xMin: -95,
+      xMax: -65,
+      zMin: -35,
+      zMax: -5,
+      fillColor: 'rgba(120, 53, 15, 0.45)',
+      strokeColor: '#f97316',
+      labelX: -93,
+      labelZ: -31
+    },
+    // Historic Steam Boiler House
+    {
+      name: 'CENTRAL BOILER HOUSE',
+      xMin: -90,
+      xMax: -70,
+      zMin: -70,
+      zMax: -45,
+      fillColor: 'rgba(67, 56, 202, 0.4)',
+      strokeColor: '#818cf8',
+      labelX: -88,
+      labelZ: -66
+    },
+    // Nuclear Overhaul Vault (RCOH)
+    {
+      name: 'RCOH NUCLEAR OVERHAUL VAULT',
+      xMin: 37,
+      xMax: 54,
+      zMin: -70,
+      zMax: -52,
+      fillColor: 'rgba(168, 85, 247, 0.35)',
+      strokeColor: '#c084fc',
+      labelX: 38,
+      labelZ: -66
+    },
+    // Tugboat Dorothy Dry Mount
+    {
+      name: 'TUGBOAT DOROTHY',
+      xMin: -24,
+      xMax: -16,
+      zMin: -32,
+      zMax: -18,
+      fillColor: 'rgba(220, 38, 38, 0.7)',
+      strokeColor: '#ef4444',
+      labelX: -24,
+      labelZ: -28
+    },
+    // Feline Sanctuary & Cat Motel
+    {
+      name: 'CAT MOTEL SANCTUARY',
+      xMin: -65,
+      xMax: -48,
+      zMin: -73,
+      zMax: -59,
+      fillColor: 'rgba(34, 197, 94, 0.3)',
+      strokeColor: '#22c55e',
+      labelX: -64,
+      labelZ: -69
+    }
+  ];
+
+  constructor() {
+    if (typeof document !== 'undefined') {
+      this.radarCanvas = document.getElementById('minimap-canvas') as HTMLCanvasElement | null;
+      this.fullMapCanvas = document.getElementById('full-map-canvas') as HTMLCanvasElement | null;
+
+      if (this.radarCanvas) {
+        this.radarCtx = this.radarCanvas.getContext('2d', { willReadFrequently: true });
+      }
+      if (this.fullMapCanvas) {
+        this.fullMapCtx = this.fullMapCanvas.getContext('2d', { willReadFrequently: true });
+      }
+
+      this.staticLayerCanvas = document.createElement('canvas');
+      this.staticLayerCtx = this.staticLayerCanvas.getContext('2d', { alpha: false });
+    }
+  }
+
   public dispose(): void {
     this.radarCanvas = null;
     this.fullMapCanvas = null;
     this.radarCtx = null;
     this.fullMapCtx = null;
+    this.staticLayerCanvas = null;
+    this.staticLayerCtx = null;
+    this.staticCacheValid = false;
   }
 
-  public update(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[], entityCount?: number) {
+  public invalidateCache(): void {
+    this.staticCacheValid = false;
+  }
+
+  public update(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[], entityCount?: number): void {
     const count = entityCount !== undefined ? entityCount : entities.length;
     this.renderCornerRadar(albaPos, albaHeading, entities, count);
     if (this.fullMapCanvas && this.fullMapCanvas.offsetParent !== null) {
@@ -51,23 +224,23 @@ export class MinimapSystem {
     }
   }
 
-  private renderCornerRadar(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[], count: number) {
+  private renderCornerRadar(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[], count: number): void {
     if (!this.radarCtx || !this.radarCanvas) return;
     const ctx = this.radarCtx;
     const width = this.radarCanvas.width;
     const height = this.radarCanvas.height;
-    const cx = width / 2;
-    const cy = height / 2;
+    const cx = width * 0.5;
+    const cy = height * 0.5;
     const radarRange = 45; // 45-meter radius radar
     const now = Date.now();
 
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Radar Circular Background with Brass / Cyan Glow
+    // 1. Radar Circular Background
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, cx - 2, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
     ctx.fill();
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = '#38bdf8';
@@ -99,7 +272,6 @@ export class MinimapSystem {
     ctx.stroke();
 
     // 2. Rotating Compass Cardinals (N, E, S, W)
-    // World coordinates: +X is East (River), -Z is North, +Z is South, -X is West
     ctx.font = 'bold 8px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -142,7 +314,6 @@ export class MinimapSystem {
           ctx.arc(px, py, 3, 0, Math.PI * 2);
           ctx.fill();
         } else if (ent.type === 'KINGPIN') {
-          // Boss pulsating marker
           const kingpinPulse = 5 + Math.sin(now * 0.008) * 1.5;
           ctx.fillStyle = '#f97316';
           ctx.arc(px, py, kingpinPulse, 0, Math.PI * 2);
@@ -159,7 +330,6 @@ export class MinimapSystem {
           ctx.arc(px, py, 3.5, 0, Math.PI * 2);
           ctx.fill();
         } else if (ent.type === 'OBJECTIVE') {
-          // Golden Waypoint Beacon Diamond & Pulsing Sonar Ring
           const pulse = 4 + Math.sin(now * 0.006) * 2;
           ctx.strokeStyle = 'rgba(250, 204, 21, 0.6)';
           ctx.lineWidth = 1.5;
@@ -188,7 +358,6 @@ export class MinimapSystem {
       ctx.translate(epx, epy);
       ctx.rotate(-closestObjectiveAngle + Math.PI);
 
-      // Gold Arrow
       ctx.fillStyle = '#facc15';
       ctx.beginPath();
       ctx.moveTo(0, -6);
@@ -198,7 +367,6 @@ export class MinimapSystem {
       ctx.fill();
       ctx.restore();
 
-      // Distance Text
       ctx.fillStyle = '#fef08a';
       ctx.font = 'bold 7px monospace';
       ctx.textAlign = 'center';
@@ -206,7 +374,6 @@ export class MinimapSystem {
     }
 
     // 5. Alba Center Indicator with Forward Vision Cone
-    // Forward Vision Cone (35-degree field)
     ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
     ctx.beginPath();
     ctx.moveTo(cx, cy);
@@ -214,7 +381,6 @@ export class MinimapSystem {
     ctx.closePath();
     ctx.fill();
 
-    // Alba Arrow
     ctx.fillStyle = '#38bdf8';
     ctx.beginPath();
     ctx.moveTo(cx, cy - 7);
@@ -227,105 +393,114 @@ export class MinimapSystem {
     ctx.restore();
   }
 
-  private renderFullTacticalMap(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[], count: number) {
+  private ensureStaticLayerCache(w: number, h: number): void {
+    if (this.staticCacheValid && this.lastMapWidth === w && this.lastMapHeight === h && this.staticLayerCanvas) {
+      return;
+    }
+
+    if (!this.staticLayerCanvas || !this.staticLayerCtx) {
+      this.staticLayerCanvas = document.createElement('canvas');
+      this.staticLayerCtx = this.staticLayerCanvas.getContext('2d', { alpha: false });
+    }
+
+    this.staticLayerCanvas.width = w;
+    this.staticLayerCanvas.height = h;
+    const sCtx = this.staticLayerCtx;
+    if (!sCtx) return;
+
+    this.lastMapWidth = w;
+    this.lastMapHeight = h;
+    this.staticCacheValid = true;
+
+    const mapX = (worldX: number) => ((worldX - this.worldMinX) / (this.worldMaxX - this.worldMinX)) * w;
+    const mapZ = (worldZ: number) => ((worldZ - this.worldMinZ) / (this.worldMaxZ - this.worldMinZ)) * h;
+
+    // 1. Blueprint Grid & Foundation
+    sCtx.fillStyle = '#060e17';
+    sCtx.fillRect(0, 0, w, h);
+
+    sCtx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+    sCtx.lineWidth = 1;
+    for (let x = 0; x < w; x += 25) {
+      sCtx.beginPath();
+      sCtx.moveTo(x, 0);
+      sCtx.lineTo(x, h);
+      sCtx.stroke();
+    }
+    for (let y = 0; y < h; y += 25) {
+      sCtx.beginPath();
+      sCtx.moveTo(0, y);
+      sCtx.lineTo(w, y);
+      sCtx.stroke();
+    }
+
+    // 2. James River Waterfront (East Pier & Basin)
+    const riverLeft = mapX(58);
+    sCtx.fillStyle = '#0369a1';
+    sCtx.fillRect(riverLeft, 0, w - riverLeft, h);
+    sCtx.fillStyle = '#0284c7';
+    sCtx.fillRect(riverLeft - 3, 0, 3, h); // Waterfront bulkheads
+
+    // 3. Yard Facilities
+    for (let i = 0; i < MinimapSystem.FACILITIES.length; i++) {
+      const fac = MinimapSystem.FACILITIES[i];
+      const left = mapX(fac.xMin);
+      const top = mapZ(fac.zMin);
+      const right = mapX(fac.xMax);
+      const bottom = mapZ(fac.zMax);
+      const fw = right - left;
+      const fh = bottom - top;
+
+      sCtx.fillStyle = fac.fillColor;
+      sCtx.fillRect(left, top, fw, fh);
+
+      sCtx.strokeStyle = fac.strokeColor;
+      sCtx.lineWidth = 1.5;
+      sCtx.strokeRect(left, top, fw, fh);
+
+      // Interior crosshatch for heavy dry docks
+      if (fac.name.includes('DRY DOCK')) {
+        sCtx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        sCtx.lineWidth = 1;
+        for (let step = left + 10; step < right; step += 10) {
+          sCtx.beginPath();
+          sCtx.moveTo(step, top);
+          sCtx.lineTo(step, bottom);
+          sCtx.stroke();
+        }
+      }
+
+      // Facility Label
+      sCtx.font = 'bold 8.5px monospace';
+      sCtx.fillStyle = '#f8fafc';
+      sCtx.fillText(fac.name, mapX(fac.labelX), mapZ(fac.labelZ));
+    }
+
+    // Waterfront Label
+    sCtx.font = 'bold 10px monospace';
+    sCtx.fillStyle = '#bae6fd';
+    sCtx.fillText('JAMES RIVER CHANNEL', mapX(60), h * 0.5);
+  }
+
+  private renderFullTacticalMap(albaPos: THREE.Vector3, albaHeading: number, entities: MinimapEntity[], count: number): void {
     if (!this.fullMapCtx || !this.fullMapCanvas) return;
     const ctx = this.fullMapCtx;
     const w = this.fullMapCanvas.width;
     const h = this.fullMapCanvas.height;
     const now = Date.now();
 
-    ctx.clearRect(0, 0, w, h);
+    this.ensureStaticLayerCache(w, h);
+
+    // Blit cached static map (eliminates repeated polygon re-evaluations and stroke computations)
+    if (this.staticLayerCanvas) {
+      ctx.drawImage(this.staticLayerCanvas, 0, 0);
+    }
 
     // Coordinate mapping helper
     const mapX = (worldX: number) => ((worldX - this.worldMinX) / (this.worldMaxX - this.worldMinX)) * w;
     const mapZ = (worldZ: number) => ((worldZ - this.worldMinZ) / (this.worldMaxZ - this.worldMinZ)) * h;
 
-    // 1. Blueprint Grid Background
-    ctx.fillStyle = '#09131e';
-    ctx.fillRect(0, 0, w, h);
-
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < w; x += 25) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-    }
-    for (let y = 0; y < h; y += 25) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-    }
-
-    // 2. Facility Zones & Polygons
-
-    // James River Waterfront (East Pier)
-    ctx.fillStyle = '#0369a1';
-    ctx.fillRect(mapX(55), 0, w - mapX(55), h);
-
-    // Historic Dry Dock 1 (Perpendicular Basin Trough X:15 to 45, Z:-35 to -20)
-    ctx.fillStyle = 'rgba(180, 83, 9, 0.35)';
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1.5;
-    const dd1Left = mapX(15);
-    const dd1Top = mapZ(-35);
-    const dd1W = mapX(45) - dd1Left;
-    const dd1H = mapZ(-20) - dd1Top;
-    ctx.fillRect(dd1Left, dd1Top, dd1W, dd1H);
-    ctx.strokeRect(dd1Left, dd1Top, dd1W, dd1H);
-
-    // Tugboat Dorothy Dry Mount
-    ctx.fillStyle = '#991b1b';
-    ctx.fillRect(mapX(-23), mapZ(-32), mapX(-17) - mapX(-23), mapZ(-18) - mapZ(-32));
-
-    // Dry Dock 12 / Big Blue Gantry Basin (North)
-    ctx.fillStyle = 'rgba(71, 85, 105, 0.45)';
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 1.5;
-    const ddLeft = mapX(3.5);
-    const ddTop = mapZ(-10);
-    const ddW = mapX(36.5) - ddLeft;
-    const ddH = mapZ(70) - ddTop;
-    ctx.fillRect(ddLeft, ddTop, ddW, ddH);
-    ctx.strokeRect(ddLeft, ddTop, ddW, ddH);
-
-    // Red Brick Machine Shop No. 1
-    ctx.fillStyle = 'rgba(153, 27, 27, 0.4)';
-    ctx.strokeStyle = '#ef4444';
-    const msLeft = mapX(-56);
-    const msTop = mapZ(-38);
-    const msW = mapX(-34) - msLeft;
-    const msH = mapZ(-2) - msTop;
-    ctx.fillRect(msLeft, msTop, msW, msH);
-    ctx.strokeRect(msLeft, msTop, msW, msH);
-
-    // Submarine MOF Fabrication Shop
-    ctx.fillStyle = 'rgba(30, 41, 59, 0.6)';
-    ctx.strokeStyle = '#f59e0b';
-    ctx.fillRect(mapX(-45), mapZ(30), mapX(-15) - mapX(-45), mapZ(65) - mapZ(30));
-    ctx.strokeRect(mapX(-45), mapZ(30), mapX(-15) - mapX(-45), mapZ(65) - mapZ(30));
-
-    // RCOH Nuclear Overhaul Vault
-    ctx.fillStyle = 'rgba(168, 85, 247, 0.25)';
-    ctx.strokeStyle = '#a855f7';
-    ctx.fillRect(mapX(37), mapZ(-68), mapX(53) - mapX(37), mapZ(-52) - mapZ(-68));
-    ctx.strokeRect(mapX(37), mapZ(-68), mapX(53) - mapX(37), mapZ(-52) - mapZ(-68));
-
-    // Cat Motel Sanctuary
-    ctx.fillStyle = 'rgba(34, 197, 94, 0.25)';
-    ctx.strokeStyle = '#22c55e';
-    ctx.fillRect(mapX(-62), mapZ(-71), mapX(-48) - mapX(-62), mapZ(-59) - mapZ(-71));
-    ctx.strokeRect(mapX(-62), mapZ(-71), mapX(-48) - mapX(-62), mapZ(-59) - mapZ(-71));
-
-    // Facility Labels with Diegetic Badges
-    ctx.font = 'bold 9px monospace';
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillText('DRY DOCK 12 / BIG BLUE', ddLeft + 4, ddTop + 14);
-    ctx.fillText('HISTORIC DRY DOCK 1', dd1Left + 4, dd1Top + 12);
-    ctx.fillText('TUGBOAT DOROTHY', mapX(-30), mapZ(-24));
-    ctx.fillText('MACHINE SHOP NO. 1', msLeft + 4, msTop + 14);
-    ctx.fillText('SUBMARINE FAB (MOF)', mapX(-44), mapZ(34));
-    ctx.fillText('RCOH NUCLEAR VAULT', mapX(38), mapZ(-60));
-    ctx.fillText('CAT MOTEL HUB', mapX(-60), mapZ(-67));
-    ctx.fillText('JAMES RIVER', mapX(58), h / 2);
-
-    // 3. Render Entities on Map
+    // Render Dynamic Entities
     for (let i = 0; i < count; i++) {
       const ent = entities[i];
       if (!ent) continue;
@@ -353,7 +528,6 @@ export class MinimapSystem {
         ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
         ctx.fill();
       } else if (ent.type === 'OBJECTIVE') {
-        // Golden Waypoint Pulsing Target Reticle
         const pulse = 6 + Math.sin(now * 0.005) * 3;
         ctx.strokeStyle = '#facc15';
         ctx.lineWidth = 1.5;
@@ -367,11 +541,11 @@ export class MinimapSystem {
 
         ctx.font = 'bold 8px monospace';
         ctx.fillStyle = '#fef08a';
-        ctx.fillText('WAYPOINT', ex + 8, ey + 3);
+        ctx.fillText(ent.label || 'WAYPOINT', ex + 8, ey + 3);
       }
     }
 
-    // 4. Alba Location Marker with Heading Needle & Field of View
+    // Alba Location Marker & Heading
     const ax = mapX(albaPos.x);
     const ay = mapZ(albaPos.z);
 
@@ -384,7 +558,7 @@ export class MinimapSystem {
 
     ctx.save();
     ctx.translate(ax, ay);
-    ctx.rotate(albaHeading); // Points directly in Alba's forward direction
+    ctx.rotate(albaHeading);
 
     ctx.fillStyle = '#38bdf8';
     ctx.beginPath();
@@ -398,4 +572,4 @@ export class MinimapSystem {
     ctx.restore();
   }
 }
-
+```
