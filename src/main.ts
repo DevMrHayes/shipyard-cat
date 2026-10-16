@@ -649,7 +649,8 @@ document.addEventListener('DOMContentLoaded', () => {
     missionSubtitle.textContent = `MISSION ${mission.id}: ${mission.subtitle.toUpperCase()}`;
 
     objectiveList.innerHTML = '';
-    mission.objectives.forEach(obj => {
+    const firstIncompleteIdx = mission.objectives.findIndex(o => !o.isCompleted);
+    mission.objectives.forEach((obj, idx) => {
       const item = document.createElement('div');
       item.className = `objective-item ${obj.isCompleted ? 'done' : ''}`;
       
@@ -658,11 +659,12 @@ document.addEventListener('DOMContentLoaded', () => {
         countText = ` (${obj.currentCount || 0}/${obj.requiredCount})`;
       }
 
+      const showActiveHint = !obj.isCompleted && idx === firstIncompleteIdx && obj.hint;
       item.innerHTML = `
         <div class="obj-checkbox">${obj.isCompleted ? '✓' : ''}</div>
         <div>
           <span>${obj.description}${countText}</span>
-          ${!obj.isCompleted && obj.hint ? `<div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">💡 ${obj.hint}</div>` : ''}
+          ${showActiveHint ? `<div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">💡 ${obj.hint}</div>` : ''}
         </div>
       `;
       objectiveList.appendChild(item);
@@ -786,6 +788,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.code === 'KeyH' && !e.repeat && onboardingCard) {
       onboardingCard.classList.toggle('hidden');
     }
+    if (e.code === 'F3' && !e.repeat) {
+      e.preventDefault();
+      isDevTelemetryVisible = !isDevTelemetryVisible;
+      const pill = document.getElementById('flight-status-pill');
+      if (pill) pill.style.display = isDevTelemetryVisible ? 'flex' : 'none';
+      const banner = document.getElementById('freeze-alert-banner');
+      if (banner && !isDevTelemetryVisible) banner.style.display = 'none';
+    }
+    if ((e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD') && onboardingCard && !onboardingCard.classList.contains('hidden')) {
+      window.setTimeout(() => {
+        onboardingCard.classList.add('hidden');
+        try { localStorage.setItem('shipyard_cat_onboarding_dismissed', 'true'); } catch {}
+      }, 2200);
+    }
   });
 
   window.addEventListener('keyup', (e) => {
@@ -795,9 +811,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Onboarding & Work Order Buttons
+  // Restore saved onboarding dismissal state & dev telemetry query flag
+  let isDevTelemetryVisible = typeof window !== 'undefined' && window.location.search.includes('debug=true');
+  if (isDevTelemetryVisible) {
+    const pill = document.getElementById('flight-status-pill');
+    if (pill) pill.style.display = 'flex';
+  }
+  try {
+    if (localStorage.getItem('shipyard_cat_onboarding_dismissed') === 'true') {
+      onboardingCard?.classList.add('hidden');
+    }
+  } catch {}
+
+  // Onboarding, Utility Drawer, Mission Collapse & Work Order Buttons
   btnDismissOnboarding?.addEventListener('click', () => {
     onboardingCard?.classList.add('hidden');
+    try { localStorage.setItem('shipyard_cat_onboarding_dismissed', 'true'); } catch {}
+  });
+
+  const btnUtilityMenu = document.getElementById('btn-utility-menu');
+  const hudUtilityDrawer = document.getElementById('hud-utility-drawer');
+  btnUtilityMenu?.addEventListener('click', () => {
+    hudUtilityDrawer?.classList.toggle('hidden');
+  });
+
+  const btnToggleMissionCard = document.getElementById('btn-toggle-mission-card');
+  const missionCardHud = document.getElementById('mission-card-hud');
+  btnToggleMissionCard?.addEventListener('click', () => {
+    if (missionCardHud) {
+      const collapsed = missionCardHud.classList.toggle('collapsed');
+      if (btnToggleMissionCard) btnToggleMissionCard.textContent = collapsed ? '▸' : '▾';
+    }
   });
 
   btnControls?.addEventListener('click', () => {
@@ -1114,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', () => {
       flightStatusText.style.color = '#f87171';
     }
 
-    if (freezeBanner && freezeDetails) {
+    if (freezeBanner && freezeDetails && isDevTelemetryVisible) {
       freezeBanner.style.display = 'block';
       freezeDetails.innerHTML = `<span style="color: #fef08a;">${incident.culpritSection}</span> took <strong>${incident.sectionDurationMs}ms</strong> at (${incident.catPosition.x}, ${incident.catPosition.z}) | State: <em>${incident.catState}</em>${incident.nearestRatDist ? ` | Rat: ${incident.nearestRatDist}m` : ''}`;
       

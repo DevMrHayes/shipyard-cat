@@ -535,14 +535,14 @@ export class RenderSubsystem {
     }
 
     // Asymmetric exponential spring damping:
-    // Fast pull-in on obstacle occlusion (lambda=24), smooth restoration when clear (lambda=8)
-    const distLambda = targetAllowedDist < this.currentCamDist ? 24.0 : 8.0;
+    // Smooth pull-in on obstacle occlusion (lambda=14), gentle restoration when clear (lambda=6)
+    const distLambda = targetAllowedDist < this.currentCamDist ? 14.0 : 6.0;
     const distLerp = 1.0 - Math.exp(-distLambda * deltaTime);
     this.currentCamDist += (targetAllowedDist - this.currentCamDist) * Math.min(1.0, distLerp);
 
     const desiredCameraPos = RenderSubsystem.scratchDesiredCamPos.set(
       rawLookTarget.x + rayDir.x * this.currentCamDist,
-      Math.max(targetPos.y + 0.25, rawLookTarget.y + rayDir.y * this.currentCamDist),
+      Math.max(targetPos.y + 0.45, rawLookTarget.y + rayDir.y * this.currentCamDist),
       rawLookTarget.z + rayDir.z * this.currentCamDist
     );
 

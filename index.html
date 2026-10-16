@@ -198,19 +198,19 @@
         </div>
       </div>
 
-      <!-- Top Center: Live Engine Flight Recorder & Diurnal Shipyard Chronometer -->
+      <!-- Top Center: Diurnal Shipyard Chronometer & Optional Dev Flight Recorder (F3 / ?debug=true) -->
       <div id="flight-recorder-hud" style="display: flex; flex-direction: column; align-items: center; pointer-events: auto;">
-        <div id="diurnal-chronometer-pill" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 0.25rem 0.75rem; border-radius: 9999px; font-family: monospace; font-size: 0.75rem; color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin-bottom: 0.4rem;">
+        <div id="diurnal-chronometer-pill" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 0.25rem 0.85rem; border-radius: 9999px; font-family: monospace; font-size: 0.75rem; color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
           <span id="chronometer-clock" style="font-weight: 900; color: #f59e0b; font-size: 0.85rem; letter-spacing: 1px;">07:00</span>
           <span style="color: #64748b;">•</span>
           <span id="chronometer-shift" style="color: #38bdf8; font-weight: 700;">1ST SHIFT: DAY FABRICATION</span>
         </div>
-        <div id="flight-status-pill" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 0.25rem 0.75rem; border-radius: 9999px; font-family: monospace; font-size: 0.75rem; color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+        <div id="flight-status-pill" class="dev-telemetry-only" style="display: none; align-items: center; gap: 0.5rem; margin-top: 0.35rem; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 0.25rem 0.75rem; border-radius: 9999px; font-family: monospace; font-size: 0.72rem; color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
           <span id="flight-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
           <span id="flight-status-text">Flight Recorder: Active</span>
           <span id="flight-incident-count" style="background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold; display: none;">0 Stalls</span>
         </div>
-        <div id="freeze-alert-banner" style="display: none; margin-top: 0.4rem; background: rgba(220, 38, 38, 0.95); border: 1px solid #ef4444; border-radius: 8px; padding: 0.4rem 0.8rem; color: #fff; font-family: monospace; font-size: 0.75rem; box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4); max-width: 520px; text-align: center;">
+        <div id="freeze-alert-banner" class="dev-telemetry-only" style="display: none; margin-top: 0.35rem; background: rgba(220, 38, 38, 0.95); border: 1px solid #ef4444; border-radius: 8px; padding: 0.35rem 0.75rem; color: #fff; font-family: monospace; font-size: 0.72rem; box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4); max-width: 480px; text-align: center;">
           ⚠️ <strong id="freeze-culprit-title">STALL DETECTED</strong>: <span id="freeze-culprit-details">...</span>
         </div>
       </div>
@@ -229,8 +229,27 @@
           </div>
         </div>
 
-        <!-- Quick System Toolbar -->
+        <!-- Primary Gameplay Toolbar (Compact 5-Button Layout) -->
         <div class="system-toolbar">
+          <button id="btn-map" class="hud-btn-mini" title="Shipyard Blueprint Map [M]">
+            <span>🗺️ Map</span>
+          </button>
+          <button id="btn-abilities" class="hud-btn-mini" title="Abilities & Perks">
+            <span>⭐ Abilities</span> <span id="sp-badge" class="badge-mini">0 SP</span>
+          </button>
+          <button id="btn-workorder" class="hud-btn-mini" title="NNS Work Order & Dispatch [O]">
+            <span>📋 Orders</span>
+          </button>
+          <button id="btn-logbook" class="hud-btn-mini" title="Shipyard Logbook & Comms">
+            <span>📜 Logbook</span>
+          </button>
+          <button id="btn-utility-menu" class="hud-btn-mini" title="Toggle Audio, Shift & Diagnostic Tools">
+            <span>⚙️ Tools ▾</span>
+          </button>
+        </div>
+
+        <!-- Collapsible Secondary Utility & Dev Drawer -->
+        <div id="hud-utility-drawer" class="system-toolbar utility-drawer hidden">
           <button id="btn-music-toggle" class="hud-btn-mini" title="Toggle Ambient Music Soundtrack">
             <span id="hud-music-label">🎵 Music: ON</span>
           </button>
@@ -240,26 +259,14 @@
           <button id="btn-night-mode" class="hud-btn-mini" title="Toggle Day / Night Shift [N]">
             <span id="hud-shift-label">🌙 Night [N]</span>
           </button>
-          <button id="btn-workorder" class="hud-btn-mini" title="NNS Work Order & Dispatch">
-            <span>📋 Orders</span>
-          </button>
-          <button id="btn-controls" class="hud-btn-mini" title="Feline Keybinds & Controls Protocol">
+          <button id="btn-controls" class="hud-btn-mini" title="Feline Keybinds & Controls Protocol [H]">
             <span>🎮 Controls</span>
-          </button>
-          <button id="btn-map" class="hud-btn-mini" title="Shipyard Blueprint Map [M]">
-            <span>🗺️ Map</span>
-          </button>
-          <button id="btn-abilities" class="hud-btn-mini" title="Abilities & Perks">
-            <span>⭐ Abilities</span> <span id="sp-badge" class="badge-mini">0 SP</span>
-          </button>
-          <button id="btn-logbook" class="hud-btn-mini" title="Shipyard Logbook & Comms">
-            <span>📜 Logbook</span>
-          </button>
-          <button id="btn-sandbox" class="hud-btn-mini" title="Level Sandbox Debugger">
-            <span>🛠️ Sandbox</span>
           </button>
           <button id="btn-gallery" class="hud-btn-mini" title="Lore & Gallery">
             <span>🖼 Lore</span>
+          </button>
+          <button id="btn-sandbox" class="hud-btn-mini" title="Level Sandbox & Telemetry Debugger">
+            <span>🛠️ Sandbox</span>
           </button>
           <button id="btn-tests" class="hud-btn-mini" title="Test Diagnostics">
             <span>🧪 Tests</span>
@@ -371,9 +378,11 @@
     <div class="hud-bottom">
       <div class="mission-card interactive" id="mission-card-hud">
         <div class="mission-brass-header">
-          <span class="brass-rivet"></span>
-          <span class="mission-badge" id="mission-subtitle">MISSION 1: HISTORIC DRY DOCK 1</span>
-          <span class="brass-rivet"></span>
+          <div style="display: flex; align-items: center; gap: 0.45rem;">
+            <span class="brass-rivet"></span>
+            <span class="mission-badge" id="mission-subtitle">MISSION 1: HISTORIC DRY DOCK 1</span>
+          </div>
+          <button id="btn-toggle-mission-card" class="btn-close-mini" title="Minimize / Expand Mission Directives" style="font-size: 0.9rem; padding: 0 0.25rem;">▾</button>
         </div>
         <div class="mission-title" id="mission-title">The Rigger's Whistle</div>
         

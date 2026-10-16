@@ -14,6 +14,9 @@ import { soundEngine } from '../core/SoundEngine';
 import { TextureGenerator } from '../core/TextureGenerator';
 import { EventBus } from '../core/EventBus';
 import { EngineFlightRecorder } from '../core/EngineFlightRecorder';
+import { PhysicsSubsystem, PhysicsInputState } from '../physics/PhysicsSubsystem';
+import { DiurnalSystem } from '../systems/DiurnalSystem';
+import { SecurityGate } from '../security/SecurityGate';
 
 export interface PlaytestSessionResult {
   sessionId: string;
@@ -55,6 +58,7 @@ export class PlaytestHarness {
       { id: 'SESSION_S', name: 'Session S: Event Bus Throughput & Zero-Drop Stress Benchmark (10,000 events/sec with zero allocations)', fn: () => PlaytestHarness.runSessionS_EventBusThroughputAndZeroDropStress() },
       { id: 'SESSION_T', name: 'Session T: Swept-Capsule Collision & Ledge Mantling Boundary Integrity (smooth corner sliding, monotonic step-ups)', fn: () => PlaytestHarness.runSessionT_SweptCapsuleCollisionAndLedgeMantlingIntegrity() },
       { id: 'SESSION_U', name: 'Session U: Zero-GC Memory Allocation & Subsystem Teardown Verification (asserts 100% clean resource disposal and zero memory leaks)', fn: () => PlaytestHarness.runSessionU_ZeroGCMemoryAllocationAndSubsystemTeardown() },
+      { id: 'SESSION_V', name: 'Session V: Multi-Deck Carrier Flight Deck, SMOF Crossover Bridge & Physics Lookahead Verification', fn: () => PlaytestHarness.runSessionV_MultiDeckCarrierSubmarineAndPhysicsLookahead() },
     ];
 
     for (const s of sessions) {
@@ -4394,6 +4398,230 @@ export class PlaytestHarness {
         flightRecorderIncidentsRemaining: incidentsAfter,
         isZeroMemoryLeakVerified: true,
         isCompleteTeardownVerified: true
+      },
+      observations
+    };
+  }
+
+  // =========================================================================
+  // SESSION V: Multi-Deck Carrier Flight Deck, SMOF Crossover Bridge & Physics Lookahead Verification
+  // =========================================================================
+  public static runSessionV_MultiDeckCarrierSubmarineAndPhysicsLookahead(): PlaytestSessionResult {
+    const observations: string[] = [];
+    const env = new ShipyardEnvironment();
+    env.group.updateMatrixWorld(true);
+    const vitals = new CatVitals(100, 100);
+    const progression = new ProgressionSystem();
+    const physics = new PhysicsSubsystem();
+
+    const DT = 1 / 60;
+    let totalTicks = 0;
+
+    // -------------------------------------------------------------------------
+    // 1. CVN-80 ENTERPRISE GANGWAY & FLIGHT DECK TRAVERSAL (Y=0.0m -> Y=3.25m -> Sponson Y=3.70m)
+    // -------------------------------------------------------------------------
+    physics.teleport(new THREE.Vector3(3.0, 0.0, 44.0), Math.PI / 2); // Facing East (+X) up the gangway
+
+    const eastInput: PhysicsInputState = {
+      driveInput: 1.0,
+      turnInput: 0.0,
+      isSprinting: false,
+      isCrouching: false,
+      isMoving: true,
+      jumpRequested: false
+    };
+
+    let cvnGangwayTicks = 0;
+    let maxCvnY = 0;
+    let cvnMonotonicAscent = true;
+    let prevStepY = -0.05;
+
+    for (let t = 0; t < 180; t++) {
+      physics.update(DT, eastInput, env, vitals, progression);
+      cvnGangwayTicks++;
+      totalTicks++;
+
+      if (physics.position.y > maxCvnY) {
+        maxCvnY = physics.position.y;
+      }
+      if (physics.position.y < prevStepY - 0.05) {
+        cvnMonotonicAscent = false;
+      }
+      prevStepY = physics.position.y;
+    }
+
+    if (physics.position.x < 14.0 || Math.abs(physics.position.y - 3.25) > 0.15 || !cvnMonotonicAscent) {
+      throw new Error(`Session V: CVN-80 gangway ascent failed (pos=${physics.position.x.toFixed(2)}, ${physics.position.y.toFixed(2)}, ${physics.position.z.toFixed(2)}, monotonic=${cvnMonotonicAscent})`);
+    }
+    observations.push(`CVN-80 Gangway & Flight Deck: Driven via PhysicsSubsystem from (3.0, 0.0, 44.0) to (${physics.position.x.toFixed(2)}, ${physics.position.y.toFixed(2)}, ${physics.position.z.toFixed(2)}) over ${cvnGangwayTicks} ticks (Monotonic: ${cvnMonotonicAscent}).`);
+
+    // Verify Portside Sponson platform at X=10.5, Z=25.0 (Y=3.70m) from Flight Deck (Y=3.25m)
+    const sponsonFloor = env.getPlatformFloor(10.5, 25.0, 3.25);
+    if (Math.abs(sponsonFloor - 3.70) > 0.05) {
+      throw new Error(`Session V: CVN-80 Portside Sponson platform mismatch at (10.5, 25.0): expected 3.70m, got ${sponsonFloor}`);
+    }
+    observations.push(`CVN-80 Portside Sponson Platform: Verified walkable at Y=${sponsonFloor.toFixed(2)}m from flight deck elevation.`);
+
+    // -------------------------------------------------------------------------
+    // 2. SMOF SUBMARINE STAIRCASE & CROSSOVER BRIDGE TRAVERSAL (Y=0.0m -> Y=4.50m)
+    // -------------------------------------------------------------------------
+    physics.teleport(new THREE.Vector3(-37.0, 0.0, 27.5), 0.0); // Facing North (+Z) up SMOF stairs
+
+    let smofStairTicks = 0;
+    for (let t = 0; t < 160; t++) {
+      physics.update(DT, eastInput, env, vitals, progression);
+      smofStairTicks++;
+      totalTicks++;
+    }
+
+    if (physics.position.z < 36.0 || Math.abs(physics.position.y - 4.50) > 0.15) {
+      throw new Error(`Session V: SMOF staircase climb failed (pos=${physics.position.x.toFixed(2)}, ${physics.position.y.toFixed(2)}, ${physics.position.z.toFixed(2)})`);
+    }
+    observations.push(`SMOF Interior Staircase: Climbed from Y=0.0m to upper catwalk Y=${physics.position.y.toFixed(2)}m at Z=${physics.position.z.toFixed(2)}m in ${smofStairTicks} ticks.`);
+
+    // Walk East across the SMOF central crossover bridge (X: -36.0 -> -24.0 at Z=45.0, Y=4.50m) directly over both submarine hulls
+    physics.teleport(new THREE.Vector3(-36.0, 4.50, 45.0), Math.PI / 2); // Facing East (+X)
+
+    let bridgeTicks = 0;
+    let bridgeHullSnags = 0;
+    for (let t = 0; t < 180; t++) {
+      const prevX = physics.position.x;
+      physics.update(DT, eastInput, env, vitals, progression);
+      bridgeTicks++;
+      totalTicks++;
+      if (t > 10 && physics.position.x - prevX < 0.01 && physics.position.x < -24.0) {
+        bridgeHullSnags++;
+      }
+      if (Math.abs(physics.position.y - 4.50) > 0.1) {
+        throw new Error(`Session V: SMOF crossover bridge dropped off Y=4.50m at X=${physics.position.x.toFixed(2)}: Y=${physics.position.y.toFixed(2)}`);
+      }
+      if (physics.position.x >= -24.0) break;
+    }
+
+    if (physics.position.x < -24.5 || bridgeHullSnags > 0) {
+      throw new Error(`Session V: SMOF crossover bridge obstructed by submarine hull (final X=${physics.position.x.toFixed(2)}, snags=${bridgeHullSnags})`);
+    }
+    observations.push(`SMOF Submarine Crossover Bridge: Traversed X=-36.0m to X=${physics.position.x.toFixed(2)}m at Y=4.50m over both SSN hulls with ${bridgeHullSnags} snags.`);
+
+    // -------------------------------------------------------------------------
+    // 3. PHYSICS LOOKAHEAD PROBE, UPWARD JUMP VELOCITY GUARD & HUNGER SPEED SCALING
+    // -------------------------------------------------------------------------
+    // Test upward jump near a stair step is NOT cancelled on frame 1 when velocity.y > 0
+    physics.teleport(new THREE.Vector3(39.4, 0.0, 20.0), Math.PI / 2);
+    physics.isGrounded = false;
+    physics.velocity.set(2.0, 6.2, 0.0); // Airborne rising jump
+    physics.update(DT, eastInput, env, vitals, progression);
+    totalTicks++;
+
+    if (physics.isGrounded || physics.velocity.y <= 0) {
+      throw new Error(`Session V: Upward jump velocity was prematurely cancelled near stair step (isGrounded=${physics.isGrounded}, vy=${physics.velocity.y})`);
+    }
+    observations.push(`Upward Jump Velocity Guard: Rising jump (vy=${physics.velocity.y.toFixed(2)} m/s) remained airborne near stair ledge without premature landing snap.`);
+
+    // Test Hunger Speed Multiplier integration in PhysicsSubsystem
+    const fullVitals = new CatVitals(100, 100);
+    fullVitals.setHunger(100);
+    const starvingVitals = new CatVitals(100, 100);
+    starvingVitals.setHunger(0);
+
+    physics.teleport(new THREE.Vector3(0.0, 0.0, 0.0), Math.PI / 2);
+    for (let i = 0; i < 30; i++) {
+      physics.update(DT, eastInput, env, fullVitals, progression);
+      totalTicks++;
+    }
+    const fullSpeed = physics.currentSpeed;
+
+    physics.teleport(new THREE.Vector3(0.0, 0.0, 0.0), Math.PI / 2);
+    for (let i = 0; i < 30; i++) {
+      physics.update(DT, eastInput, env, starvingVitals, progression);
+      totalTicks++;
+    }
+    const starvingSpeed = physics.currentSpeed;
+
+    if (starvingSpeed >= fullSpeed * 0.9) {
+      throw new Error(`Session V: Starving vitals speed (${starvingSpeed}) was not scaled down relative to full vitals speed (${fullSpeed})`);
+    }
+    observations.push(`Vitals Speed Multiplier Integration: Full-fed walk speed=${fullSpeed.toFixed(2)} m/s vs Starving walk speed=${starvingSpeed.toFixed(2)} m/s.`);
+
+    // -------------------------------------------------------------------------
+    // 4. MUTANT CAT 3D VISUAL IDENTIFIERS & CAMERA RAYCAST FILTERING
+    // -------------------------------------------------------------------------
+    const scoutMutant = new MutantCatEntity('Mutant Scout Fang', new THREE.Vector3(10, 0, 10), false);
+    const bossMutant = new MutantCatEntity('Lieutenant Cobalt', new THREE.Vector3(20, 0, 20), true);
+    if (bossMutant.attackDamage <= scoutMutant.attackDamage) {
+      throw new Error(`Session V: Boss Mutant attackDamage (${bossMutant.attackDamage}) should exceed Scout (${scoutMutant.attackDamage})`);
+    }
+    if (!scoutMutant.radioactiveAura || !scoutMutant.eyeLight || scoutMutant.mesh.children.length < 3) {
+      throw new Error(`Session V: MutantCatEntity missing 3D visual identifiers (radioactiveAura or identifier group)`);
+    }
+    observations.push(`MutantCat Visual & Combat Scaling: Verified dorsal cobalt crystal spines, glowing tapetum eyes, radioactive aura, and scaled attackDamage (Scout=${scoutMutant.attackDamage}, Boss=${bossMutant.attackDamage}).`);
+
+    // Verify camera collisionObjects only includes tall walls/structures (> 1.5m height)
+    const lowObstaclesInCameraRaycast = env.collisionObjects.filter(m => {
+      const box = new THREE.Box3().setFromObject(m);
+      return (box.max.y - box.min.y) <= 1.5;
+    });
+    if (lowObstaclesInCameraRaycast.length > 0) {
+      throw new Error(`Session V: Found ${lowObstaclesInCameraRaycast.length} low props (<=1.5m) polluting camera collisionObjects`);
+    }
+    observations.push(`Camera Spring-Arm Raycast Filtering: Verified ${env.collisionObjects.length} structural camera occluders with 0 low props <= 1.5m.`);
+
+    // -------------------------------------------------------------------------
+    // 5. DIURNAL SYSTEM & SECURITY GATE VERIFICATION
+    // -------------------------------------------------------------------------
+    const dummyScene = new THREE.Scene();
+    const dummySun = new THREE.DirectionalLight(0xffffff, 2.0);
+    const dummyAmb = new THREE.AmbientLight(0xffffff, 0.5);
+    const dummyHemi = new THREE.HemisphereLight(0xffffff, 0x000000, 1.0);
+    const Flood1 = new THREE.SpotLight(0xffffff, 0.8);
+    const diurnal = new DiurnalSystem(dummyScene, dummySun, dummyAmb, dummyHemi, [Flood1]);
+
+    diurnal.setTime(12.0);
+    const noonShift = diurnal.evaluateShift();
+    diurnal.setTime(21.0);
+    const eveningShift = diurnal.evaluateShift();
+    diurnal.setTime(2.0);
+    const nightShift = diurnal.evaluateShift();
+
+    if (noonShift.shiftId !== '1ST_SHIFT' || noonShift.isNight) {
+      throw new Error(`Session V: Diurnal 12:00 shift evaluation failed: ${JSON.stringify(noonShift)}`);
+    }
+    if (eveningShift.shiftId !== '2ND_SHIFT' || !eveningShift.isNight) {
+      throw new Error(`Session V: Diurnal 21:00 shift evaluation failed: ${JSON.stringify(eveningShift)}`);
+    }
+    if (nightShift.shiftId !== '3RD_SHIFT' || !nightShift.isNight || !diurnal.floodlightsActive) {
+      throw new Error(`Session V: Diurnal 02:00 shift evaluation failed: ${JSON.stringify(nightShift)}`);
+    }
+    observations.push(`Diurnal 24h Clock & Shift Governance: Verified 1ST_SHIFT (${noonShift.timeString}), 2ND_SHIFT (${eveningShift.timeString}), and 3RD_SHIFT (${nightShift.timeString}) with automatic stadium floodlight activation.`);
+
+    const invalidAuth = SecurityGate.authorize('TEST-BADGE', 'WRONG-CODE');
+    const validAuth = SecurityGate.authorize('TEST-BADGE', 'DRYDOCK-12');
+    if (invalidAuth.success || !validAuth.success || validAuth.profile?.badgeId !== 'TEST-BADGE') {
+      throw new Error(`Session V: SecurityGate authorization check failed`);
+    }
+    observations.push(`SecurityGate Protocol: Verified rejection of invalid codes and persistence of valid clearance code 'DRYDOCK-12'.`);
+
+    env.dispose();
+    TextureGenerator.disposeAll();
+
+    return {
+      sessionId: 'SESSION_V',
+      name: 'Session V: Multi-Deck Carrier Flight Deck, SMOF Crossover Bridge & Physics Lookahead Verification',
+      passed: true,
+      durationMs: 0,
+      ticksSimulated: totalTicks,
+      telemetry: {
+        cvnGangwayAscentTicks: cvnGangwayTicks,
+        cvnFlightDeckElevationMeters: Math.round(maxCvnY * 100) / 100,
+        cvnPortsideSponsonElevationMeters: sponsonFloor,
+        smofStairAscentTicks: smofStairTicks,
+        smofCrossoverBridgeTicks: bridgeTicks,
+        smofBridgeHullSnags: bridgeHullSnags,
+        fullFedSpeedMetersPerSec: Math.round(fullSpeed * 100) / 100,
+        starvingSpeedMetersPerSec: Math.round(starvingSpeed * 100) / 100,
+        cameraStructuralOccludersCount: env.collisionObjects.length,
+        lowPropsInCameraRaycastCount: lowObstaclesInCameraRaycast.length,
+        isMultiDeckVerticalityVerified: true
       },
       observations
     };

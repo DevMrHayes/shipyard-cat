@@ -15,6 +15,9 @@ import { EventBus } from '../core/EventBus';
 import { EngineFlightRecorder } from '../core/EngineFlightRecorder';
 import { PlaytestHarness, PlaytestSessionResult } from './PlaytestHarness';
 import { runFlightRecorderTests } from './FlightRecorder.test';
+import { PhysicsSubsystem, PhysicsInputState } from '../physics/PhysicsSubsystem';
+import { DiurnalSystem } from '../systems/DiurnalSystem';
+import { SecurityGate } from '../security/SecurityGate';
 
 export interface TestResult {
   name: string;
@@ -72,6 +75,12 @@ export class TestRunner {
       { name: 'Unit: Complete Subsystem Teardown, Listener Cleanup & Resource Disposal', cat: 'UNIT' as const, fn: TestRunner.testSubsystemTeardownAndResourceDisposal },
       { name: 'Unit: Kingpin Boss Active Attack Requirement & Contact Damage Feedback', cat: 'UNIT' as const, fn: TestRunner.testKingpinBossActiveAttackAndContactDamage },
       { name: 'Unit: Tiered Crate Mantling & Flush SMOF Ground Elevation Verification', cat: 'UNIT' as const, fn: TestRunner.testTieredCrateMantlingAndSMOFFloorAlignment },
+      { name: 'Unit: CVN-80 Enterprise Gangway Continuous Ascent & Flight Deck Platform (Y=0.0m to Y=3.25m)', cat: 'UNIT' as const, fn: TestRunner.testCVN80GangwayAndFlightDeckPlatform },
+      { name: 'Unit: SMOF Submarine Outfitting Catwalk Clearance & Crossover Bridge Integrity (Y=4.5m)', cat: 'UNIT' as const, fn: TestRunner.testSMOFCatwalkAndSubmarineHullClearance },
+      { name: 'Unit: PhysicsSubsystem Forward Lookahead Probe, Upward Jump Guard & Vitals Speed Scaling', cat: 'UNIT' as const, fn: TestRunner.testPhysicsLookaheadJumpGuardAndVitalsScaling },
+      { name: 'Unit: MutantCat 3D Visual Identifiers, Variable Attack Damage & Dosimeter vs Friendly Cats', cat: 'UNIT' as const, fn: TestRunner.testMutantCatVisualsAndVariableDamage },
+      { name: 'Unit: DiurnalSystem Continuous Clock Progression & Shift Window Evaluation', cat: 'UNIT' as const, fn: TestRunner.testDiurnalSystemClockAndShiftWindows },
+      { name: 'Unit: SecurityGate Clearance Protocol & Badge Token Persistence', cat: 'UNIT' as const, fn: TestRunner.testSecurityGateClearanceProtocol },
 
       // INTEGRATION TESTS
       { name: 'Integration: Rat Stealth Stalking, Pounce Catch & Accidental Assistance', cat: 'INTEGRATION' as const, fn: TestRunner.testRatHuntingAndAssistanceIntegration },
@@ -82,7 +91,7 @@ export class TestRunner {
       { name: 'Integration: 3D Asset Loading Fallbacks & Feline Entity Scene Integrity', cat: 'INTEGRATION' as const, fn: TestRunner.testAssetLoadingAndSceneIntegrity },
       { name: 'Integration: Shipyard Feeding Bowls Registration & Sanctuary Nutrition', cat: 'INTEGRATION' as const, fn: TestRunner.testFoodBowlsAndSanctuaryIntegration },
 
-      // PLAYTEST SIMULATION SUITE (21 COMPLETE GAMEPLAY SESSIONS)
+      // PLAYTEST SIMULATION SUITE (22 COMPLETE GAMEPLAY SESSIONS)
       { name: 'Playtest Session A: Idle Stability & Camera Calmness (0 Angular Drift over 500 ticks)', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionA_IdleCalmness() },
       { name: 'Playtest Session B: 8-Direction Locomotion, Sprinting & Braking Arc Kinematics', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionB_LocomotionAndBraking() },
       { name: 'Playtest Session C: Solid Wall Collisions, Sliding Tangents & Corner Resolution', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionC_WallCollisionAndSliding() },
@@ -99,11 +108,12 @@ export class TestRunner {
       { name: 'Playtest Session N: Enhanced Visual Architecture & Stylized Shipbuilder Integrity Test', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionN_EnhancedVisualArchitectureAndShipbuilders() },
       { name: 'Playtest Session O: Mezzanine Catwalk, Dry Dock Crate Climbing & Collision Airtightness Integrity Test', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionO_MezzanineCatwalkAndCrateClimbing() },
       { name: 'Playtest Session P: Box Collision Airtightness & Big Blue Ground Integrity Verification', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionP_BoxCollisionAndBigBlueIntegrity() },
-      { name: 'Playtest Session Q: 1,500-Tick Deep Dive Frame Freeze & State Machine Deadlock Elimination Test', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionQ_1500TickDeepDiveFrameFreezeAndDeadlockElimination() },
+      { name: 'Playtest Session Q: 1,500-Tick Deep Dive Frame Freeze & State Machine Deadlock Elimination Test', cat: 'UNIT' === 'PLAYTEST' as string ? 'PLAYTEST' as const : 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionQ_1500TickDeepDiveFrameFreezeAndDeadlockElimination() },
       { name: 'Playtest Session R: AI-Out-of-Substep Spiral Elimination & Water Vertex CPU Stall Elimination', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionR_AISubstepSpiralAndWaterStallElimination() },
       { name: 'Playtest Session S: Event Bus Throughput & Zero-Drop Stress Benchmark (10,000 events/sec with zero allocations)', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionS_EventBusThroughputAndZeroDropStress() },
       { name: 'Playtest Session T: Swept-Capsule Collision & Ledge Mantling Boundary Integrity (smooth corner sliding, monotonic step-ups)', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionT_SweptCapsuleCollisionAndLedgeMantlingIntegrity() },
-      { name: 'Playtest Session U: Zero-GC Memory Allocation & Subsystem Teardown Verification (asserts 100% clean resource disposal and zero memory leaks)', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionU_ZeroGCMemoryAllocationAndSubsystemTeardown() }
+      { name: 'Playtest Session U: Zero-GC Memory Allocation & Subsystem Teardown Verification (asserts 100% clean resource disposal and zero memory leaks)', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionU_ZeroGCMemoryAllocationAndSubsystemTeardown() },
+      { name: 'Playtest Session V: Multi-Deck Carrier Flight Deck, SMOF Crossover Bridge & Physics Lookahead Verification', cat: 'PLAYTEST' as const, fn: () => PlaytestHarness.runSessionV_MultiDeckCarrierSubmarineAndPhysicsLookahead() }
     ];
 
     for (const t of tests) {
@@ -1780,6 +1790,191 @@ export class TestRunner {
 
     env.dispose();
     TextureGenerator.disposeAll();
+  }
+
+  private static testCVN80GangwayAndFlightDeckPlatform() {
+    const env = new ShipyardEnvironment();
+    env.group.updateMatrixWorld(true);
+
+    // 1. Verify Dry Dock 12 West Wall has an open gangway portal at Z = 44.0 (X = 3.0 -> 5.0)
+    const portalStart = new THREE.Vector3(3.0, 0.0, 44.0);
+    const portalTarget = new THREE.Vector3(5.0, 0.3, 44.0);
+    const resolvedPortal = env.resolveCollision(portalTarget, 0.35, portalStart);
+    if (Math.abs(resolvedPortal.x - 5.0) > 0.05) {
+      throw new Error(`CVN-80 gangway portal at Z=44.0 was blocked by West Wall collision: X=${resolvedPortal.x}`);
+    }
+
+    // 2. Verify monotonic step platforms from X = 4.0 to X = 12.6 at Z = 44.0 up to Flight Deck (Y = 3.25m)
+    let prevY = 0.0;
+    for (let x = 4.2; x <= 12.6; x += 0.6) {
+      const floorY = env.getPlatformFloor(x, 44.0, prevY);
+      if (floorY < prevY - 0.01 || floorY - prevY > 0.85) {
+        throw new Error(`CVN-80 gangway step discontinuity at X=${x.toFixed(1)}: prevY=${prevY.toFixed(2)}, floorY=${floorY.toFixed(2)}`);
+      }
+      prevY = floorY;
+    }
+    if (Math.abs(prevY - 3.25) > 0.1) {
+      throw new Error(`Expected top of CVN-80 gangway to reach flight deck height ~3.25m, got ${prevY}`);
+    }
+
+    // 3. Verify CVN-80 Flight Deck platform (X: 11.5..28.5, Z: 14.0..70.0) at Y = 3.25m
+    const flightDeckCenter = env.getPlatformFloor(20.0, 44.0, 3.0);
+    if (Math.abs(flightDeckCenter - 3.25) > 0.01) {
+      throw new Error(`Expected CVN-80 flight deck platform at Y=3.25m, got ${flightDeckCenter}`);
+    }
+
+    // 4. Verify Portside Sponson platform (X: 9.0..12.2, Z: 20.0..30.0) at Y = 3.70m
+    const sponsonFloor = env.getPlatformFloor(10.5, 25.0, 3.25);
+    if (Math.abs(sponsonFloor - 3.70) > 0.01) {
+      throw new Error(`Expected CVN-80 Portside Sponson platform at Y=3.70m, got ${sponsonFloor}`);
+    }
+
+    env.dispose();
+    TextureGenerator.disposeAll();
+  }
+
+  private static testSMOFCatwalkAndSubmarineHullClearance() {
+    const env = new ShipyardEnvironment();
+    env.group.updateMatrixWorld(true);
+
+    // 1. Verify SMOF central crossover bridge (X: -36.5..-23.5, Z: 43.8..46.2) at Y = 4.50m is completely clear of submarine hull collisions
+    for (let x = -36.0; x <= -24.0; x += 1.0) {
+      const prev = new THREE.Vector3(x - 0.5, 4.50, 45.0);
+      const target = new THREE.Vector3(x, 4.50, 45.0);
+      const resolved = env.resolveCollision(target, 0.35, prev);
+      if (Math.abs(resolved.x - x) > 0.01 || Math.abs(resolved.z - 45.0) > 0.01) {
+        throw new Error(`SMOF crossover bridge at (${x}, 4.5, 45.0) was blocked by obstacle collision: resolved=(${resolved.x}, ${resolved.z})`);
+      }
+      const floorY = env.getPlatformFloor(x, 45.0, 4.50);
+      if (Math.abs(floorY - 4.50) > 0.01) {
+        throw new Error(`SMOF crossover bridge floor dropped at X=${x}: Y=${floorY}`);
+      }
+    }
+
+    // 2. Verify submarine hull collision boxes still block ground-level entities (Y = 0.0..4.05m) outside the bridge
+    // SSN-798 hull spans X: [-33.35, -29.65] at Z=35.0; probing from East (X=-28.5) into hull center (X=-31.5)
+    const groundSubPrev = new THREE.Vector3(-28.5, 1.0, 35.0);
+    const groundSubTarget = new THREE.Vector3(-31.5, 1.0, 35.0);
+    const groundSubResolved = env.resolveCollision(groundSubTarget, 0.35, groundSubPrev);
+    if (groundSubResolved.x < -29.65 + 0.35 - 1e-3) {
+      throw new Error(`Ground-level entity penetrated SSN-798 hull module at Z=35.0: resolved X=${groundSubResolved.x}`);
+    }
+
+    env.dispose();
+    TextureGenerator.disposeAll();
+  }
+
+  private static testPhysicsLookaheadJumpGuardAndVitalsScaling() {
+    const env = new ShipyardEnvironment();
+    const physics = new PhysicsSubsystem();
+    const vitals = new CatVitals(100, 100);
+    const prog = new ProgressionSystem();
+    const dt = 1 / 60;
+
+    const forwardInput: PhysicsInputState = {
+      driveInput: 1.0,
+      turnInput: 0.0,
+      isSprinting: false,
+      isCrouching: false,
+      isMoving: true,
+      jumpRequested: false
+    };
+
+    // 1. Forward Lookahead Probe on Boardwalk Stairs (X = 39.3 -> 45.2, Z = 20.0)
+    physics.teleport(new THREE.Vector3(39.0, 0.0, 20.0), Math.PI / 2); // Facing East (+X)
+
+    for (let i = 0; i < 120; i++) {
+      physics.update(dt, forwardInput, env, vitals, prog);
+    }
+    if (physics.position.x < 44.5 || Math.abs(physics.position.y - 1.40) > 0.1) {
+      throw new Error(`PhysicsSubsystem lookahead failed to climb Pier Boardwalk stairs: pos=(${physics.position.x.toFixed(2)}, ${physics.position.y.toFixed(2)})`);
+    }
+
+    // 2. Upward Jump Velocity Guard: Jumping upward near a step must NOT snap back to ground while velocity.y > 0
+    physics.teleport(new THREE.Vector3(39.4, 0.0, 20.0), Math.PI / 2);
+    physics.isGrounded = false;
+    physics.velocity.set(1.5, 6.2, 0.0);
+    physics.update(dt, forwardInput, env, vitals, prog);
+    if (physics.isGrounded || physics.velocity.y <= 0) {
+      throw new Error(`Upward jump velocity guard failed: jump was cancelled on frame 1 (isGrounded=${physics.isGrounded}, vy=${physics.velocity.y})`);
+    }
+
+    // 3. Vitals Hunger Speed Multiplier
+    vitals.setHunger(0); // Starving -> 0.65x speed multiplier
+    if (Math.abs(vitals.getSpeedMultiplier() - 0.65) > 0.01) {
+      throw new Error(`Expected 0.65x speed multiplier at 0 hunger, got ${vitals.getSpeedMultiplier()}`);
+    }
+
+    env.dispose();
+    TextureGenerator.disposeAll();
+  }
+
+  private static testMutantCatVisualsAndVariableDamage() {
+    const scout = new MutantCatEntity('Mutant Scout Fang', new THREE.Vector3(0, 0, 0), false);
+    const boss = new MutantCatEntity('Lieutenant Cobalt', new THREE.Vector3(15, 0, 0), true);
+
+    // Verify variable attackDamage and maxHealth scaling by standard vs boss variant
+    if (scout.attackDamage !== 12 || boss.attackDamage !== 25 || scout.maxHealth !== 60 || boss.maxHealth !== 240) {
+      throw new Error(`Mutant scaling mismatch: scout=(dmg:${scout.attackDamage}, hp:${scout.maxHealth}), boss=(dmg:${boss.attackDamage}, hp:${boss.maxHealth})`);
+    }
+
+    // Verify 3D visual identifiers (dorsal cobalt crystal spines, glowing tapetum eyes, radioactive aura)
+    if (!scout.radioactiveAura || !scout.eyeLight || scout.mesh.children.length < 3) {
+      throw new Error(`MutantCatEntity missing 3D visual identifiers or radioactiveAura`);
+    }
+
+    // Verify defeat state
+    scout.takeDamage(999);
+    if (!scout.isDefeated || scout.state !== 'DEFEATED') {
+      throw new Error(`Defeated MutantCatEntity did not transition to DEFEATED state`);
+    }
+  }
+
+  private static testDiurnalSystemClockAndShiftWindows() {
+    const scene = new THREE.Scene();
+    const sun = new THREE.DirectionalLight(0xffffff, 2.0);
+    const amb = new THREE.AmbientLight(0xffffff, 0.5);
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 1.0);
+    const flood = new THREE.SpotLight(0xffffff, 0.8);
+    const diurnal = new DiurnalSystem(scene, sun, amb, hemi, [flood]);
+
+    // 1. Default 07:00 1st Shift
+    const s1 = diurnal.evaluateShift();
+    if (s1.shiftId !== '1ST_SHIFT' || s1.isNight || s1.timeString !== '07:00') {
+      throw new Error(`Expected 07:00 1ST_SHIFT daytime, got ${JSON.stringify(s1)}`);
+    }
+
+    // 2. Advance clock by 500 seconds (500 * 0.02 = +10.0 hours -> 17:00 2nd Shift)
+    const s2 = diurnal.update(500);
+    if (s2.shiftId !== '2ND_SHIFT' || s2.isNight) {
+      throw new Error(`Expected 17:00 2ND_SHIFT twilight, got ${JSON.stringify(s2)}`);
+    }
+
+    // 3. Set time to 23:45 (3rd Shift Night Security + Stadium Floodlights ON)
+    diurnal.setTime(23.75);
+    const s3 = diurnal.evaluateShift();
+    if (s3.shiftId !== '3RD_SHIFT' || !s3.isNight || !diurnal.floodlightsActive || flood.intensity < 6.0) {
+      throw new Error(`Expected 23:45 3RD_SHIFT night with active floodlights, got ${JSON.stringify(s3)}, flood=${flood.intensity}`);
+    }
+  }
+
+  private static testSecurityGateClearanceProtocol() {
+    SecurityGate.revokeSession();
+
+    const emptyRes = SecurityGate.authorize('YARD-CAT-01', '');
+    if (emptyRes.success) {
+      throw new Error('SecurityGate should reject empty clearance code');
+    }
+
+    const badRes = SecurityGate.authorize('YARD-CAT-01', 'INVALID-PASSCODE');
+    if (badRes.success) {
+      throw new Error('SecurityGate should reject invalid clearance code');
+    }
+
+    const validRes = SecurityGate.authorize('alba-01', 'drydock-12');
+    if (!validRes.success || validRes.profile?.badgeId !== 'ALBA-01') {
+      throw new Error(`SecurityGate failed valid authorization: ${JSON.stringify(validRes)}`);
+    }
   }
 }
 
