@@ -318,7 +318,9 @@ export class GameEngine {
   public startLoop(): void {
     if (!this.animationFrameId && !this.isDisposed) {
       this.lastFrameTimestamp = 0;
+      this.renderSystem.isSceneReady = true;
       this.renderSystem.snapCameraToTarget(this.cat.mesh.position, this.physics.heading);
+      this.scene.updateMatrixWorld(true);
       this.animationFrameId = requestAnimationFrame(this.animate);
     }
   }
@@ -384,29 +386,25 @@ export class GameEngine {
       s.mesh.visible = true;
     });
 
-    // Ensure particle system has active points
-    this.renderSystem.triggerImpactFeedback(this.physics.position, true);
-    this.renderSystem.hitFlashLight.intensity = 5.0;
-
-    // Enable shadow maps and force shadow update
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.needsUpdate = true;
-
-    const originalFov = this.camera.fov;
-    this.camera.fov = 135;
-    this.camera.updateProjectionMatrix();
-
-    // Compile entire scene graph (prefer compileAsync for parallel driver compilation)
-    if (this.renderer && typeof (this.renderer as any).compileAsync === 'function') {
-      await (this.renderer as any).compileAsync(this.scene, this.camera);
-    } else if (this.renderer && typeof this.renderer.compile === 'function') {
-      this.renderer.compile(this.scene, this.camera);
-    }
-
-    // 5. Run Warmup Render Passes across all major shipyard zones, elevations, and 360-degree orientations
+    // 5. Pre-warm skeletal animation poses for cat and enemies
     try {
-      const tempCamPos = this.camera.position.clone();
-      const tempCatPos = this.physics.position.clone();
+      const catActions = ['stand', 'sit', 'walk', 'run', 'jump', 'pounce', 'attack', 'eat'];
+      for (const actionKey of catActions) {
+        this.cat.cyclePrewarmAction(actionKey);
+      }
+      this.cat.resetToStand();
+
+      // Explicitly toggle trajectory visualizer variants
+      this.trajectoryVisualizer.setVisible(true);
+      this.trajectoryVisualizer.setTargetLock(true);
+      this.trajectoryVisualizer.updateTrajectory(this.physics.position, new THREE.Vector3(0, 5, 5), 18.0, 0);
+      this.trajectoryVisualizer.setVisible(false);
+      this.trajectoryVisualizer.setTargetLock(false);
+
+      // Snap camera strictly to Alba's canonical gameplay transform (62 FOV - no 135 FOV distortion or premature canvas renders)
+      this.renderSystem.snapCameraToTarget(this.cat.mesh.position, this.physics.heading);
+      this.scene.updateMatrixWorld(true);
+
       const zonePositions = [
         new THREE.Vector3(-10, 0, -20),   // South Yard & Dorothy Tugboat
         new THREE.Vector3(-45, 0, -30),   // Machine Shop Interior & Mezzanine
@@ -421,74 +419,12 @@ export class GameEngine {
         new THREE.Vector3(45, 0, -60)     // RCOH Radiation Vault
       ];
 
-      const catActions = ['stand', 'sit', 'walk', 'run', 'jump', 'pounce', 'attack', 'eat'];
-      const ratPositions = this.rats.map((r) => r.mesh.position.clone());
-      const mutantPositions = this.mutantCats.map((m) => m.mesh.position.clone());
+      // Delegate full GPU warmup to RenderSubsystem (asynchronously compiles all shaders & uploads textures to VRAM)
+      await this.renderSystem.warmupGPU(this.scene, this.camera, zonePositions, onProgress);
 
-      // Pass A: Pre-warm skeletal animation poses for cat and enemies
-      for (const actionKey of catActions) {
-        this.cat.cyclePrewarmAction(actionKey);
-        this.renderer.render(this.scene, this.camera);
-      }
-      await new Promise(r => setTimeout(r, 16));
-
-      // Pass B: Target Lock Green Trajectory variant
-      this.trajectoryVisualizer.setTargetLock(true);
-      this.renderer.render(this.scene, this.camera);
-      await new Promise(r => setTimeout(r, 16));
-
-      // Pass C: Sonar Whiskers Blueprint mode across all materials
-      this.renderSystem.setWhiskersMode(this.scene, true);
-      for (let i = 0; i < this.rats.length; i++) this.rats[i].setWhiskersMode(true);
-      for (let i = 0; i < this.mutantCats.length; i++) this.mutantCats[i].setWhiskersAura(true, true);
-      this.environment.setWhiskersMode(true);
-
-      if (typeof (this.renderer as any).compileAsync === 'function') {
-        await (this.renderer as any).compileAsync(this.scene, this.camera);
-      } else if (typeof this.renderer.compile === 'function') {
-        this.renderer.compile(this.scene, this.camera);
-      }
-      this.renderer.render(this.scene, this.camera);
-      await new Promise(r => setTimeout(r, 16));
-
-      // Restore normal environment & camera to Alba
-      this.renderSystem.setWhiskersMode(this.scene, false);
-      for (let i = 0; i < this.rats.length; i++) this.rats[i].setWhiskersMode(false);
-      for (let i = 0; i < this.mutantCats.length; i++) this.mutantCats[i].setWhiskersAura(false, false);
-      this.environment.setWhiskersMode(false);
-
-      this.renderSystem.hitFlashLight.intensity = 0.0;
-      this.camera.fov = originalFov;
-      this.camera.updateProjectionMatrix();
-
-      // Restore original visibility & frustum culling states
-      this.scene.traverse((obj) => {
-        const origVis = originalVisibilityStates.get(obj);
-        if (origVis !== undefined) {
-          obj.visible = origVis;
-        }
-        const origCull = originalCullingStates.get(obj);
-        if (origCull !== undefined) {
-          obj.frustumCulled = origCull;
-        }
-      });
-
-      this.trajectoryVisualizer.setVisible(false);
-      this.trajectoryVisualizer.setTargetLock(false);
-
-      this.physics.position.copy(tempCatPos);
-      this.cat.mesh.position.copy(tempCatPos);
+      // Re-verify camera is cleanly locked onto Alba with matrices updated
       this.renderSystem.snapCameraToTarget(this.cat.mesh.position, this.physics.heading);
-      this.renderer.render(this.scene, this.camera);
-
-      this.rats.forEach((r, idx) => {
-        if (ratPositions[idx]) r.mesh.position.copy(ratPositions[idx]);
-      });
-      this.mutantCats.forEach((m, idx) => {
-        if (mutantPositions[idx]) m.mesh.position.copy(mutantPositions[idx]);
-      });
-
-      this.cat.resetToStand();
+      this.scene.updateMatrixWorld(true);
 
       const totalPrograms = this.renderer.info?.programs?.length ?? 0;
       console.log(`🚀 [PRE-WARM] WebGL Pipeline Ready: ${totalPrograms} compiled shader programs linked to GPU driver ahead of gameplay.`);

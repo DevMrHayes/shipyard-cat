@@ -112,6 +112,8 @@ export class EngineFlightRecorder {
   private nearestMutantDistance: number = 999;
   private lastRecordedSpikeFrameTick: number = -1;
   public startupGraceFrames: number = 0;
+  private lastKnownCatPos: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  private lastKnownCatState: string = 'stand';
 
   constructor(onFreeze?: FreezeIncidentCallback) {
     this.onFreezeIncident = onFreeze || null;
@@ -170,7 +172,7 @@ export class EngineFlightRecorder {
     if (this.frameTick > this.startupGraceFrames && duration >= EngineFlightRecorder.SECTION_STALL_THRESHOLD_MS) {
       if (this.lastRecordedSpikeFrameTick !== this.frameTick) {
         this.lastRecordedSpikeFrameTick = this.frameTick;
-        this.recordSpike(name, duration, 0);
+        this.recordSpike(name, duration, 0, this.lastKnownCatPos, this.lastKnownCatState);
       }
     }
     return duration;
@@ -209,6 +211,9 @@ export class EngineFlightRecorder {
     const posX = context?.catPos ? (context.catPos as THREE.Vector3).x ?? 0 : 0;
     const posY = context?.catPos ? (context.catPos as THREE.Vector3).y ?? 0 : 0;
     const posZ = context?.catPos ? (context.catPos as THREE.Vector3).z ?? 0 : 0;
+
+    this.lastKnownCatPos = { x: posX, y: posY, z: posZ };
+    this.lastKnownCatState = context?.catState || 'stand';
 
     const rendererInfo = context?.rendererInfo;
     const drawCalls = rendererInfo?.render?.calls ?? 0;
