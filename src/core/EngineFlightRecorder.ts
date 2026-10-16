@@ -223,7 +223,12 @@ export class EngineFlightRecorder {
     slot.timestamp = new Date().toISOString().substring(11, 23);
     slot.totalFrameMs = parseFloat(totalFrameMs.toFixed(2));
     slot.fps = fps;
-    slot.timings = { ...this.currentFrameTimings };
+    if (!slot.timings) {
+      slot.timings = {};
+    }
+    for (const key of Object.keys(this.currentFrameTimings)) {
+      slot.timings[key] = this.currentFrameTimings[key];
+    }
     slot.catPosition.x = parseFloat(posX.toFixed(2));
     slot.catPosition.y = parseFloat(posY.toFixed(2));
     slot.catPosition.z = parseFloat(posZ.toFixed(2));
@@ -311,7 +316,7 @@ export class EngineFlightRecorder {
     }
     this.incidents.push(incident);
 
-    console.warn(`⚠️ [SHIPYARD-FLIGHT-RECORDER] FREEZE SPIKE on Frame #${this.frameTick}:`, incident);
+    console.warn(`⚠️ [SHIPYARD-FLIGHT-RECORDER] FREEZE SPIKE on Frame #${this.frameTick}: ${incident.summary}`);
 
     // Pipe directly to automated local runtime log
     RemoteLogger.logFreezeIncident(incident);
@@ -327,6 +332,44 @@ export class EngineFlightRecorder {
 
   public getRecentIncidents(): FreezeIncident[] {
     return [...this.incidents];
+  }
+
+  public getPerformanceStats(): {
+    currentFps: number;
+    minFps: number;
+    frameStallCount: number;
+    worstStallMs: number;
+    lastStallCulprit: string;
+  } {
+    let minFps = 60;
+    let worstStall = 0;
+    let lastCulprit = 'None';
+    const count = Math.min(this.telemetryBuffer.length, this.totalFramesRecorded);
+
+    for (let i = 0; i < count; i++) {
+      const slot = this.telemetryBuffer[i];
+      if (slot && slot.fps > 0 && slot.fps < minFps) {
+        minFps = slot.fps;
+      }
+      if (slot && slot.totalFrameMs > worstStall) {
+        worstStall = slot.totalFrameMs;
+      }
+    }
+
+    if (this.incidents.length > 0) {
+      lastCulprit = this.incidents[this.incidents.length - 1].culpritSection;
+    }
+
+    const currentSlotIndex = (this.bufferHeadIndex - 1 + EngineFlightRecorder.SAMPLE_CAPACITY) % EngineFlightRecorder.SAMPLE_CAPACITY;
+    const currentFps = this.telemetryBuffer[currentSlotIndex]?.fps || 60;
+
+    return {
+      currentFps,
+      minFps,
+      frameStallCount: this.incidents.length,
+      worstStallMs: parseFloat(worstStall.toFixed(1)),
+      lastStallCulprit: lastCulprit
+    };
   }
 
   public getLatestIncident(): FreezeIncident | null {

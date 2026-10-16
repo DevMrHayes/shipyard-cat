@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     game = new GameEngine(container);
     (window as any).game = game;
     (window as any).soundEngine = soundEngine;
+    (window as any).RemoteLogger = RemoteLogger;
     const chronometerClock = document.getElementById('chronometer-clock');
     const chronometerShift = document.getElementById('chronometer-shift');
     game.onFrameUpdate = () => {
@@ -833,6 +834,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const hudUtilityDrawer = document.getElementById('hud-utility-drawer');
   btnUtilityMenu?.addEventListener('click', () => {
     hudUtilityDrawer?.classList.toggle('hidden');
+  });
+
+  const chronometerPill = document.getElementById('diurnal-chronometer-pill');
+  chronometerPill?.addEventListener('click', () => {
+    isDevTelemetryVisible = !isDevTelemetryVisible;
+    const pill = document.getElementById('flight-status-pill');
+    if (pill) pill.style.display = isDevTelemetryVisible ? 'flex' : 'none';
+    const banner = document.getElementById('freeze-alert-banner');
+    if (banner && !isDevTelemetryVisible) banner.style.display = 'none';
+    showToast(isDevTelemetryVisible ? 'Diagnostics Enabled (F3)' : 'Diagnostics Disabled', 'Live engine performance telemetry toggled.', 'info');
   });
 
   const btnToggleMissionCard = document.getElementById('btn-toggle-mission-card');

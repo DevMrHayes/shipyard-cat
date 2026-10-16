@@ -1,11 +1,21 @@
 /**
- * RemoteLogger - Automated Local Game Runtime Error & Diagnostics Bridge.
- * Transmits runtime errors, WebGL context events, and engine freeze incidents
- * directly to the local Vite dev server, which writes them to .agents/logs/game_runtime.log.
+ * RemoteLogger - Automated Game Runtime Error & Diagnostics Bridge.
+ * Transmits runtime errors, WebGL context events, and engine freeze incidents.
+ * Routes to local Vite dev server endpoint (/api/log) during local development,
+ * and Firebase Firestore REST API telemetry endpoint in production.
  */
 
 export interface RemoteLogPayload {
-  type: 'ERROR' | 'UNHANDLED_REJECTION' | 'WEBGL_CONTEXT_LOST' | 'WEBGL_CONTEXT_RESTORED' | 'FREEZE_SPIKE' | 'SHADER_WARN' | 'CLIPPING_ALERT' | 'PHYSICS_WARN' | 'INFO';
+  type:
+    | 'ERROR'
+    | 'UNHANDLED_REJECTION'
+    | 'WEBGL_CONTEXT_LOST'
+    | 'WEBGL_CONTEXT_RESTORED'
+    | 'FREEZE_SPIKE'
+    | 'SHADER_WARN'
+    | 'CLIPPING_ALERT'
+    | 'PHYSICS_WARN'
+    | 'INFO';
   message: string;
   source?: string;
   lineno?: number;
@@ -14,13 +24,102 @@ export interface RemoteLogPayload {
   details?: any;
 }
 
+export interface TelemetryStats {
+  queueLength: number;
+  totalSent: number;
+  totalDropped: number;
+  lastError: string | null;
+}
+
+const MAX_QUEUE_SIZE = 25;
+const FLUSH_DEBOUNCE_MS = 500;
+const FAILURE_COOLDOWN_MS = 5000;
+const DEDUPE_TTL_MS = 5000;
+
+const FIRESTORE_TELEMETRY_ENDPOINT =
+  'https://firestore.googleapis.com/v1/projects/shipyard-cat-game/databases/(default)/documents/game_telemetry';
+const LOCAL_TELEMETRY_ENDPOINT = '/api/log';
+
+/**
+ * Safely extracts human-readable text from arbitrary values without triggering
+ * circular structure TypeError exceptions on complex objects or DOM elements.
+ */
+function safeFormatArg(arg: any): string {
+  if (arg === null) return 'null';
+  if (arg === undefined) return 'undefined';
+  if (typeof arg === 'string') return arg;
+  if (typeof arg === 'number' || typeof arg === 'boolean' || typeof arg === 'bigint') return String(arg);
+  if (typeof arg === 'symbol') return arg.toString();
+  if (typeof arg === 'function') return `[Function: ${arg.name || 'anonymous'}]`;
+
+  if (arg instanceof Error) {
+    return `${arg.name}: ${arg.message}${arg.stack ? `\n${arg.stack}` : ''}`;
+  }
+
+  if (typeof arg === 'object') {
+    if (typeof arg.message === 'string') {
+      return arg.message;
+    }
+    try {
+      if (typeof arg.toString === 'function' && arg.toString !== Object.prototype.toString) {
+        return arg.toString();
+      }
+    } catch {
+      // Fall through to property scan
+    }
+
+    try {
+      const keys = Object.keys(arg).slice(0, 8);
+      const entries = keys.map((key) => {
+        const val = arg[key];
+        const valStr =
+          typeof val === 'object' && val !== null
+            ? (val.message || (Array.isArray(val) ? `[Array(${val.length})]` : '[Object]'))
+            : String(val);
+        return `${key}: ${valStr}`;
+      });
+      return `{ ${entries.join(', ')} }`;
+    } catch {
+      return '[Unserializable Object]';
+    }
+  }
+
+  return String(arg);
+}
+
+/**
+ * Safe JSON serializer guarding against circular references, DOM Nodes, and Three.js scenes.
+ */
+function safeSerialize(data: any): string {
+  const seen = new WeakSet();
+  return JSON.stringify(data, (_key, value) => {
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return '[Circular]';
+      }
+      seen.add(value);
+      if (typeof Node !== 'undefined' && value instanceof Node) {
+        return `[DOM ${value.nodeName}]`;
+      }
+      if (typeof Event !== 'undefined' && value instanceof Event) {
+        return `[Event ${value.type}]`;
+      }
+    }
+    return value;
+  });
+}
+
 export class RemoteLogger {
-  private static endpoint = '/api/log';
   private static isInitialized = false;
   private static logQueue: RemoteLogPayload[] = [];
   private static isSending = false;
   private static flushTimeout: any = null;
   private static recentMessages = new Set<string>();
+
+  private static cooldownUntil = 0;
+  private static totalSent = 0;
+  private static totalDropped = 0;
+  private static lastError: string | null = null;
 
   public static init(): void {
     if (this.isInitialized || typeof window === 'undefined') return;
@@ -46,19 +145,19 @@ export class RemoteLogger {
         type: 'UNHANDLED_REJECTION',
         message: reason?.message || String(reason || 'Unhandled Promise Rejection'),
         stack: reason?.stack,
-        details: { reason: String(reason) }
+        details: { reason: safeFormatArg(reason) }
       });
     });
 
-    // 3. Intercept Console Errors and Warnings for Real-Time Runtime Auditing
+    // 3. Intercept Console Errors and Warnings with Safe Sanitization & 5s Deduplication
     const originalConsoleError = console.error;
     console.error = (...args: any[]) => {
       originalConsoleError.apply(console, args);
-      const msg = args.map(a => (typeof a === 'object' ? (a?.message || JSON.stringify(a)) : String(a))).join(' ');
-      const key = `err_${msg.slice(0, 60)}`;
+      const msg = args.map(safeFormatArg).join(' ');
+      const key = `err_${msg.slice(0, 80)}`;
       if (!this.recentMessages.has(key)) {
         this.recentMessages.add(key);
-        setTimeout(() => this.recentMessages.delete(key), 3000);
+        setTimeout(() => this.recentMessages.delete(key), DEDUPE_TTL_MS);
         this.send({ type: 'ERROR', message: msg });
       }
     };
@@ -66,11 +165,11 @@ export class RemoteLogger {
     const originalConsoleWarn = console.warn;
     console.warn = (...args: any[]) => {
       originalConsoleWarn.apply(console, args);
-      const msg = args.map(a => (typeof a === 'object' ? (a?.message || JSON.stringify(a)) : String(a))).join(' ');
-      const key = `warn_${msg.slice(0, 60)}`;
+      const msg = args.map(safeFormatArg).join(' ');
+      const key = `warn_${msg.slice(0, 80)}`;
       if (!this.recentMessages.has(key)) {
         this.recentMessages.add(key);
-        setTimeout(() => this.recentMessages.delete(key), 3000);
+        setTimeout(() => this.recentMessages.delete(key), DEDUPE_TTL_MS);
         this.send({ type: 'SHADER_WARN', message: msg });
       }
     };
@@ -78,7 +177,7 @@ export class RemoteLogger {
     // Initial boot heartbeat
     this.send({
       type: 'INFO',
-      message: 'Shipyard Cat Runtime Logger initialized on client. Local logging active.'
+      message: `Shipyard Cat Runtime Logger initialized (${this.isLocalhost() ? 'Localhost' : 'Production'}).`
     });
   }
 
@@ -104,21 +203,22 @@ export class RemoteLogger {
   }
 
   public static logFreezeIncident(incident: any): void {
-    // Deduplicate repetitive freeze spikes within 2 seconds
-    const key = `${incident.culpritSection}_${incident.frameTick}`;
+    const culprit = incident?.culpritSection ?? 'unknown';
+    const tick = incident?.frameTick ?? 0;
+    const key = `freeze_${culprit}_${tick}`;
     if (this.recentMessages.has(key)) return;
     this.recentMessages.add(key);
-    setTimeout(() => this.recentMessages.delete(key), 2000);
+    setTimeout(() => this.recentMessages.delete(key), DEDUPE_TTL_MS);
 
     this.send({
       type: 'FREEZE_SPIKE',
-      message: `[Freeze Spike] Frame #${incident.frameTick}: '${incident.culpritSection}' took ${incident.sectionDurationMs}ms (Total Frame: ${incident.totalFrameMs}ms)`,
+      message: `[Freeze Spike] Frame #${tick}: '${culprit}' took ${incident?.sectionDurationMs ?? 0}ms (Total Frame: ${incident?.totalFrameMs ?? 0}ms)`,
       details: incident
     });
   }
 
   /**
-   * Logs collision clipping, penetration into obstacles, or floor drop-throughs
+   * Logs collision clipping, penetration into obstacles, or floor drop-throughs.
    */
   public static logClippingIncident(incident: {
     type: 'OBSTACLE_PENETRATION' | 'FLOOR_VOID_DROP' | 'PLATFORM_CLIPPING' | 'STUCK_IN_GEOMETRY';
@@ -128,10 +228,13 @@ export class RemoteLogger {
     obstacleName?: string;
     penetrationDepth?: number;
   }): void {
-    const key = `${incident.type}_${incident.obstacleName || 'floor'}_${Math.round(incident.position.x * 2)}_${Math.round(incident.position.z * 2)}`;
+    const posKey = incident.position
+      ? `${Math.round(incident.position.x * 2)}_${Math.round(incident.position.z * 2)}`
+      : '0_0';
+    const key = `clip_${incident.type}_${incident.obstacleName || 'floor'}_${posKey}`;
     if (this.recentMessages.has(key)) return;
     this.recentMessages.add(key);
-    setTimeout(() => this.recentMessages.delete(key), 2500);
+    setTimeout(() => this.recentMessages.delete(key), DEDUPE_TTL_MS);
 
     this.send({
       type: 'CLIPPING_ALERT',
@@ -144,10 +247,38 @@ export class RemoteLogger {
     this.send({ type, message, details });
   }
 
+  public static getTelemetryStats(): TelemetryStats {
+    return {
+      queueLength: this.logQueue.length,
+      totalSent: this.totalSent,
+      totalDropped: this.totalDropped,
+      lastError: this.lastError
+    };
+  }
+
+  private static isLocalhost(): boolean {
+    if (typeof window === 'undefined' || !window.location) return false;
+    const hostname = window.location.hostname;
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname.endsWith('.local')
+    );
+  }
+
   private static send(payload: RemoteLogPayload): void {
     this.logQueue.push(payload);
+
+    // Hard queue safety cap: max 25 entries. Drop oldest if capacity exceeded.
+    if (this.logQueue.length > MAX_QUEUE_SIZE) {
+      const droppedCount = this.logQueue.length - MAX_QUEUE_SIZE;
+      this.totalDropped += droppedCount;
+      this.logQueue.splice(0, droppedCount);
+    }
+
     if (!this.flushTimeout) {
-      this.flushTimeout = setTimeout(() => this.flush(), 80);
+      this.flushTimeout = setTimeout(() => this.flush(), FLUSH_DEBOUNCE_MS);
     }
   }
 
@@ -155,26 +286,92 @@ export class RemoteLogger {
     this.flushTimeout = null;
     if (this.logQueue.length === 0 || this.isSending) return;
 
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (now < this.cooldownUntil) {
+      const remaining = Math.max(100, Math.ceil(this.cooldownUntil - now));
+      this.flushTimeout = setTimeout(() => this.flush(), remaining);
+      return;
+    }
+
+    // Dequeue batch
     const itemsToSend = [...this.logQueue];
     this.logQueue = [];
     this.isSending = true;
 
     try {
-      if (typeof fetch !== 'undefined') {
-        await fetch(this.endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ entries: itemsToSend }),
-          keepalive: true
-        });
+      if (this.isLocalhost()) {
+        await this.sendLocal(itemsToSend);
+      } else {
+        await this.sendProduction(itemsToSend);
       }
-    } catch {
-      // If server is unreachable or offline, re-enqueue
-      this.logQueue.unshift(...itemsToSend);
+      this.totalSent += itemsToSend.length;
+    } catch (err: any) {
+      // Cooldown penalty on failure: pause network for 5 seconds
+      const errMessage = err?.message || String(err || 'Unknown Network Error');
+      this.lastError = errMessage;
+      this.totalDropped += itemsToSend.length;
+      this.cooldownUntil = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + FAILURE_COOLDOWN_MS;
+      // CRITICAL: NEVER unshift failed items back to prevent cascading memory exhaustion
     } finally {
       this.isSending = false;
-      if (this.logQueue.length > 0) {
-        this.flushTimeout = setTimeout(() => this.flush(), 250);
+      if (this.logQueue.length > 0 && !this.flushTimeout) {
+        this.flushTimeout = setTimeout(() => this.flush(), FLUSH_DEBOUNCE_MS);
+      }
+    }
+  }
+
+  private static async sendLocal(items: RemoteLogPayload[]): Promise<void> {
+    if (typeof fetch === 'undefined') return;
+
+    const res = await fetch(LOCAL_TELEMETRY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeSerialize({ entries: items }),
+      keepalive: true
+    });
+
+    if (!res.ok) {
+      throw new Error(`Local logger responded with status ${res.status}`);
+    }
+  }
+
+  private static async sendProduction(items: RemoteLogPayload[]): Promise<void> {
+    const payloadString = safeSerialize(items);
+    const firestoreBody = JSON.stringify({
+      fields: {
+        timestamp: { stringValue: new Date().toISOString() },
+        count: { integerValue: String(items.length) },
+        entries: { stringValue: payloadString.slice(0, 500000) }
+      }
+    });
+
+    // Attempt navigator.sendBeacon first (non-blocking transport)
+    let beaconSuccess = false;
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      try {
+        const blob = new Blob([firestoreBody], { type: 'application/json' });
+        beaconSuccess = navigator.sendBeacon(FIRESTORE_TELEMETRY_ENDPOINT, blob);
+      } catch {
+        beaconSuccess = false;
+      }
+    }
+
+    if (beaconSuccess) {
+      return;
+    }
+
+    // Fall back to safe fetch with keepalive
+    if (typeof fetch !== 'undefined') {
+      const res = await fetch(FIRESTORE_TELEMETRY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: firestoreBody,
+        keepalive: true,
+        mode: 'cors'
+      });
+
+      if (!res.ok && res.status >= 500) {
+        throw new Error(`Production logger responded with status ${res.status}`);
       }
     }
   }
