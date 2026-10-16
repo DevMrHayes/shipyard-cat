@@ -4,6 +4,7 @@ export interface ExpansionCollisionItem {
   box: THREE.Box3;
   mesh?: THREE.Object3D;
   surfaceType?: 'metal' | 'concrete' | 'catwalk' | 'hull';
+  name?: string;
 }
 
 export interface SubmarineAndFabResult {
@@ -182,7 +183,7 @@ export class SubmarineAndFabExpansion {
     this.registerBoxCollider(
       new THREE.Vector3(origin.x, origin.y - dockDepth, origin.z),
       new THREE.Vector3(dockWidth, 2, dockLength),
-      'concrete'
+      'catwalk'
     );
 
     // 2. Concrete Retaining Walls (Left, Right, End Gate)
@@ -466,7 +467,7 @@ export class SubmarineAndFabExpansion {
     this.registerBoxCollider(
       new THREE.Vector3(origin.x, origin.y + 0.6, origin.z),
       new THREE.Vector3(bldWidth + 4, 1.2, bldLength + 4),
-      'concrete'
+      'catwalk'
     );
 
     // 2. Main Outer Structural Walls with Giant Roll-Up Hull Transport Bay Doors
@@ -677,13 +678,17 @@ export class SubmarineAndFabExpansion {
     });
   }
 
-  private registerBoxCollider(center: THREE.Vector3, size: THREE.Vector3, surfaceType: ExpansionCollisionItem['surfaceType'] = 'concrete'): void {
+  private registerBoxCollider(center: THREE.Vector3, size: THREE.Vector3, surfaceType: ExpansionCollisionItem['surfaceType'] = 'concrete', name?: string): void {
     const halfSize = new THREE.Vector3(size.x / 2, size.y / 2, size.z / 2);
     const box = new THREE.Box3(
       new THREE.Vector3(center.x - halfSize.x, center.y - halfSize.y, center.z - halfSize.z),
       new THREE.Vector3(center.x + halfSize.x, center.y + halfSize.y, center.z + halfSize.z)
     );
-    this.colliders.push({ box, surfaceType });
+    this.colliders.push({ box, surfaceType, name });
+  }
+
+  public getColliders(): ExpansionCollisionItem[] {
+    return this.colliders;
   }
 
   public getWalkablePlatforms(): { minX: number; maxX: number; minZ: number; maxZ: number; height: number }[] {

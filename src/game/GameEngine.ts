@@ -422,9 +422,9 @@ export class GameEngine {
       // Delegate full GPU warmup to RenderSubsystem (asynchronously compiles all shaders & uploads textures to VRAM)
       await this.renderSystem.warmupGPU(this.scene, this.camera, zonePositions, onProgress);
 
-      // Re-verify camera is cleanly locked onto Alba with matrices updated
-      this.renderSystem.snapCameraToTarget(this.cat.mesh.position, this.physics.heading);
-      this.scene.updateMatrixWorld(true);
+      // Ensure all thermal / whisker mode overlays and enemy auras are cleanly reset to OFF for standard gameplay
+      this.rats.forEach((r) => r.setWhiskersMode(false));
+      this.mutantCats.forEach((m) => m.setWhiskersAura(false, false));
 
       const totalPrograms = this.renderer.info?.programs?.length ?? 0;
       console.log(`🚀 [PRE-WARM] WebGL Pipeline Ready: ${totalPrograms} compiled shader programs linked to GPU driver ahead of gameplay.`);
@@ -1696,6 +1696,9 @@ export class GameEngine {
 
     if (this.lastFrameTimestamp === 0) {
       this.lastFrameTimestamp = now;
+      this.renderSystem.snapCameraToTarget(this.cat.mesh.position, this.physics.heading);
+      this.scene.updateMatrixWorld(true);
+      this.renderSystem.render(this.scene);
       return;
     }
 
@@ -1864,6 +1867,7 @@ export class GameEngine {
     if (this.frameTick % 10 === 0) {
       const kingpin = this.rats.find((r) => r.isKingpin && r.state !== 'CAUGHT');
       const catPos = this.cat?.mesh?.position;
+      // Strictly down in the Dry Dock 1 basin floor (y <= -0.5) and inside the basin horizontal walls
       const inDryDock1Arena = !!(
         catPos &&
         catPos.x >= 14 && catPos.x <= 44 &&
@@ -1871,12 +1875,14 @@ export class GameEngine {
         catPos.y <= -0.5
       );
       const distToKingpin = (catPos && kingpin) ? catPos.distanceTo(kingpin.mesh.position) : 999;
+      // Boss music ONLY plays when Alba is physically down in Dry Dock 1 AND actively engaged in combat
       const isBattlingBoss = !!(
         kingpin &&
         kingpin.state !== 'CAUGHT' &&
         kingpin.health > 0 &&
         this.cat &&
-        (inDryDock1Arena || distToKingpin < 16.0 || kingpin.health < kingpin.maxHealth)
+        inDryDock1Arena &&
+        (distToKingpin < 12.0 || kingpin.health < kingpin.maxHealth)
       );
       soundEngine.updateBGM(isBattlingBoss);
     }

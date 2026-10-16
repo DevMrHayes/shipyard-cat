@@ -20,11 +20,11 @@ export class MinimapSystem {
   private lastMapWidth = 0;
   private lastMapHeight = 0;
 
-  // Expanded Shipyard World Boundaries (-210 to +75 in X, -110 to +290 in Z)
-  private readonly worldMinX = -210;
-  private readonly worldMaxX = 75;
-  private readonly worldMinZ = -110;
-  private readonly worldMaxZ = 290;
+  // Expanded Shipyard World Boundaries (-225 to +65 in X, -115 to +305 in Z)
+  private readonly worldMinX = -225;
+  private readonly worldMaxX = 65;
+  private readonly worldMinZ = -115;
+  private readonly worldMaxZ = 305;
 
   constructor() {
     if (typeof document !== 'undefined') {
@@ -279,11 +279,22 @@ export class MinimapSystem {
     }
 
     // 2. James River Waterfront (East Pier & Deepwater Basin)
-    const riverLeft = mapX(55);
+    const riverLeft = mapX(56.5);
     sCtx.fillStyle = '#0369a1';
     sCtx.fillRect(riverLeft, 0, w - riverLeft, h);
     sCtx.fillStyle = '#0284c7';
     sCtx.fillRect(riverLeft - 3, 0, 3, h); // Waterfront bulkheads
+
+    // 2B. Outer Perimeter Security Fence (Dashed Yellow Boundary Line)
+    const fenceMinX = mapX(-220);
+    const fenceMaxX = mapX(56.5);
+    const fenceMinZ = mapZ(-105);
+    const fenceMaxZ = mapZ(300);
+    sCtx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+    sCtx.lineWidth = 1.5;
+    sCtx.setLineDash([4, 4]);
+    sCtx.strokeRect(fenceMinX, fenceMinZ, fenceMaxX - fenceMinX, fenceMaxZ - fenceMinZ);
+    sCtx.setLineDash([]);
 
     // 3. Complete Yard Facility Polygons
     const facilities = [
@@ -299,9 +310,10 @@ export class MinimapSystem {
       { name: 'THE APPRENTICE SCHOOL', xMin: -65, xMax: -45, zMin: -60, zMax: -40, fill: 'rgba(14, 165, 233, 0.25)', stroke: '#0ea5e9' },
       { name: 'PIPE FAB & SPOOL DEPOT', xMin: -95, xMax: -45, zMin: -95, zMax: -30, fill: 'rgba(100, 116, 139, 0.35)', stroke: '#94a3b8' },
       { name: 'PLATE BENDING & BLAST', xMin: -95, xMax: -50, zMin: -15, zMax: 30, fill: 'rgba(120, 53, 15, 0.35)', stroke: '#b45309' },
+      { name: 'GATE 4 BADGE CHECKPOINT', xMin: -108, xMax: -102, zMin: -5, zMax: 5, fill: 'rgba(234, 179, 8, 0.45)', stroke: '#eab308' },
       { name: 'RAIL MARSHALING YARD', xMin: -65, xMax: 30, zMin: 65, zMax: 100, fill: 'rgba(51, 65, 85, 0.45)', stroke: '#64748b' },
-      { name: 'DRY DOCK 2 (VIRGINIA SUB)', xMin: -200, xMax: -160, zMin: 40, zMax: 180, fill: 'rgba(15, 43, 53, 0.75)', stroke: '#22d3ee' },
-      { name: 'HEAVY STEEL FAB SUPER-SHOP', xMin: -140, xMax: -90, zMin: 190, zMax: 290, fill: 'rgba(88, 28, 135, 0.45)', stroke: '#c084fc' }
+      { name: 'DRY DOCK 2 (SSN VIRGINIA)', xMin: -202, xMax: -158, zMin: 40, zMax: 180, fill: 'rgba(15, 43, 53, 0.75)', stroke: '#22d3ee' },
+      { name: 'HEAVY STEEL FAB SUPER-SHOP', xMin: -148, xMax: -82, zMin: 190, zMax: 290, fill: 'rgba(88, 28, 135, 0.45)', stroke: '#c084fc' }
     ];
 
     for (const fac of facilities) {

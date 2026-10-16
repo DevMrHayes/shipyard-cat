@@ -575,8 +575,8 @@ export class CatCharacter {
         // Locomotion state resolution with speed & steering deadzone hysteresis
         const currentLoco = this.currentActionName;
 
-        // Run vs Walk hysteresis (Deadband: enter run > 5.2 m/s, exit run < 4.6 m/s)
-        const isRunning = (currentLoco === 'run') ? (speed > 4.6) : (speed > 5.2);
+        // Run vs Walk hysteresis (Deadband: enter run > 6.2 m/s, exit run < 5.5 m/s; standard walk is 4.6 m/s, sprint is 9.2 m/s)
+        const isRunning = (currentLoco === 'run') ? (speed > 5.5) : (speed > 6.2);
 
         if (isRunning) {
           targetName = 'run';

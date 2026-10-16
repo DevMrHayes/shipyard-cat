@@ -61,6 +61,10 @@ export class IndustrialExpansion {
     }
   }
 
+  public getExpansionColliders() {
+    return this.submarineAndFabExpansion ? this.submarineAndFabExpansion.getColliders() : [];
+  }
+
   /**
    * ZONE 1: Pipe Fabrication & Cable Spool Depot (X in [-95, -45], Z in [-95, -30])
    */

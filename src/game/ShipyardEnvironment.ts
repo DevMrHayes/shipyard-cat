@@ -80,6 +80,17 @@ export class ShipyardEnvironment {
     this.buildPerimeterFencingAndSecurityTurnstiles();
     const industrialExpansion = new IndustrialExpansion(this.platforms);
     this.group.add(industrialExpansion.group);
+
+    const expansionColliders = industrialExpansion.getExpansionColliders();
+    expansionColliders.forEach((item, idx) => {
+      if (item.surfaceType !== 'catwalk' && item.box) {
+        this.registerObstacle(
+          item.box.min,
+          item.box.max,
+          item.name || `ExpansionCollider_${idx}`
+        );
+      }
+    });
   }
 
   private registerObstacle(min: THREE.Vector3, max: THREE.Vector3, name: string) {
@@ -155,16 +166,13 @@ export class ShipyardEnvironment {
   public resolveCollision(pos: THREE.Vector3, radius: number = 0.35, previousPos?: THREE.Vector3): THREE.Vector3 {
     const resolved = ShipyardEnvironment.scratchResolved.copy(pos);
 
-    if (resolved.x > 56.5 - radius) {
-      resolved.x = 56.5 - radius;
-    }
-
-    resolved.x = Math.max(-104.5 + radius, Math.min(56.5 - radius, resolved.x));
-    resolved.z = Math.max(-104.5 + radius, Math.min(104.5 - radius, resolved.z));
+    resolved.x = Math.max(-218.0 + radius, Math.min(56.5 - radius, resolved.x));
+    resolved.z = Math.max(-104.5 + radius, Math.min(298.0 - radius, resolved.z));
 
     const isInsideDD1 = (resolved.x >= 15.0 && resolved.x <= 44.5 && resolved.z >= -36.0 && resolved.z <= -19.0);
     const isInsideDD12 = (resolved.x >= 5.0 && resolved.x <= 35.0 && resolved.z >= 10.0 && resolved.z <= 80.0);
-    if (!isInsideDD1 && !isInsideDD12 && resolved.y < 0.0) {
+    const isInsideDD2 = (resolved.x >= -198.0 && resolved.x <= -162.0 && resolved.z >= 40.0 && resolved.z <= 180.0);
+    if (!isInsideDD1 && !isInsideDD12 && !isInsideDD2 && resolved.y < 0.0) {
       resolved.y = 0.0;
     }
 
@@ -323,6 +331,7 @@ export class ShipyardEnvironment {
       const asphaltAO = TextureGenerator.createWetAsphaltAOTexture();
 
       groundMat = new THREE.MeshStandardMaterial({
+        color: 0x22262b,
         map: asphaltDiff,
         normalMap: asphaltNor,
         roughnessMap: asphaltRough,
@@ -340,11 +349,11 @@ export class ShipyardEnvironment {
       });
     }
     const groundShape = new THREE.Shape();
-    // Yard bounds: X in [-140, 51], Z in [-140, 140] (in 2D shape with y = -Z)
-    groundShape.moveTo(-140, -140);
-    groundShape.lineTo(51, -140);
-    groundShape.lineTo(51, 140);
-    groundShape.lineTo(-140, 140);
+    // Yard bounds: X in [-225, 56.5], Z in [-140, 310] (in 2D shape with y = -Z)
+    groundShape.moveTo(-225, -310);
+    groundShape.lineTo(56.5, -310);
+    groundShape.lineTo(56.5, 140);
+    groundShape.lineTo(-225, 140);
     groundShape.closePath();
 
     // Open Cutout 1: Historic Dry Dock 1 Basin (X: 14.5 to 45.5, Z: -36.5 to -18.5 -> 2D y: 18.5 to 36.5) [CW winding]
@@ -365,6 +374,15 @@ export class ShipyardEnvironment {
     holeDD12.closePath();
     groundShape.holes.push(holeDD12);
 
+    // Open Cutout 3: Dry Dock 2 Virginia Submarine Berth (X: -198 to -162, Z: 40 to 180 -> 2D y: -180 to -40) [CW winding]
+    const holeDD2 = new THREE.Path();
+    holeDD2.moveTo(-198, -180);
+    holeDD2.lineTo(-198, -40);
+    holeDD2.lineTo(-162, -40);
+    holeDD2.lineTo(-162, -180);
+    holeDD2.closePath();
+    groundShape.holes.push(holeDD2);
+
     const groundGeo = new THREE.ShapeGeometry(groundShape);
     groundGeo.rotateX(-Math.PI / 2);
 
@@ -374,7 +392,7 @@ export class ShipyardEnvironment {
     for (let i = 0; i < posAttr.count; i++) {
       const vx = posAttr.getX(i);
       const vz = posAttr.getZ(i);
-      uvs[i * 2] = (vx + 140) * 0.1;
+      uvs[i * 2] = (vx + 225) * 0.1;
       uvs[i * 2 + 1] = (vz + 140) * 0.1;
     }
     const uvBuffer = new THREE.BufferAttribute(uvs, 2);
@@ -3399,81 +3417,67 @@ export class ShipyardEnvironment {
     const barbMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
 
     // 1. Concrete Foundation Curb along All Boundary Lines (0.22m high x 0.28m wide)
-    const curbGeoN = new THREE.BoxGeometry(161.5, 0.22, 0.28);
-    const curbN = new THREE.Mesh(curbGeoN, curbMat);
-    curbN.position.set(-24.25, 0.11, 105.0);
+    const curbGeoEW = new THREE.BoxGeometry(276.5, 0.22, 0.28);
+    const curbN = new THREE.Mesh(curbGeoEW, curbMat);
+    curbN.position.set(-81.75, 0.11, 300.0);
     fenceGroup.add(curbN);
 
-    const curbS = new THREE.Mesh(curbGeoN, curbMat);
-    curbS.position.set(-24.25, 0.11, -105.0);
+    const curbS = new THREE.Mesh(curbGeoEW, curbMat);
+    curbS.position.set(-81.75, 0.11, -105.0);
     fenceGroup.add(curbS);
 
-    const curbGeoW = new THREE.BoxGeometry(0.28, 0.22, 98.5);
-    const curbWN = new THREE.Mesh(curbGeoW, curbMat);
-    curbWN.position.set(-105.0, 0.11, 55.75);
-    fenceGroup.add(curbWN);
-
-    const curbWS = new THREE.Mesh(curbGeoW, curbMat);
-    curbWS.position.set(-105.0, 0.11, -55.75);
-    fenceGroup.add(curbWS);
+    const curbGeoNS = new THREE.BoxGeometry(0.28, 0.22, 405.0);
+    const curbW = new THREE.Mesh(curbGeoNS, curbMat);
+    curbW.position.set(-220.0, 0.11, 97.5);
+    fenceGroup.add(curbW);
 
     // 2. Chain-Link Wire Mesh Wall Panels (Y = 0.22 to 3.0m)
-    const meshGeoN = new THREE.BoxGeometry(161.5, 2.78, 0.04);
-    const meshN = new THREE.Mesh(meshGeoN, wireMeshMat);
-    meshN.position.set(-24.25, 1.61, 105.0);
-    const meshS = new THREE.Mesh(meshGeoN, wireMeshMat);
-    meshS.position.set(-24.25, 1.61, -105.0);
+    const meshGeoEW = new THREE.BoxGeometry(276.5, 2.78, 0.04);
+    const meshN = new THREE.Mesh(meshGeoEW, wireMeshMat);
+    meshN.position.set(-81.75, 1.61, 300.0);
+    const meshS = new THREE.Mesh(meshGeoEW, wireMeshMat);
+    meshS.position.set(-81.75, 1.61, -105.0);
     fenceGroup.add(meshN, meshS);
 
-    const meshGeoW = new THREE.BoxGeometry(0.04, 2.78, 98.5);
-    const meshWN = new THREE.Mesh(meshGeoW, wireMeshMat);
-    meshWN.position.set(-105.0, 1.61, 55.75);
-    const meshWS = new THREE.Mesh(meshGeoW, wireMeshMat);
-    meshWS.position.set(-105.0, 1.61, -55.75);
-    fenceGroup.add(meshWN, meshWS);
+    const meshGeoNS = new THREE.BoxGeometry(0.04, 2.78, 405.0);
+    const meshW = new THREE.Mesh(meshGeoNS, wireMeshMat);
+    meshW.position.set(-220.0, 1.61, 97.5);
+    fenceGroup.add(meshW);
 
     // 3. Top & Mid Steel Horizontal Tension Rails
-    const railGeoN = new THREE.CylinderGeometry(0.03, 0.03, 161.5, 6);
-    railGeoN.rotateZ(Math.PI / 2);
-    const topRailN = new THREE.Mesh(railGeoN, railMat);
-    topRailN.position.set(-24.25, 3.0, 105.0);
-    const midRailN = new THREE.Mesh(railGeoN, railMat);
-    midRailN.position.set(-24.25, 1.6, 105.0);
-    const topRailS = new THREE.Mesh(railGeoN, railMat);
-    topRailS.position.set(-24.25, 3.0, -105.0);
-    const midRailS = new THREE.Mesh(railGeoN, railMat);
-    midRailS.position.set(-24.25, 1.6, -105.0);
+    const railGeoEW = new THREE.CylinderGeometry(0.03, 0.03, 276.5, 6);
+    railGeoEW.rotateZ(Math.PI / 2);
+    const topRailN = new THREE.Mesh(railGeoEW, railMat);
+    topRailN.position.set(-81.75, 3.0, 300.0);
+    const midRailN = new THREE.Mesh(railGeoEW, railMat);
+    midRailN.position.set(-81.75, 1.6, 300.0);
+    const topRailS = new THREE.Mesh(railGeoEW, railMat);
+    topRailS.position.set(-81.75, 3.0, -105.0);
+    const midRailS = new THREE.Mesh(railGeoEW, railMat);
+    midRailS.position.set(-81.75, 1.6, -105.0);
     fenceGroup.add(topRailN, midRailN, topRailS, midRailS);
 
-    const railGeoW = new THREE.CylinderGeometry(0.03, 0.03, 98.5, 6);
-    railGeoW.rotateX(Math.PI / 2);
-    const topRailWN = new THREE.Mesh(railGeoW, railMat);
-    topRailWN.position.set(-105.0, 3.0, 55.75);
-    const midRailWN = new THREE.Mesh(railGeoW, railMat);
-    midRailWN.position.set(-105.0, 1.6, 55.75);
-    const topRailWS = new THREE.Mesh(railGeoW, railMat);
-    topRailWS.position.set(-105.0, 3.0, -55.75);
-    const midRailWS = new THREE.Mesh(railGeoW, railMat);
-    midRailWS.position.set(-105.0, 1.6, -55.75);
-    fenceGroup.add(topRailWN, midRailWN, topRailWS, midRailWS);
+    const railGeoNS = new THREE.CylinderGeometry(0.03, 0.03, 405.0, 6);
+    railGeoNS.rotateX(Math.PI / 2);
+    const topRailW = new THREE.Mesh(railGeoNS, railMat);
+    topRailW.position.set(-220.0, 3.0, 97.5);
+    const midRailW = new THREE.Mesh(railGeoNS, railMat);
+    midRailW.position.set(-220.0, 1.6, 97.5);
+    fenceGroup.add(topRailW, midRailW);
 
     // 4. Instanced Galvanized Fence Posts along All Boundaries
     const postPositions: THREE.Vector3[] = [];
-    // North Fence line: X from -105.0 to 56.5
-    for (let x = -105.0; x <= 56.5; x += 4.0) {
-      postPositions.push(new THREE.Vector3(x, 1.6, 105.0));
+    // North Fence line: X from -220.0 to 56.5 at Z = 300.0
+    for (let x = -220.0; x <= 56.5; x += 4.0) {
+      postPositions.push(new THREE.Vector3(x, 1.6, 300.0));
     }
-    // South Fence line: X from -105.0 to 56.5
-    for (let x = -105.0; x <= 56.5; x += 4.0) {
+    // South Fence line: X from -220.0 to 56.5 at Z = -105.0
+    for (let x = -220.0; x <= 56.5; x += 4.0) {
       postPositions.push(new THREE.Vector3(x, 1.6, -105.0));
     }
-    // West Fence North: Z from 6.5 to 105.0
-    for (let z = 6.5; z <= 105.0; z += 4.0) {
-      postPositions.push(new THREE.Vector3(-105.0, 1.6, z));
-    }
-    // West Fence South: Z from -105.0 to -6.5
-    for (let z = -105.0; z <= -6.5; z += 4.0) {
-      postPositions.push(new THREE.Vector3(-105.0, 1.6, z));
+    // West Fence line: Z from -105.0 to 300.0 at X = -220.0
+    for (let z = -105.0; z <= 300.0; z += 4.0) {
+      postPositions.push(new THREE.Vector3(-220.0, 1.6, z));
     }
 
     const postGeo = new THREE.CylinderGeometry(0.06, 0.06, 3.2, 8);
@@ -3487,14 +3491,22 @@ export class ShipyardEnvironment {
     fenceGroup.add(instancedPosts);
 
     // 5. Triple-Strand Barbed Wire Outriggers on Top of Perimeter Fencing
-    const barbGeo = new THREE.CylinderGeometry(0.012, 0.012, 161.5, 4);
-    barbGeo.rotateZ(Math.PI / 2);
+    const barbGeoEW = new THREE.CylinderGeometry(0.012, 0.012, 276.5, 4);
+    barbGeoEW.rotateZ(Math.PI / 2);
     [0.12, 0.24, 0.36].forEach((offsetY, idx) => {
-      const bWireN = new THREE.Mesh(barbGeo, barbMat);
-      bWireN.position.set(-24.25, 3.1 + offsetY, 105.15 + idx * 0.08);
-      const bWireS = new THREE.Mesh(barbGeo, barbMat);
-      bWireS.position.set(-24.25, 3.1 + offsetY, -105.15 - idx * 0.08);
+      const bWireN = new THREE.Mesh(barbGeoEW, barbMat);
+      bWireN.position.set(-81.75, 3.1 + offsetY, 300.15 + idx * 0.08);
+      const bWireS = new THREE.Mesh(barbGeoEW, barbMat);
+      bWireS.position.set(-81.75, 3.1 + offsetY, -105.15 - idx * 0.08);
       fenceGroup.add(bWireN, bWireS);
+    });
+
+    const barbGeoNS = new THREE.CylinderGeometry(0.012, 0.012, 405.0, 4);
+    barbGeoNS.rotateX(Math.PI / 2);
+    [0.12, 0.24, 0.36].forEach((offsetY, idx) => {
+      const bWireW = new THREE.Mesh(barbGeoNS, barbMat);
+      bWireW.position.set(-220.15 - idx * 0.08, 3.1 + offsetY, 97.5);
+      fenceGroup.add(bWireW);
     });
 
     // 6. GATE 4 MAIN SECURITY CHECKPOINT & REVOLVING TURNSTILE FACILITY
@@ -3694,18 +3706,32 @@ export class ShipyardEnvironment {
     this.group.add(fenceGroup);
 
     // 9. Register Solid Boundary Colliders
-    // West Fence North segment (Solid barrier)
+    // West Fence along outer boundary
     this.registerObstacle(
-      new THREE.Vector3(-106.0, 0, 6.5),
-      new THREE.Vector3(-104.0, 10.0, 106.0),
+      new THREE.Vector3(-221.0, 0, -106.0),
+      new THREE.Vector3(-219.0, 10.0, 301.0),
       'West Yard Security Fence'
     );
 
-    // West Fence South segment (Solid barrier)
+    // North Fence along outer boundary
     this.registerObstacle(
-      new THREE.Vector3(-106.0, 0, -106.0),
-      new THREE.Vector3(-104.0, 10.0, -6.5),
-      'West Yard Security Fence (South)'
+      new THREE.Vector3(-221.0, 0, 299.0),
+      new THREE.Vector3(56.5, 10.0, 301.0),
+      'North Yard Security Fence'
+    );
+
+    // South Fence along outer boundary
+    this.registerObstacle(
+      new THREE.Vector3(-221.0, 0, -106.0),
+      new THREE.Vector3(56.5, 10.0, -104.0),
+      'South Yard Security Fence'
+    );
+
+    // East Pier River Railing
+    this.registerObstacle(
+      new THREE.Vector3(56.5, 0, -106.0),
+      new THREE.Vector3(58.0, 10.0, 301.0),
+      'East Pier River Railing'
     );
 
     // Gate 4 Guardhouse Booth (Solid structure)
@@ -3713,34 +3739,6 @@ export class ShipyardEnvironment {
       new THREE.Vector3(-107.5, 0, 2.2),
       new THREE.Vector3(-103.0, 10.0, 7.0),
       'Gate 4 Security Guardhouse'
-    );
-
-    // Gate 4 Turnstile Checkpoint Barrier (Workers badge in/out; player character Alba blocked from leaving)
-    this.registerObstacle(
-      new THREE.Vector3(-107.0, 0, -6.8),
-      new THREE.Vector3(-103.0, 10.0, 2.2),
-      'Gate 4 Turnstile Security Checkpoint (NNS Badge Required)'
-    );
-
-    // North Fence
-    this.registerObstacle(
-      new THREE.Vector3(-106.0, 0, 104.0),
-      new THREE.Vector3(56.5, 10.0, 106.0),
-      'North Yard Security Fence'
-    );
-
-    // South Fence
-    this.registerObstacle(
-      new THREE.Vector3(-106.0, 0, -106.0),
-      new THREE.Vector3(56.5, 10.0, -104.0),
-      'South Yard Security Fence'
-    );
-
-    // East Pier River Railing
-    this.registerObstacle(
-      new THREE.Vector3(56.5, 0, -140.0),
-      new THREE.Vector3(58.0, 10.0, 140.0),
-      'East Pier River Railing'
     );
   }
 

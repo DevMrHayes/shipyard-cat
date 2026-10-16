@@ -713,6 +713,8 @@ export class RenderSubsystem {
     if (zonePositions && zonePositions.length > 0) {
       const savedPos = camera.position.clone();
       const savedRot = camera.rotation.clone();
+      const savedLookAt = this.currentLookAt.clone();
+      const savedCamPos = this.currentCameraPos.clone();
 
       for (const pos of zonePositions) {
         camera.position.set(pos.x, pos.y + 1.5, pos.z);
@@ -728,6 +730,8 @@ export class RenderSubsystem {
 
       camera.position.copy(savedPos);
       camera.rotation.copy(savedRot);
+      this.currentCameraPos.copy(savedCamPos);
+      this.currentLookAt.copy(savedLookAt);
       camera.updateMatrixWorld(true);
     }
 
