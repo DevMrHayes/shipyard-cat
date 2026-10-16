@@ -1,7 +1,5 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
-import { TextureGenerator } from '../core/TextureGenerator';
-import { ModelManager } from '../core/ModelManager';
 import { DiurnalSystem, ShiftInfo } from '../systems/DiurnalSystem';
 
 export interface ScreenProjection {
@@ -16,7 +14,8 @@ export interface RenderEvents {
 
 /**
  * RenderSubsystem: Encapsulates the WebGL rendering pipeline, Three.js camera,
- * spring-arm collision avoidance, indoor/outdoor clamping, golden-hour sun,
+ * spring-arm collision avoidance, indoor/outdoor clamping, dynamic industrial atmospheric fog,
+ * diurnal shift lighting with distance falloff high-mast floodlights,
  * shadow cascades, impact sparks particle simulation, and shader pre-warming.
  */
 export class RenderSubsystem {
@@ -51,17 +50,64 @@ export class RenderSubsystem {
   public subShopFlood: THREE.SpotLight;
   public riverFlood: THREE.DirectionalLight;
 
+  // Atmospheric Fog & Palettes
   public static readonly normalBgColor = new THREE.Color(0x131d2e);
   public static readonly sonarBgColor = new THREE.Color(0x021726);
-  public normalFog = new THREE.FogExp2(0x131d2e, 0.0075);
-  public sonarFog = new THREE.Fog(0x021726, 40, 300);
+  public static readonly dayFogColor = new THREE.Color(0x768ca0);
+  public static readonly duskFogColor = new THREE.Color(0x382c3e);
+  public static readonly nightFogColor = new THREE.Color(0x030814);
+
+  public normalFog: THREE.FogExp2;
+  public sonarFog: THREE.Fog;
   public isNightMode: boolean = false;
   public diurnalSystem!: DiurnalSystem;
 
-  public updateDiurnal(deltaTime: number): ShiftInfo {
+  private targetFogColor: THREE.Color = new THREE.Color(0x768ca0);
+  private currentFogColor: THREE.Color = new THREE.Color(0x768ca0);
+  private targetFogDensity: number = 0.0055;
+  private currentFogDensity: number = 0.0055;
+
+  public updateDiurnal(deltaTime: number, scene?: THREE.Scene): ShiftInfo {
     const info = this.diurnalSystem.update(deltaTime);
     this.isNightMode = info.isNight;
+
+    // Dynamic industrial exponential fog transitions based on solar cycle
+    if (!this.isWhiskersMode && scene) {
+      this.updateAtmosphericFog(deltaTime, info, scene);
+    }
+
     return info;
+  }
+
+  /**
+   * Smoothly interpolate industrial atmospheric exponential fog with diurnal cycle
+   */
+  private updateAtmosphericFog(deltaTime: number, info: ShiftInfo, scene: THREE.Scene): void {
+    const timeNorm = info.cycleProgress; // 0.0 - 1.0 (0=Dawn, 0.25=Noon, 0.5=Dusk, 0.75=Midnight)
+
+    if (info.isNight) {
+      this.targetFogColor.copy(RenderSubsystem.nightFogColor);
+      this.targetFogDensity = 0.0085; // Heavier maritime haze on night shift
+    } else if (timeNorm > 0.42 && timeNorm < 0.6) {
+      // Golden hour / Dusk shift
+      this.targetFogColor.copy(RenderSubsystem.duskFogColor);
+      this.targetFogDensity = 0.0068;
+    } else {
+      // Daytime industrial atmospheric haze
+      this.targetFogColor.copy(RenderSubsystem.dayFogColor);
+      this.targetFogDensity = 0.005;
+    }
+
+    const lerpRate = Math.min(1.0, deltaTime * 1.5);
+    this.currentFogColor.lerp(this.targetFogColor, lerpRate);
+    this.currentFogDensity = THREE.MathUtils.lerp(this.currentFogDensity, this.targetFogDensity, lerpRate);
+
+    this.normalFog.color.copy(this.currentFogColor);
+    this.normalFog.density = this.currentFogDensity;
+
+    if (!scene.background || !(scene.background as any).isTexture) {
+      (scene.background as THREE.Color).copy(this.currentFogColor);
+    }
   }
 
   public setNightMode(isNight: boolean, scene: THREE.Scene): void {
@@ -70,24 +116,24 @@ export class RenderSubsystem {
       this.hemiLight.color.setHex(0x1e293b);
       this.hemiLight.groundColor.setHex(0x020617);
       this.hemiLight.intensity = 0.35;
-      if (this.ambientLight) this.ambientLight.intensity = 0.2;
+      if (this.ambientLight) this.ambientLight.intensity = 0.18;
 
       this.sunLight.color.setHex(0x60a5fa);
-      this.sunLight.intensity = 0.35;
+      this.sunLight.intensity = 0.3;
 
       this.fillLight.color.setHex(0x1e293b);
       this.fillLight.intensity = 0.15;
 
       this.riverFlood.intensity = 0.35;
 
-      // High-mast stadium floodlights burn brightly on night shift
-      this.southYardFlood.intensity = 6.5;
-      this.dryDockFlood.intensity = 7.5;
-      this.subShopFlood.intensity = 6.5;
+      // High-mast stadium floodlights with realistic quadratic/physical falloff
+      this.southYardFlood.intensity = 8.5;
+      this.dryDockFlood.intensity = 9.8;
+      this.subShopFlood.intensity = 8.5;
 
-      const nightBg = new THREE.Color(0x020617);
-      scene.background = nightBg;
-      scene.fog = new THREE.FogExp2(0x020617, 0.008);
+      this.targetFogColor.copy(RenderSubsystem.nightFogColor);
+      this.targetFogDensity = 0.0085;
+      scene.background = RenderSubsystem.nightFogColor;
       this.renderer.toneMappingExposure = 0.95;
     } else {
       this.hemiLight.color.setHex(0xcbd5e1);
@@ -95,19 +141,21 @@ export class RenderSubsystem {
       this.hemiLight.intensity = 1.35;
 
       this.sunLight.color.setHex(0xfff4e0);
-      this.sunLight.intensity = 2.45;
+      this.sunLight.intensity = 2.65;
 
       this.fillLight.color.setHex(0x38bdf8);
       this.fillLight.intensity = 1.4;
 
       this.riverFlood.intensity = 1.7;
 
-      this.southYardFlood.intensity = 2.4;
-      this.dryDockFlood.intensity = 2.8;
-      this.subShopFlood.intensity = 2.4;
+      // Realistic daylight standby floodlights
+      this.southYardFlood.intensity = 1.5;
+      this.dryDockFlood.intensity = 1.8;
+      this.subShopFlood.intensity = 1.5;
 
-      scene.background = RenderSubsystem.normalBgColor;
-      scene.fog = this.normalFog;
+      this.targetFogColor.copy(RenderSubsystem.dayFogColor);
+      this.targetFogDensity = 0.005;
+      scene.background = this.hdrSkyTexture ? this.hdrSkyTexture : RenderSubsystem.dayFogColor;
       this.renderer.toneMappingExposure = 1.05;
     }
   }
@@ -123,7 +171,7 @@ export class RenderSubsystem {
 
   public static readonly THERMAL_COLORS = {
     PREY_AMBER: new THREE.Color(0xff9500),       // Warm high-contrast amber/orange for mice & rats
-    KINGPIN_CRIMSON: new THREE.Color(0x991b1b),  // Deep menacing crimson silhouette for Rat Kingpin (replaces bright yellow)
+    KINGPIN_CRIMSON: new THREE.Color(0x991b1b),  // Deep menacing crimson silhouette for Rat Kingpin
     MUTANT_VIOLET: new THREE.Color(0xc026d3),    // Radioactive vibrant violet for mutants
     NEUTRAL_CYAN: new THREE.Color(0x06b6d4)      // Cool blueprint cyan
   };
@@ -159,10 +207,10 @@ export class RenderSubsystem {
       62,
       window.innerWidth / window.innerHeight,
       0.1,
-      600
+      650
     );
 
-    // 2. Setup WebGL Renderer (AAA Grade Pipeline)
+    // 2. Setup WebGL Renderer (High-Performance Industrial Pipeline)
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
@@ -175,58 +223,82 @@ export class RenderSubsystem {
 
     container.appendChild(this.renderer.domElement);
 
-    // 3. Scene Atmosphere
-    scene.background = RenderSubsystem.normalBgColor;
+    // 3. Dynamic Exponential Fog & Scene Atmosphere
+    this.normalFog = new THREE.FogExp2(RenderSubsystem.dayFogColor.getHex(), 0.0055);
+    this.sonarFog = new THREE.Fog(0x021726, 35, 280);
+
+    scene.background = RenderSubsystem.dayFogColor;
     scene.fog = this.normalFog;
 
     // 4. Setup Lighting
-    // Golden-hour sky & Slate navy ground bounce
     this.hemiLight = new THREE.HemisphereLight(0xcbd5e1, 0x1e293b, 1.35);
     scene.add(this.hemiLight);
 
-    // Calibrated golden sunset sun with crisp shadow cascade tracking
-    this.sunLight = new THREE.DirectionalLight(0xfff4e0, 2.45);
-    this.sunLight.position.set(45, 48, 25);
+    // Day Key Sun Light with high-fidelity shadow cascade configuration
+    this.sunLight = new THREE.DirectionalLight(0xfff4e0, 2.65);
+    this.sunLight.position.set(55, 60, 30);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
-    this.sunLight.shadow.bias = -0.0001;
-    this.sunLight.shadow.normalBias = 0.035;
+    this.sunLight.shadow.bias = -0.00012;
+    this.sunLight.shadow.normalBias = 0.045;
     this.sunLight.shadow.camera.near = 5;
-    this.sunLight.shadow.camera.far = 240;
-    this.sunLight.shadow.camera.left = -80;
-    this.sunLight.shadow.camera.right = 80;
-    this.sunLight.shadow.camera.top = 80;
-    this.sunLight.shadow.camera.bottom = -80;
+    this.sunLight.shadow.camera.far = 280;
+    this.sunLight.shadow.camera.left = -90;
+    this.sunLight.shadow.camera.right = 90;
+    this.sunLight.shadow.camera.top = 90;
+    this.sunLight.shadow.camera.bottom = -90;
     scene.add(this.sunLight);
 
-    // Cool maritime river fill light
+    // Cool maritime fill light
     this.fillLight = new THREE.DirectionalLight(0x38bdf8, 1.4);
     this.fillLight.position.set(-60, 45, -45);
     scene.add(this.fillLight);
 
-    // High-mast floodlights (Tightly scoped cones & distances to prevent full-scene fragment shading overlap)
-    this.southYardFlood = new THREE.SpotLight(0xff9922, 2.4, 42, Math.PI / 4, 0.45, 1.2);
-    this.southYardFlood.position.set(-20, 18, -15);
+    // High-mast floodlights with distance decay falloff
+    // South Yard Mast Light
+    this.southYardFlood = new THREE.SpotLight(0xffb74d, 2.4, 75, Math.PI / 4, 0.45, 1.8);
+    this.southYardFlood.position.set(-20, 24, -15);
     this.southYardFlood.target.position.set(-20, 0, -25);
+    this.southYardFlood.castShadow = true;
+    this.southYardFlood.shadow.mapSize.width = 1024;
+    this.southYardFlood.shadow.mapSize.height = 1024;
+    this.southYardFlood.shadow.bias = -0.0002;
+    this.southYardFlood.shadow.camera.near = 2;
+    this.southYardFlood.shadow.camera.far = 80;
     scene.add(this.southYardFlood, this.southYardFlood.target);
 
-    this.dryDockFlood = new THREE.SpotLight(0x60a5fa, 2.8, 48, Math.PI / 4.5, 0.35, 1.0);
-    this.dryDockFlood.position.set(20, 36, 25);
+    // Dry Dock Basin Floodlight
+    this.dryDockFlood = new THREE.SpotLight(0x93c5fd, 2.8, 90, Math.PI / 4.2, 0.35, 1.7);
+    this.dryDockFlood.position.set(25, 42, 25);
     this.dryDockFlood.target.position.set(20, 0, 30);
+    this.dryDockFlood.castShadow = true;
+    this.dryDockFlood.shadow.mapSize.width = 1024;
+    this.dryDockFlood.shadow.mapSize.height = 1024;
+    this.dryDockFlood.shadow.bias = -0.0002;
+    this.dryDockFlood.shadow.camera.near = 2;
+    this.dryDockFlood.shadow.camera.far = 95;
     scene.add(this.dryDockFlood, this.dryDockFlood.target);
 
-    this.subShopFlood = new THREE.SpotLight(0xfde047, 2.4, 38, Math.PI / 4, 0.3, 1.1);
-    this.subShopFlood.position.set(-30, 18, 45);
-    this.subShopFlood.target.position.set(-30, 0, 45);
+    // Heavy Fab & Sub MOF Tower Light
+    this.subShopFlood = new THREE.SpotLight(0xffedd5, 2.4, 80, Math.PI / 3.8, 0.4, 1.8);
+    this.subShopFlood.position.set(-45, 28, 60);
+    this.subShopFlood.target.position.set(-50, 0, 70);
+    this.subShopFlood.castShadow = true;
+    this.subShopFlood.shadow.mapSize.width = 1024;
+    this.subShopFlood.shadow.mapSize.height = 1024;
+    this.subShopFlood.shadow.bias = -0.0002;
+    this.subShopFlood.shadow.camera.near = 2;
+    this.subShopFlood.shadow.camera.far = 85;
     scene.add(this.subShopFlood, this.subShopFlood.target);
 
+    // River Waterfront Luminaire
     this.riverFlood = new THREE.DirectionalLight(0xbae6fd, 1.7);
     this.riverFlood.position.set(50, 30, 0);
     this.riverFlood.target.position.set(120, 0, 0);
     scene.add(this.riverFlood, this.riverFlood.target);
 
-    // 4B. Diurnal Celestial & Shift Progression System
+    // Diurnal Celestial & Shift Progression System
     const ambientFallback = new THREE.AmbientLight(0xffffff, 0.4);
     this.ambientLight = ambientFallback;
     scene.add(ambientFallback);
@@ -327,8 +399,7 @@ export class RenderSubsystem {
   }
 
   /**
-   * Set Whiskers Vision Sonar Blueprint mode vs normal maritime dusk sky,
-   * triggering the 35m expanding radial sonar pulse.
+   * Set Whiskers Vision Sonar Blueprint mode vs normal maritime sky
    */
   public setWhiskersMode(scene: THREE.Scene, active: boolean, originPos?: THREE.Vector3): void {
     this.isWhiskersMode = active;
@@ -336,7 +407,6 @@ export class RenderSubsystem {
       scene.background = RenderSubsystem.sonarBgColor;
       scene.fog = this.sonarFog;
 
-      // Trigger expanding radial sonar ripple wave from Alba's coordinates
       this.sonarWaveActive = true;
       this.sonarWaveElapsed = 0;
       this.sonarWaveRing.visible = true;
@@ -349,7 +419,7 @@ export class RenderSubsystem {
       if (this.hdrSkyTexture) {
         scene.background = this.hdrSkyTexture;
       } else {
-        scene.background = RenderSubsystem.normalBgColor;
+        scene.background = this.currentFogColor;
       }
       scene.fog = this.normalFog;
       this.sonarWaveActive = false;
@@ -364,7 +434,7 @@ export class RenderSubsystem {
 
   /**
    * Updates expanding 35m radial sonar wave and applies high-contrast thermal
-   * emissive signatures to prey (amber), Kingpin (gold), and mutants (violet).
+   * emissive signatures to prey (amber), Kingpin (crimson), and mutants (violet).
    */
   public updateWhiskersSonarWave(
     deltaTime: number,
@@ -374,7 +444,6 @@ export class RenderSubsystem {
     if (this.sonarWaveActive) {
       this.sonarWaveElapsed += deltaTime;
       const t = Math.min(1.0, this.sonarWaveElapsed / RenderSubsystem.SONAR_WAVE_DURATION);
-      // Ease-out cubic expansion to 35m
       const eased = 1.0 - Math.pow(1.0 - t, 3);
       const radius = Math.max(0.1, eased * RenderSubsystem.SONAR_WAVE_MAX_RADIUS);
 
@@ -482,7 +551,7 @@ export class RenderSubsystem {
   }
 
   /**
-   * Spring-Arm Camera Update with obstacle collision avoidance, indoor/outdoor room clamping,
+   * Spring-Arm Camera Update with obstacle collision avoidance, indoor/outdoor clamping,
    * camera shake, and exponential decay smoothing.
    */
   public updateCamera(
@@ -497,18 +566,16 @@ export class RenderSubsystem {
     }
 
     if (!isFreeLooking) {
-      // Smoothly re-center camera behind Alba with exponential decay
       const yawDecay = 1.0 - Math.exp(-4.5 * deltaTime);
       this.cameraYaw = THREE.MathUtils.lerp(this.cameraYaw, 0, yawDecay);
     }
 
-    // Interior boundary detection: Machine Shop No. 1, Cat Motel Hub & Heavy Steel Fab Super-Shop
+    // Facility boundary recognition
     const isInsideMachineShop = targetPos.x >= -56 && targetPos.x <= -34 && targetPos.z >= -38 && targetPos.z <= -2;
     const isInsideMotel = targetPos.x >= -62 && targetPos.x <= -48 && targetPos.z >= -71 && targetPos.z <= -59;
     const isInsideSteelSuperShop = targetPos.x >= -145 && targetPos.x <= -85 && targetPos.z >= 185 && targetPos.z <= 295;
     const isIndoors = isInsideMachineShop || isInsideMotel || isInsideSteelSuperShop;
 
-    // Comprehensive Shipyard Spatial Facility Recognition
     let currentLocation = 'Shipyard Grounds (South Yard)';
     if (isInsideMachineShop) {
       currentLocation = 'Machine Shop No. 1 (Mezzanine Catwalk)';
@@ -551,224 +618,4 @@ export class RenderSubsystem {
     const maxDesiredDist = isIndoors ? 1.8 : RenderSubsystem.DEFAULT_CAM_DIST;
     const totalHeading = catHeading + this.cameraYaw;
     const cosPitch = Math.cos(this.cameraPitch);
-    const dirX = -Math.sin(totalHeading) * cosPitch;
-    const dirY = Math.sin(this.cameraPitch);
-    const dirZ = -Math.cos(totalHeading) * cosPitch;
-
-    const rayDir = RenderSubsystem.scratchRayDir.set(dirX, dirY, dirZ).normalize();
-    const rayOrigin = RenderSubsystem.scratchRayOrigin.copy(rawLookTarget);
-
-    let targetAllowedDist = maxDesiredDist;
-    if (obstacleRaycastFn) {
-      const hitDistance = obstacleRaycastFn(rayOrigin, rayDir, maxDesiredDist);
-      if (hitDistance !== null && hitDistance < maxDesiredDist) {
-        targetAllowedDist = Math.max(
-          RenderSubsystem.MIN_CAM_DIST,
-          hitDistance - RenderSubsystem.CAM_COLLISION_OFFSET
-        );
-      }
-    }
-
-    // Asymmetric exponential spring damping:
-    // Smooth pull-in on obstacle occlusion (lambda=14), gentle restoration when clear (lambda=6)
-    const distLambda = targetAllowedDist < this.currentCamDist ? 14.0 : 6.0;
-    const distLerp = 1.0 - Math.exp(-distLambda * deltaTime);
-    this.currentCamDist += (targetAllowedDist - this.currentCamDist) * Math.min(1.0, distLerp);
-
-    const desiredCameraPos = RenderSubsystem.scratchDesiredCamPos.set(
-      rawLookTarget.x + rayDir.x * this.currentCamDist,
-      Math.max(targetPos.y + 0.45, rawLookTarget.y + rayDir.y * this.currentCamDist),
-      rawLookTarget.z + rayDir.z * this.currentCamDist
-    );
-
-    // Indoor Machine Shop room boundary clamping
-    if (isInsideMachineShop) {
-      desiredCameraPos.x = Math.max(-55.0, Math.min(-35.0, desiredCameraPos.x));
-      desiredCameraPos.z = Math.max(-37.0, Math.min(-3.0, desiredCameraPos.z));
-      desiredCameraPos.y = Math.max(0.4, Math.min(6.5, desiredCameraPos.y));
-    }
-
-    // Frame-rate independent exponential spring-arm smoothing
-    const camLerpFactor = 1.0 - Math.exp(-14.0 * deltaTime);
-    this.currentCameraPos.lerp(desiredCameraPos, Math.min(1.0, camLerpFactor));
-
-    // Apply dynamic camera shake from combat impacts
-    if (this.cameraShakeIntensity > 0) {
-      this.camera.position.x = this.currentCameraPos.x + (Math.random() - 0.5) * this.cameraShakeIntensity;
-      this.camera.position.y = this.currentCameraPos.y + (Math.random() - 0.5) * this.cameraShakeIntensity * 0.7;
-      this.camera.position.z = this.currentCameraPos.z + (Math.random() - 0.5) * this.cameraShakeIntensity;
-      this.cameraShakeIntensity = Math.max(0, this.cameraShakeIntensity - deltaTime * 3.5);
-    } else {
-      this.camera.position.copy(this.currentCameraPos);
-    }
-
-    // Smooth look-at target tracking
-    const lookLerpFactor = 1.0 - Math.exp(-16.0 * deltaTime);
-    this.currentLookAt.lerp(rawLookTarget, Math.min(1.0, lookLerpFactor));
-    this.camera.lookAt(this.currentLookAt);
-
-    // Keep sunlight shadow camera centered on Alba's quadrant with discrete texel snapping to eliminate shadow edge shimmering
-    const shadowTexelSnap = 0.25;
-    const snappedX = Math.round(targetPos.x / shadowTexelSnap) * shadowTexelSnap;
-    const snappedZ = Math.round(targetPos.z / shadowTexelSnap) * shadowTexelSnap;
-    this.sunLight.target.position.set(snappedX, 0, snappedZ);
-    this.sunLight.position.set(snappedX + 45, 48, snappedZ + 25);
-    this.sunLight.target.updateMatrixWorld();
-  }
-
-  /**
-   * Fast GPU Screen Coordinate Projection for 3D In-World UI Elements (Zero-Allocation)
-   */
-  public projectPoint(pos: THREE.Vector3, heightOffset: number): ScreenProjection {
-    const v = RenderSubsystem.scratchProjectVec.copy(pos);
-    v.y += heightOffset;
-    v.project(this.camera);
-
-    if (v.z < 1.0) {
-      const screenX = (v.x * 0.5 + 0.5) * window.innerWidth;
-      const screenY = (-(v.y * 0.5) + 0.5) * window.innerHeight;
-      if (screenX >= 20 && screenX <= window.innerWidth - 20 && screenY >= 20 && screenY <= window.innerHeight - 20) {
-        RenderSubsystem.scratchScreenProj.screenX = screenX;
-        RenderSubsystem.scratchScreenProj.screenY = screenY;
-        RenderSubsystem.scratchScreenProj.visible = true;
-        return RenderSubsystem.scratchScreenProj;
-      }
-    }
-
-    RenderSubsystem.scratchScreenProj.screenX = 0;
-    RenderSubsystem.scratchScreenProj.screenY = 0;
-    RenderSubsystem.scratchScreenProj.visible = false;
-    return RenderSubsystem.scratchScreenProj;
-  }
-
-  /**
-   * Handle viewport resize
-   */
-  public resize(): void {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
-  }
-
-  /**
-   * GPU Shader & Pipeline Pre-Warming:
-   * Asynchronously compiles all materials, uploads all textures to GPU VRAM,
-   * sweeps camera through all key shipyard facilities offscreen, flushes driver command buffers,
-   * and completely eliminates runtime hitching and multi-second WebGL shader compilation stalls.
-   */
-  public async warmupGPU(
-    scene: THREE.Scene,
-    camera: THREE.PerspectiveCamera,
-    zonePositions?: THREE.Vector3[],
-    onProgress?: (pct: number, stage: string) => void
-  ): Promise<void> {
-    this.isSceneReady = false;
-    onProgress?.(80, 'Uploading PBR Textures to GPU VRAM...');
-
-    // 1. Force GPU allocation & driver upload of all textures across the entire scene graph
-    const texturesToInit = new Set<THREE.Texture>();
-    const originalCullingStates = new Map<THREE.Object3D, boolean>();
-
-    scene.traverse((obj: THREE.Object3D) => {
-      originalCullingStates.set(obj, obj.frustumCulled);
-      obj.frustumCulled = false;
-
-      const mesh = obj as THREE.Mesh;
-      if (mesh.isMesh && mesh.material) {
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        for (const mat of mats) {
-          if (!mat) continue;
-          for (const key of Object.keys(mat)) {
-            const val = (mat as any)[key];
-            if (val && val.isTexture) {
-              texturesToInit.add(val);
-            }
-          }
-        }
-      }
-    });
-
-    texturesToInit.forEach((tex) => {
-      try {
-        this.renderer.initTexture(tex);
-      } catch {
-        // Fallback for custom or procedural textures
-      }
-    });
-
-    onProgress?.(88, 'Pre-Compiling WebGL Shaders & Linking GPU Driver Programs...');
-
-    // 2. Pre-compile using compileAsync across all materials with frustum culling disabled
-    scene.updateMatrixWorld(true);
-    camera.updateMatrixWorld(true);
-
-    if (typeof (this.renderer as any).compileAsync === 'function') {
-      await (this.renderer as any).compileAsync(scene, camera);
-    } else if (typeof this.renderer.compile === 'function') {
-      this.renderer.compile(scene, camera);
-    }
-
-    // 3. Multi-zone sweeps: Compile shadows & unique shader variants from different facility zones
-    if (zonePositions && zonePositions.length > 0) {
-      const savedPos = camera.position.clone();
-      const savedRot = camera.rotation.clone();
-      const savedLookAt = this.currentLookAt.clone();
-      const savedCamPos = this.currentCameraPos.clone();
-
-      for (const pos of zonePositions) {
-        camera.position.set(pos.x, pos.y + 1.5, pos.z);
-        camera.lookAt(pos.x + 10, pos.y + 1, pos.z + 10);
-        camera.updateMatrixWorld(true);
-
-        if (typeof (this.renderer as any).compileAsync === 'function') {
-          await (this.renderer as any).compileAsync(scene, camera);
-        } else if (typeof this.renderer.compile === 'function') {
-          this.renderer.compile(scene, camera);
-        }
-      }
-
-      camera.position.copy(savedPos);
-      camera.rotation.copy(savedRot);
-      this.currentCameraPos.copy(savedCamPos);
-      this.currentLookAt.copy(savedLookAt);
-      camera.updateMatrixWorld(true);
-    }
-
-    // 4. Restore original frustum culling states
-    originalCullingStates.forEach((cull, obj) => {
-      obj.frustumCulled = cull;
-    });
-
-    this.isSceneReady = true;
-    onProgress?.(98, 'GPU Pipeline Linked and Ready');
-  }
-
-  /**
-   * Render frame pass (Protected by isSceneReady gate)
-   */
-  public render(scene: THREE.Scene): void {
-    if (!this.isSceneReady) return;
-    this.renderer.render(scene, this.camera);
-  }
-
-  /**
-   * Dispose all WebGL resources, geometries, materials, and canvas elements
-   */
-  public dispose(): void {
-    if (this.sparkPoints) {
-      this.sparkPoints.geometry.dispose();
-      (this.sparkPoints.material as THREE.Material).dispose();
-    }
-
-    if (this.hdrSkyTexture) {
-      this.hdrSkyTexture.dispose();
-      this.hdrSkyTexture = null;
-    }
-
-    this.renderer.dispose();
-    if (this.renderer.domElement && this.renderer.domElement.parentElement) {
-      this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);
-    }
-  }
-}
+    const dirX = -Math.sin(totalHeading) * cosPitch

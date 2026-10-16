@@ -15,12 +15,43 @@ export interface SubmarineAndFabResult {
     position: THREE.Vector3;
     type: 'inspection' | 'catwalk' | 'submarine_sail' | 'fab_overhead';
   }[];
+  update: (delta: number, playerPos?: THREE.Vector3) => void;
+}
+
+interface SparkParticle {
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  life: number;
+  maxLife: number;
+  originIndex: number;
+}
+
+interface SteamParticle {
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  life: number;
+  maxLife: number;
+  scale: number;
+  origin: THREE.Vector3;
 }
 
 export class SubmarineAndFabExpansion {
   private group: THREE.Group;
   private colliders: ExpansionCollisionItem[];
   private interactivePoints: SubmarineAndFabResult['interactivePoints'];
+
+  // Particle systems & Dynamic FX references
+  private sparkGeometries: THREE.BufferGeometry[] = [];
+  private sparkPoints: THREE.Points[] = [];
+  private sparkParticles: SparkParticle[] = [];
+  private weldingLights: THREE.PointLight[] = [];
+  private weldingLightBases: { light: THREE.PointLight; baseIntensity: number; color: THREE.Color }[] = [];
+  private weldingEmitters: THREE.Vector3[] = [];
+
+  private steamGeometry!: THREE.BufferGeometry;
+  private steamPoints!: THREE.Points;
+  private steamParticles: SteamParticle[] = [];
+  private steamEmitters: THREE.Vector3[] = [];
 
   // Shared reusable materials to reduce draw calls and avoid runtime shader recompilation
   private materials: {
@@ -36,6 +67,7 @@ export class SubmarineAndFabExpansion {
     scaffoldMetal: THREE.MeshStandardMaterial;
     hazardStripe: THREE.MeshStandardMaterial;
     waterTrough: THREE.MeshStandardMaterial;
+    anechoicTileMaterial: THREE.MeshStandardMaterial;
   };
 
   constructor() {
@@ -58,10 +90,15 @@ export class SubmarineAndFabExpansion {
     const fabShopOrigin = new THREE.Vector3(-115, 0, 240);
     this.buildHeavySteelFabSuperShop(fabShopOrigin);
 
+    // 3. Dynamic Visual FX systems (Welding Sparks, Steam Columns)
+    this.initWeldingSparksFX(fabShopOrigin);
+    this.initSubmarineSteamVentFX(dryDock2Origin);
+
     return {
       group: this.group,
       colliders: this.colliders,
-      interactivePoints: this.interactivePoints
+      interactivePoints: this.interactivePoints,
+      update: (delta: number, playerPos?: THREE.Vector3) => this.update(delta, playerPos)
     };
   }
 
@@ -78,10 +115,23 @@ export class SubmarineAndFabExpansion {
       metalness: 0.15
     });
 
+    // Procedural Anechoic Rubber Acoustic Tiles Texture
+    const anechoicTileTexture = this.generateAnechoicTileTexture();
+
     const subHullBlack = new THREE.MeshStandardMaterial({
       color: 0x141619,
-      roughness: 0.35,
-      metalness: 0.8
+      roughness: 0.45,
+      metalness: 0.5,
+      bumpMap: anechoicTileTexture,
+      bumpScale: 0.035
+    });
+
+    const anechoicTileMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1b1e22,
+      roughness: 0.8,
+      metalness: 0.25,
+      bumpMap: anechoicTileTexture,
+      bumpScale: 0.05
     });
 
     const subHullRed = new THREE.MeshStandardMaterial({
@@ -93,7 +143,9 @@ export class SubmarineAndFabExpansion {
     const subSail = new THREE.MeshStandardMaterial({
       color: 0x181a1d,
       roughness: 0.4,
-      metalness: 0.75
+      metalness: 0.75,
+      bumpMap: anechoicTileTexture,
+      bumpScale: 0.03
     });
 
     const steelDark = new THREE.MeshStandardMaterial({
@@ -155,8 +207,57 @@ export class SubmarineAndFabExpansion {
       glassTranslucent,
       scaffoldMetal,
       hazardStripe,
-      waterTrough
+      waterTrough,
+      anechoicTileMaterial
     };
+  }
+
+  /**
+   * Generates a procedural high-resolution normal/bump texture representing the rectangular
+   * rubber acoustic anechoic tiles outfitted on Virginia-class nuclear attack submarines.
+   */
+  private generateAnechoicTileTexture(): THREE.CanvasTexture {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, size, size);
+
+    const tileCols = 16;
+    const tileRows = 32;
+    const tileW = size / tileCols;
+    const tileH = size / tileRows;
+
+    for (let y = 0; y < tileRows; y++) {
+      const offsetX = (y % 2 === 0) ? 0 : tileW * 0.5;
+      for (let x = -1; x <= tileCols; x++) {
+        const px = x * tileW + offsetX;
+        const py = y * tileH;
+
+        // Tile bevel & grooved perimeter seam
+        ctx.fillStyle = '#656565';
+        ctx.fillRect(px + 1, py + 1, tileW - 2, tileH - 2);
+
+        ctx.fillStyle = '#999999';
+        ctx.fillRect(px + 2, py + 2, tileW - 4, tileH - 4);
+
+        // Acoustic perforation dimple in tile center
+        ctx.fillStyle = '#404040';
+        ctx.beginPath();
+        ctx.arc(px + tileW / 2, py + tileH / 2, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(12, 24);
+    texture.needsUpdate = true;
+    return texture;
   }
 
   // =========================================================================
@@ -187,7 +288,6 @@ export class SubmarineAndFabExpansion {
     );
 
     // 2. Concrete Retaining Walls (Left, Right, End Gate)
-    // Left Wall
     const leftWallGeo = new THREE.BoxGeometry(wallThick, dockDepth + 1, dockLength);
     const leftWall = new THREE.Mesh(leftWallGeo, this.materials.concreteWall);
     leftWall.position.set(-dockWidth / 2 - wallThick / 2, -dockDepth / 2 + 0.5, 0);
@@ -201,7 +301,6 @@ export class SubmarineAndFabExpansion {
       'concrete'
     );
 
-    // Right Wall
     const rightWall = new THREE.Mesh(leftWallGeo, this.materials.concreteWall);
     rightWall.position.set(dockWidth / 2 + wallThick / 2, -dockDepth / 2 + 0.5, 0);
     rightWall.receiveShadow = true;
@@ -234,7 +333,7 @@ export class SubmarineAndFabExpansion {
     waterPlane.position.set(0, -dockDepth + 1.05, 0);
     dockGroup.add(waterPlane);
 
-    // 3. Virginia-Class Submarine Hull
+    // 3. Virginia-Class Submarine Hull with Anechoic Tile Details
     this.buildVirginiaClassSubmarine(dockGroup, dockDepth);
 
     // 4. Heavy Keel Blocking & Shores supporting the sub
@@ -253,14 +352,13 @@ export class SubmarineAndFabExpansion {
     // Virginia-class proportions: ~115m length, 10.4m beam
     const subLength = 115;
     const subRadius = 5.2;
-    const subCenterY = -dockDepth + 3.0 + subRadius; // Elevate on keel blocks
+    const subCenterY = -dockDepth + 3.0 + subRadius;
 
     subGroup.position.set(0, subCenterY, 0);
 
     // Main Cylindrical Pressure Hull
     const hullCylinderLen = subLength * 0.68;
-    const hullGeo = new THREE.CylinderGeometry(subRadius, subRadius, hullCylinderLen, 24, 1, false);
-    // Orient along Z axis
+    const hullGeo = new THREE.CylinderGeometry(subRadius, subRadius, hullCylinderLen, 32, 1, false);
     hullGeo.rotateX(Math.PI / 2);
 
     const mainHullUpper = new THREE.Mesh(hullGeo, this.materials.subHullBlack);
@@ -268,9 +366,12 @@ export class SubmarineAndFabExpansion {
     mainHullUpper.receiveShadow = true;
     subGroup.add(mainHullUpper);
 
+    // Anechoic Rubber Tile Outer Shell Overlay Bands
+    this.buildSubmarineAnechoicTilePanels(subGroup, subRadius, hullCylinderLen);
+
     // Rounded Teardrop Bow
     const bowRadiusZ = 18;
-    const bowGeo = new THREE.SphereGeometry(subRadius, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    const bowGeo = new THREE.SphereGeometry(subRadius, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2);
     bowGeo.scale(1, 1, bowRadiusZ / subRadius);
     bowGeo.rotateX(-Math.PI / 2);
     const bowMesh = new THREE.Mesh(bowGeo, this.materials.subHullBlack);
@@ -280,7 +381,7 @@ export class SubmarineAndFabExpansion {
 
     // Tapered Stern Cone
     const sternLength = 22;
-    const sternGeo = new THREE.ConeGeometry(subRadius, sternLength, 24, 1, true);
+    const sternGeo = new THREE.ConeGeometry(subRadius, sternLength, 32, 1, true);
     sternGeo.rotateX(-Math.PI / 2);
     const sternMesh = new THREE.Mesh(sternGeo, this.materials.subHullBlack);
     sternMesh.position.set(0, 0, hullCylinderLen / 2 + sternLength / 2);
@@ -288,7 +389,7 @@ export class SubmarineAndFabExpansion {
     subGroup.add(sternMesh);
 
     // Propulsor Pump-Jet Shroud (Propulsion at stern)
-    const propShroudGeo = new THREE.CylinderGeometry(2.2, 2.6, 4.5, 16, 1, true);
+    const propShroudGeo = new THREE.CylinderGeometry(2.2, 2.6, 4.5, 20, 1, true);
     propShroudGeo.rotateX(Math.PI / 2);
     const propShroud = new THREE.Mesh(propShroudGeo, this.materials.steelDark);
     propShroud.position.set(0, 0, hullCylinderLen / 2 + sternLength + 2.2);
@@ -351,6 +452,46 @@ export class SubmarineAndFabExpansion {
     parent.add(subGroup);
   }
 
+  /**
+   * Builds high-detail 3D acoustic anechoic tile matrix bands along the dorsal and lateral spine
+   * of the submarine hull to realistically reflect Virginia-class rubberized sound dampening.
+   */
+  private buildSubmarineAnechoicTilePanels(parent: THREE.Group, hullRadius: number, cylinderLen: number): void {
+    const tileGroup = new THREE.Group();
+    tileGroup.name = 'AnechoicTileArrays';
+
+    const segmentCount = 14;
+    const segmentLength = 4.2;
+    const tileWidth = 2.4;
+    const tileThickness = 0.08;
+
+    const tileGeo = new THREE.BoxGeometry(tileWidth, tileThickness, segmentLength);
+
+    for (let i = 0; i < segmentCount; i++) {
+      const zOffset = -cylinderLen * 0.45 + i * (cylinderLen * 0.9 / segmentCount);
+
+      // Top Dorsal spine tiles
+      const dorsalTile = new THREE.Mesh(tileGeo, this.materials.anechoicTileMaterial);
+      dorsalTile.position.set(0, hullRadius + tileThickness * 0.5, zOffset);
+      dorsalTile.castShadow = true;
+      tileGroup.add(dorsalTile);
+
+      // Port side tile band
+      const portTile = new THREE.Mesh(tileGeo, this.materials.anechoicTileMaterial);
+      portTile.position.set(-hullRadius * 0.92, hullRadius * 0.38, zOffset);
+      portTile.rotation.z = Math.PI / 3;
+      tileGroup.add(portTile);
+
+      // Starboard side tile band
+      const stbdTile = new THREE.Mesh(tileGeo, this.materials.anechoicTileMaterial);
+      stbdTile.position.set(hullRadius * 0.92, hullRadius * 0.38, zOffset);
+      stbdTile.rotation.z = -Math.PI / 3;
+      tileGroup.add(stbdTile);
+    }
+
+    parent.add(tileGroup);
+  }
+
   private buildDockCribbingAndShores(parent: THREE.Group, dockLength: number, dockDepth: number, dockWidth: number): void {
     const cribGeo = new THREE.BoxGeometry(4.8, 2.2, 2.6);
     const cribCount = 22;
@@ -364,18 +505,15 @@ export class SubmarineAndFabExpansion {
       parent.add(crib);
     }
 
-    // Bilge Shores / Side Bracing Struts angled from dock wall to submarine hull
     const shoreGeo = new THREE.CylinderGeometry(0.25, 0.25, dockWidth * 0.36, 8);
     const shorePairs = 6;
     for (let j = 0; j < shorePairs; j++) {
       const z = -40 + j * 16;
-      // Left Shore
       const shoreL = new THREE.Mesh(shoreGeo, this.materials.scaffoldMetal);
       shoreL.position.set(-dockWidth * 0.32, -dockDepth + 4.8, z);
       shoreL.rotation.z = Math.PI / 3.8;
       parent.add(shoreL);
 
-      // Right Shore
       const shoreR = new THREE.Mesh(shoreGeo, this.materials.scaffoldMetal);
       shoreR.position.set(dockWidth * 0.32, -dockDepth + 4.8, z);
       shoreR.rotation.z = -Math.PI / 3.8;
@@ -390,14 +528,12 @@ export class SubmarineAndFabExpansion {
     dockLength: number,
     dockDepth: number
   ): void {
-    // Scaffold towers alongside hull for staging
     const platformY = -dockDepth * 0.45;
     const platformWidth = 3.0;
     const platformLength = dockLength * 0.75;
 
     const catwalkGeo = new THREE.BoxGeometry(platformWidth, 0.4, platformLength);
 
-    // Port staging catwalk
     const portCatwalk = new THREE.Mesh(catwalkGeo, this.materials.catwalkGrating);
     portCatwalk.position.set(-dockWidth * 0.36, platformY, 0);
     portCatwalk.castShadow = true;
@@ -409,7 +545,6 @@ export class SubmarineAndFabExpansion {
       'catwalk'
     );
 
-    // Starboard staging catwalk
     const stbdCatwalk = new THREE.Mesh(catwalkGeo, this.materials.catwalkGrating);
     stbdCatwalk.position.set(dockWidth * 0.36, platformY, 0);
     stbdCatwalk.castShadow = true;
@@ -421,7 +556,6 @@ export class SubmarineAndFabExpansion {
       'catwalk'
     );
 
-    // Gangway bridge connecting ground level (Y=0) to the submarine deck
     const gangwayLength = dockWidth * 0.55;
     const gangwayGeo = new THREE.BoxGeometry(gangwayLength, 0.35, 2.4);
     const gangway = new THREE.Mesh(gangwayGeo, this.materials.steelYellow);
@@ -435,7 +569,6 @@ export class SubmarineAndFabExpansion {
       'catwalk'
     );
 
-    // Interactive Gangway Entry Point
     this.interactivePoints.push({
       name: 'Dry Dock 2 Submarine Access Gangway',
       position: new THREE.Vector3(dockOrigin.x - dockWidth * 0.45, dockOrigin.y + 0.5, dockOrigin.z - 18),
@@ -452,9 +585,9 @@ export class SubmarineAndFabExpansion {
     shopGroup.position.copy(origin);
     shopGroup.name = 'HeavySteelFabSuperShop';
 
-    const bldWidth = 65;   // X span
-    const bldLength = 100; // Z span
-    const bldHeight = 24;  // Y clearance
+    const bldWidth = 65;
+    const bldLength = 100;
+    const bldHeight = 24;
     const wallThick = 1.2;
 
     // 1. Reinforced High-Load Concrete Slab
@@ -471,7 +604,6 @@ export class SubmarineAndFabExpansion {
     );
 
     // 2. Main Outer Structural Walls with Giant Roll-Up Hull Transport Bay Doors
-    // Back Wall (Z: -bldLength/2)
     const backWallGeo = new THREE.BoxGeometry(bldWidth, bldHeight, wallThick);
     const backWall = new THREE.Mesh(backWallGeo, this.materials.concreteWall);
     backWall.position.set(0, bldHeight / 2, -bldLength / 2);
@@ -484,7 +616,6 @@ export class SubmarineAndFabExpansion {
       'concrete'
     );
 
-    // Left Long Wall (X: -bldWidth/2)
     const sideWallGeo = new THREE.BoxGeometry(wallThick, bldHeight, bldLength);
     const leftWall = new THREE.Mesh(sideWallGeo, this.materials.concreteWall);
     leftWall.position.set(-bldWidth / 2, bldHeight / 2, 0);
@@ -497,7 +628,6 @@ export class SubmarineAndFabExpansion {
       'concrete'
     );
 
-    // Right Long Wall (X: +bldWidth/2) with clerestory industrial window bands
     const rightWall = new THREE.Mesh(sideWallGeo, this.materials.concreteWall);
     rightWall.position.set(bldWidth / 2, bldHeight / 2, 0);
     rightWall.castShadow = true;
@@ -553,158 +683,3 @@ export class SubmarineAndFabExpansion {
     const roof = new THREE.Mesh(roofGeo, this.materials.steelDark);
     roof.position.set(0, bldHeight + 0.5, 0);
     shopGroup.add(roof);
-
-    this.registerBoxCollider(
-      new THREE.Vector3(origin.x, origin.y + bldHeight + 0.5, origin.z),
-      new THREE.Vector3(bldWidth + 2, 1.0, bldLength + 2),
-      'metal'
-    );
-
-    // 4. Heavy Overhead Gantry Crane Rail & Bridge inside the Shop
-    this.buildShopOverheadCrane(shopGroup, origin, bldWidth, bldLength, bldHeight);
-
-    // 5. Interior Curving Hull Ring Sections & Hydraulic Welding Jigs
-    this.buildInteriorFabricationFixtures(shopGroup, origin);
-
-    this.group.add(shopGroup);
-  }
-
-  private buildShopOverheadCrane(
-    parent: THREE.Group,
-    shopOrigin: THREE.Vector3,
-    bldWidth: number,
-    bldLength: number,
-    bldHeight: number
-  ): void {
-    const craneRailY = bldHeight * 0.78;
-
-    // Longitudinal Rails along both walls
-    const railGeo = new THREE.BoxGeometry(1.2, 1.0, bldLength - 4);
-    const leftRail = new THREE.Mesh(railGeo, this.materials.steelYellow);
-    leftRail.position.set(-bldWidth / 2 + 2, craneRailY, 0);
-    parent.add(leftRail);
-
-    const rightRail = new THREE.Mesh(railGeo, this.materials.steelYellow);
-    rightRail.position.set(bldWidth / 2 - 2, craneRailY, 0);
-    parent.add(rightRail);
-
-    // Dual Gantry Cross Girder
-    const girderSpan = bldWidth - 6;
-    const girderGeo = new THREE.BoxGeometry(girderSpan, 2.2, 3.2);
-    const craneGirder = new THREE.Mesh(girderGeo, this.materials.steelYellow);
-    craneGirder.position.set(0, craneRailY + 1.2, -10);
-    craneGirder.castShadow = true;
-    parent.add(craneGirder);
-
-    // Crane Trolley & Heavy Hoist Block
-    const trolleyGeo = new THREE.BoxGeometry(4.2, 1.6, 3.8);
-    const trolley = new THREE.Mesh(trolleyGeo, this.materials.steelDark);
-    trolley.position.set(4, craneRailY + 2.8, -10);
-    parent.add(trolley);
-
-    // Walkable Gantry Catwalk on top of the Crane Bridge
-    this.registerBoxCollider(
-      new THREE.Vector3(shopOrigin.x, shopOrigin.y + craneRailY + 2.4, shopOrigin.z - 10),
-      new THREE.Vector3(girderSpan, 0.4, 3.2),
-      'catwalk'
-    );
-
-    this.interactivePoints.push({
-      name: 'Super-Shop 120-Ton Overhead Crane Girder',
-      position: new THREE.Vector3(shopOrigin.x, shopOrigin.y + craneRailY + 2.6, shopOrigin.z - 10),
-      type: 'fab_overhead'
-    });
-  }
-
-  private buildInteriorFabricationFixtures(parent: THREE.Group, shopOrigin: THREE.Vector3): void {
-    // Submarine Ring Module 1 (HY-80 Steel Cylinder Section in fixture)
-    const ringRadius = 5.1;
-    const ringLength = 12.0;
-    const ringThickness = 0.6;
-    const ringGeo = new THREE.CylinderGeometry(ringRadius, ringRadius, ringLength, 20, 1, true);
-    ringGeo.rotateX(Math.PI / 2);
-
-    const hullRingMesh = new THREE.Mesh(ringGeo, this.materials.steelDark);
-    hullRingMesh.position.set(-8, ringRadius + 1.2, 15);
-    hullRingMesh.castShadow = true;
-    parent.add(hullRingMesh);
-
-    this.registerBoxCollider(
-      new THREE.Vector3(shopOrigin.x - 8, shopOrigin.y + ringRadius + 1.2, shopOrigin.z + 15),
-      new THREE.Vector3(ringRadius * 2, ringRadius * 2, ringLength),
-      'metal'
-    );
-
-    // Ring Module 2 (Being turned on heavy hydraulic welding positioner roll beds)
-    const ring2 = new THREE.Mesh(ringGeo, this.materials.subHullRed);
-    ring2.position.set(12, ringRadius + 1.2, -22);
-    ring2.castShadow = true;
-    parent.add(ring2);
-
-    this.registerBoxCollider(
-      new THREE.Vector3(shopOrigin.x + 12, shopOrigin.y + ringRadius + 1.2, shopOrigin.z - 22),
-      new THREE.Vector3(ringRadius * 2, ringRadius * 2, ringLength),
-      'metal'
-    );
-
-    // Hydraulic Positioner Beds (Heavy Yellow pedestals under cylinders)
-    const rollerGeo = new THREE.BoxGeometry(6.5, 1.4, 4.0);
-    const roller1 = new THREE.Mesh(rollerGeo, this.materials.steelYellow);
-    roller1.position.set(-8, 0.7, 15);
-    parent.add(roller1);
-
-    const roller2 = new THREE.Mesh(rollerGeo, this.materials.steelYellow);
-    roller2.position.set(12, 0.7, -22);
-    parent.add(roller2);
-
-    // Inspection Elevated Staging Catwalk inside the shop
-    const stagingGeo = new THREE.BoxGeometry(8.0, 0.4, 18.0);
-    const staging = new THREE.Mesh(stagingGeo, this.materials.catwalkGrating);
-    staging.position.set(0, 3.5, 0);
-    staging.castShadow = true;
-    staging.receiveShadow = true;
-    parent.add(staging);
-
-    this.registerBoxCollider(
-      new THREE.Vector3(shopOrigin.x, shopOrigin.y + 3.5, shopOrigin.z),
-      new THREE.Vector3(8.0, 0.4, 18.0),
-      'catwalk'
-    );
-
-    this.interactivePoints.push({
-      name: 'Super-Shop Elevated Module Staging Catwalk',
-      position: new THREE.Vector3(shopOrigin.x, shopOrigin.y + 3.8, shopOrigin.z),
-      type: 'catwalk'
-    });
-  }
-
-  private registerBoxCollider(center: THREE.Vector3, size: THREE.Vector3, surfaceType: ExpansionCollisionItem['surfaceType'] = 'concrete', name?: string): void {
-    const halfSize = new THREE.Vector3(size.x / 2, size.y / 2, size.z / 2);
-    const box = new THREE.Box3(
-      new THREE.Vector3(center.x - halfSize.x, center.y - halfSize.y, center.z - halfSize.z),
-      new THREE.Vector3(center.x + halfSize.x, center.y + halfSize.y, center.z + halfSize.z)
-    );
-    this.colliders.push({ box, surfaceType, name });
-  }
-
-  public getColliders(): ExpansionCollisionItem[] {
-    return this.colliders;
-  }
-
-  public getWalkablePlatforms(): { minX: number; maxX: number; minZ: number; maxZ: number; height: number }[] {
-    const list: { minX: number; maxX: number; minZ: number; maxZ: number; height: number }[] = [];
-    for (const c of this.colliders) {
-      if (c.surfaceType === 'catwalk') {
-        list.push({
-          minX: c.box.min.x,
-          maxX: c.box.max.x,
-          minZ: c.box.min.z,
-          maxZ: c.box.max.z,
-          height: c.box.max.y
-        });
-      }
-    }
-    return list;
-  }
-}
-
