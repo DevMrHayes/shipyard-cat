@@ -47,6 +47,9 @@ namespace ShipyardCat.UI
         // Protocol Overlay
         private VisualElement _protocolPanel;
         private Button _protocolToggleButton;
+        private Button _protocolCloseButton;
+        private VisualElement _vitalsCard;
+        private VisualElement _toolbar;
         private bool _isProtocolVisible;
         private float _protocolHideTimer;
         private int _lastToggleFrame = -1;
@@ -148,6 +151,20 @@ namespace ShipyardCat.UI
             {
                 _protocolToggleButton.clicked -= ToggleProtocolOverlay;
             }
+
+            if (_protocolCloseButton != null)
+            {
+                _protocolCloseButton.clicked -= CloseProtocolOverlay;
+            }
+        }
+
+        private void CloseProtocolOverlay() => SetProtocolOverlayVisible(false);
+
+        public void SetGameplayHudVisible(bool visible)
+        {
+            var disp = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_vitalsCard != null) _vitalsCard.style.display = disp;
+            if (_toolbar != null) _toolbar.style.display = disp;
         }
 
         public void ToggleProtocolOverlay()
@@ -313,6 +330,12 @@ namespace ShipyardCat.UI
                 _protocolToggleButton.clicked += ToggleProtocolOverlay;
             }
 
+            if (_protocolCloseButton != null)
+            {
+                _protocolCloseButton.clicked -= CloseProtocolOverlay;
+                _protocolCloseButton.clicked += CloseProtocolOverlay;
+            }
+
             SetBossBarVisible(false);
             SetProtocolOverlayVisible(false);
             HideEndgameModal();
@@ -333,17 +356,20 @@ namespace ShipyardCat.UI
             _scoreLabel = _root.Q<Label>("score-label");
             _objectiveLabel = _root.Q<Label>("objective-label");
 
-            _bossContainer = _root.Q<VisualElement>("boss-container");
-            _bossBarFill = _root.Q<VisualElement>("boss-bar-fill");
-            _bossHpLabel = _root.Q<Label>("boss-hp-label");
+            _bossContainer = _root.Q<VisualElement>("boss-card") ?? _root.Q<VisualElement>("boss-container");
+            _bossBarFill = _root.Q<VisualElement>("boss-health-fill") ?? _root.Q<VisualElement>("boss-bar-fill");
+            _bossHpLabel = _root.Q<Label>("boss-health-label") ?? _root.Q<Label>("boss-hp-label");
 
-            _protocolPanel = _root.Q<VisualElement>("protocol-panel");
-            _protocolToggleButton = _root.Q<Button>("protocol-toggle-button");
+            _protocolPanel = _root.Q<VisualElement>("protocol-overlay") ?? _root.Q<VisualElement>("protocol-panel");
+            _protocolToggleButton = _root.Q<Button>("btn-protocol") ?? _root.Q<Button>("protocol-toggle-button");
+            _protocolCloseButton = _root.Q<Button>("btn-close-protocol");
+            _vitalsCard = _root.Q<VisualElement>("vitals-card");
+            _toolbar = _root.Q<VisualElement>("toolbar");
 
-            _endgameModal = _root.Q<VisualElement>("endgame-modal");
+            _endgameModal = _root.Q<VisualElement>("endgame-overlay") ?? _root.Q<VisualElement>("endgame-modal");
             _endgameTitle = _root.Q<Label>("endgame-title");
             _endgameSubtitle = _root.Q<Label>("endgame-subtitle");
-            _restartButton = _root.Q<Button>("restart-button");
+            _restartButton = _root.Q<Button>("btn-endgame-restart") ?? _root.Q<Button>("restart-button");
         }
 
         private void TryBindDomainSystems()

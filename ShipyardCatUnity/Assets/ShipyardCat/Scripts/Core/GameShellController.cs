@@ -201,6 +201,12 @@ namespace ShipyardCat.Core
                 _cameraRig.enabled = gameplayActive;
             }
 
+            var hudController = FindAnyObjectByType<ShipyardCat.UI.ShipyardHUDController>();
+            if (hudController != null)
+            {
+                hudController.SetGameplayHudVisible(gameplayActive);
+            }
+
             if (!gameplayActive)
             {
                 UnityEngine.Cursor.lockState = CursorLockMode.None;

@@ -54,11 +54,6 @@ namespace ShipyardCat.Player
 
         private void Update()
         {
-            if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame)
-            {
-                ToggleSonar();
-            }
-
             if (!IsSonarActive)
             {
                 return;

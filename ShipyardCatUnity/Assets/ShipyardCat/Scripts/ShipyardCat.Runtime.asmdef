@@ -1,0 +1,21 @@
+{
+  "name": "ShipyardCat.Runtime",
+  "rootNamespace": "ShipyardCat",
+  "references": [
+    "Unity.InputSystem",
+    "Unity.Services.Core",
+    "Unity.Services.Authentication",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.AI.Navigation"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

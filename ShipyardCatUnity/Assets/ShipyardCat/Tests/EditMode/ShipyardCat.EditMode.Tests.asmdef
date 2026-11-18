@@ -1,0 +1,26 @@
+{
+  "name": "ShipyardCat.EditMode.Tests",
+  "rootNamespace": "ShipyardCat.Tests",
+  "references": [
+    "ShipyardCat.Runtime",
+    "ShipyardCat.Editor",
+    "Unity.InputSystem",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

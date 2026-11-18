@@ -30,6 +30,16 @@ namespace ShipyardCat.Editor
             var existingHud = GameObject.Find("ShipyardHUD");
             if (existingHud != null) Object.DestroyImmediate(existingHud);
 
+            // Clean up any legacy root-level rats or bosses from earlier assemblies
+            foreach (var oldRat in Object.FindObjectsByType<RatPreyAI>(FindObjectsSortMode.None))
+            {
+                if (oldRat != null) Object.DestroyImmediate(oldRat.gameObject);
+            }
+            foreach (var oldBoss in Object.FindObjectsByType<KingpinBossAI>(FindObjectsSortMode.None))
+            {
+                if (oldBoss != null) Object.DestroyImmediate(oldBoss.gameObject);
+            }
+
             // 1. Create Materials Folder & URP Lit Materials from ShipyardPalette + 1K PBR Textures
             EnsureFolder("Assets/ShipyardCat/Materials");
             var urpLit = Shader.Find("Universal Render Pipeline/Lit");
@@ -152,6 +162,9 @@ namespace ShipyardCat.Editor
             radZone.IsSanctuary = false;
             radZone.Radius = 14f;
 
+            // 7b. Detailed Shipyard Landmarks (Tugboat Dorothy, East Pier, Cat Motel, Gate 4, Walkable Interiors)
+            ShipyardLandmarkBuilder.BuildAllLandmarks(walkableRoot.transform, concreteMat, steelMat, subMat, waterMat, safetyAmberMat, sanctuaryMat);
+
             // 8. High-Mast Stadium Floodlights
             var floodlights = new List<Light>();
             floodlights.Add(CreateFloodlight("Floodlight_SouthYard", worldRoot.transform, new Vector3(-20f, 26f, -30f)));
@@ -168,6 +181,11 @@ namespace ShipyardCat.Editor
             var managersGo = new GameObject("ShipyardManagers");
             var gameManager = managersGo.AddComponent<ShipyardGameManager>();
             var loopManager = managersGo.AddComponent<GameLoopManager>();
+            managersGo.AddComponent<MissionManager>();
+            managersGo.AddComponent<ProgressionSystem>();
+            managersGo.AddComponent<TacticalRadarController>();
+            managersGo.AddComponent<GeigerAudioSynth>();
+            managersGo.AddComponent<SpatialAudioWiring>();
 
             var diurnal = managersGo.AddComponent<DiurnalShiftManager>();
             var sunLight = GameObject.Find("ShipyardSunLight")?.GetComponent<Light>();
@@ -201,6 +219,7 @@ namespace ShipyardCat.Editor
             var vitals = albaGo.AddComponent<CatVitals>();
             var sonar = albaGo.AddComponent<WhiskersSonarController>();
             var albaCtrl = albaGo.AddComponent<AlbaController>();
+            albaGo.AddComponent<PounceTrajectoryVisualizer>();
 
             // Subtle warm rim/aura light on Alba so she separates cleanly from asphalt
             var albaLightGo = new GameObject("Alba_RimLight");
@@ -249,9 +268,13 @@ namespace ShipyardCat.Editor
                 camRig.SetTarget(albaGo.transform);
             }
 
+            var enemiesRoot = new GameObject("Enemies");
+            enemiesRoot.transform.SetParent(worldRoot.transform, false);
+
             // 12. Dockyard Kingpin Boss in Dry Dock 1 Basin (-45, -1.9, 25)
             var kingpinGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             kingpinGo.name = "DockyardKingpin_Boss";
+            kingpinGo.transform.SetParent(enemiesRoot.transform, false);
             kingpinGo.transform.position = new Vector3(-45f, -1.4f, 25f);
             kingpinGo.transform.localScale = new Vector3(1.8f, 1.3f, 2.2f);
             kingpinGo.GetComponent<Renderer>().sharedMaterial = kingpinMat;
@@ -274,6 +297,7 @@ namespace ShipyardCat.Editor
             for (int i = 0; i < ratSpawns.Length; i++)
             {
                 var ratGo = new GameObject($"RatPrey_{i + 1}");
+                ratGo.transform.SetParent(enemiesRoot.transform, false);
                 ratGo.transform.position = ratSpawns[i];
                 var col = ratGo.AddComponent<SphereCollider>();
                 col.radius = 0.45f;
@@ -310,6 +334,69 @@ namespace ShipyardCat.Editor
                 ratGo.AddComponent<UnityEngine.AI.NavMeshAgent>();
                 ratGo.AddComponent<RatPreyAI>();
             }
+
+            // 13b. Lieutenant Cobalt Boss on CVN-80 Flight Deck
+            var cobaltGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            cobaltGo.name = "LieutenantCobalt_Boss";
+            cobaltGo.transform.SetParent(enemiesRoot.transform, false);
+            cobaltGo.transform.position = new Vector3(15f, 6.2f, 65f);
+            cobaltGo.transform.localScale = new Vector3(1.1f, 0.85f, 1.3f);
+            cobaltGo.GetComponent<Renderer>().sharedMaterial = kingpinMat;
+            cobaltGo.AddComponent<UnityEngine.AI.NavMeshAgent>();
+            cobaltGo.AddComponent<LieutenantCobaltBossAI>();
+
+            // 13c. Mutant Cats (Scout, Prowler, Enforcer)
+            var mutantSpawns = new[]
+            {
+                (name: "MutantCat_Scout", pos: new Vector3(-95f, 0.3f, 80f)),
+                (name: "MutantCat_Prowler", pos: new Vector3(-135f, 0.3f, 140f)),
+                (name: "MutantCat_Enforcer", pos: new Vector3(-115f, 0.3f, 205f))
+            };
+            foreach (var m in mutantSpawns)
+            {
+                var mGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                mGo.name = m.name;
+                mGo.transform.SetParent(enemiesRoot.transform, false);
+                mGo.transform.position = m.pos;
+                mGo.transform.localScale = new Vector3(0.7f, 0.55f, 0.9f);
+                mGo.GetComponent<Renderer>().sharedMaterial = ratMat;
+                mGo.AddComponent<UnityEngine.AI.NavMeshAgent>();
+                mGo.AddComponent<MutantCatAI>();
+            }
+
+            // 13d. Shipbuilders, Colony Sanctuary Cats & Seagull Flock
+            var npcsRoot = new GameObject("ShipyardNPCs");
+            npcsRoot.transform.SetParent(worldRoot.transform, false);
+            var workerPositions = new[]
+            {
+                new Vector3(4f, 0.5f, -45f),
+                new Vector3(-18f, 0.5f, -25f),
+                new Vector3(20f, 0.5f, 26f),
+                new Vector3(-30f, 0.5f, 10f)
+            };
+            for (int w = 0; w < workerPositions.Length; w++)
+            {
+                var wGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                wGo.name = $"Shipbuilder_{w + 1}";
+                wGo.transform.SetParent(npcsRoot.transform, false);
+                wGo.transform.position = workerPositions[w];
+                wGo.GetComponent<Renderer>().sharedMaterial = safetyAmberMat;
+                wGo.AddComponent<ShipbuilderNPC>();
+            }
+            for (int c = 0; c < 3; c++)
+            {
+                var cGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                cGo.name = $"ColonyCat_{c + 1}";
+                cGo.transform.SetParent(npcsRoot.transform, false);
+                cGo.transform.position = new Vector3(16f + c * 2f, 0.35f, -26f);
+                cGo.transform.localScale = new Vector3(0.55f, 0.45f, 0.65f);
+                cGo.GetComponent<Renderer>().sharedMaterial = sanctuaryMat;
+                cGo.AddComponent<ColonyCatNPC>();
+            }
+            var flockGo = new GameObject("SeagullFlock");
+            flockGo.transform.SetParent(worldRoot.transform, false);
+            flockGo.transform.position = new Vector3(42f, 16f, 20f);
+            flockGo.AddComponent<SeagullFlock>();
 
             // 14. UI Toolkit HUD & GameShell Setup
             var panelPath = "Assets/ShipyardCat/Settings/ShipyardPanelSettings.asset";
