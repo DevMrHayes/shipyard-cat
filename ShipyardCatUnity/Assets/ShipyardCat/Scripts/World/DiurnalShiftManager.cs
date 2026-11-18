@@ -255,6 +255,13 @@ namespace ShipyardCat.World
             RenderSettings.fogDensity = fogDensity;
             RenderSettings.ambientLight = ambientColor;
 
+            var mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                mainCam.clearFlags = IsNight ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
+                mainCam.backgroundColor = fogColor;
+            }
+
             if (sunLight != null)
             {
                 sunLight.color = sunColor;

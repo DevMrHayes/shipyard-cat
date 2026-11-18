@@ -122,9 +122,11 @@ namespace ShipyardCat.Editor
             var fabShop = new GameObject("HeavySteelFabSuperShop");
             fabShop.transform.SetParent(worldRoot.transform);
             CreateBox("FabShop_Roof", fabShop.transform, new Vector3(-115f, 14f, 240f), new Vector3(52f, 1.2f, 82f), steelMat);
-            CreateBox("FabShop_WallW", fabShop.transform, new Vector3(-140.5f, 7f, 240f), new Vector3(1.2f, 14f, 82f), concreteMat);
-            CreateBox("FabShop_WallE", fabShop.transform, new Vector3(-89.5f, 7f, 240f), new Vector3(1.2f, 14f, 82f), concreteMat);
-            CreateBox("FabShop_WallN", fabShop.transform, new Vector3(-115f, 7f, 280.5f), new Vector3(52f, 14f, 1.2f), concreteMat);
+            CreateBox("FabShop_WallW", fabShop.transform, new Vector3(-140.5f, 7f, 240f), new Vector3(1.2f, 14f, 82f), steelMat);
+            CreateBox("FabShop_WallE", fabShop.transform, new Vector3(-89.5f, 7f, 240f), new Vector3(1.2f, 14f, 82f), steelMat);
+            CreateBox("FabShop_WallN", fabShop.transform, new Vector3(-115f, 7f, 280.5f), new Vector3(52f, 14f, 1.2f), steelMat);
+            CreateBox("FabShop_TrimSW", fabShop.transform, new Vector3(-140.5f, 7f, 199f), new Vector3(1.5f, 14.2f, 1.5f), safetyAmberMat);
+            CreateBox("FabShop_TrimSE", fabShop.transform, new Vector3(-89.5f, 7f, 199f), new Vector3(1.5f, 14.2f, 1.5f), safetyAmberMat);
             // Welding Spark Stations inside Super-Shop
             CreateVFXNode("FabShop_Welder_1", worldRoot.transform, new Vector3(-105f, 1.8f, 225f), WeldingAndSteamVFX.Mode.WeldingSparks);
             CreateVFXNode("FabShop_Welder_2", worldRoot.transform, new Vector3(-125f, 1.8f, 255f), WeldingAndSteamVFX.Mode.WeldingSparks);

@@ -210,12 +210,12 @@ namespace ShipyardCat.UI
 
             if (_ratsLabel != null)
             {
-                _ratsLabel.text = $"RATS CAUGHT: {vitals.RatsCaught}";
+                _ratsLabel.text = $"{vitals.RatsCaught} / 10";
             }
 
             if (_scoreLabel != null)
             {
-                _scoreLabel.text = $"SCORE: {vitals.Score:N0}";
+                _scoreLabel.text = $"{vitals.Score:N0}";
             }
 
             UpdateZoneDisplay(vitals.CurrentZone);
@@ -608,19 +608,19 @@ namespace ShipyardCat.UI
             switch (zone)
             {
                 case ShipyardZone.YardGeneral:
-                    return "ZONE: NNSB MAIN PIER";
+                    return "NNSB MAIN PIER";
                 case ShipyardZone.DryDock12_CVN80:
-                    return "ZONE: DRY DOCK 12 // CVN-80";
+                    return "DRY DOCK 12 // CVN-80";
                 case ShipyardZone.DryDock2_SSNVirginia:
-                    return "ZONE: DRY DOCK 2 // SSN RAD ZONE";
+                    return "DRY DOCK 2 // SSN RAD ZONE";
                 case ShipyardZone.HeavySteelFabShop:
-                    return "ZONE: HEAVY STEEL FAB SHOP";
+                    return "HEAVY STEEL FAB SHOP";
                 case ShipyardZone.CatHavenSanctuary:
-                    return "ZONE: CAT HAVEN SANCTUARY";
+                    return "CAT HAVEN SANCTUARY";
                 case ShipyardZone.DryDock1_KingpinBasin:
-                    return "ZONE: DRY DOCK 1 // KINGPIN BASIN";
+                    return "DRY DOCK 1 // KINGPIN BASIN";
                 default:
-                    return "ZONE: SHIPYARD";
+                    return "SHIPYARD";
             }
         }
 
