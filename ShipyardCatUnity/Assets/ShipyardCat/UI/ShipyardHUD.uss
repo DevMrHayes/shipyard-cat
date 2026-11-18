@@ -1,0 +1,341 @@
+/* Shipyard Cat - Industrial Naval Glassmorphic HUD Stylesheet (Unity 6 UI Toolkit) */
+
+.hidden {
+    display: none;
+}
+
+#hud-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    padding: 18px;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Top Row Layout */
+.hud-top-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+}
+
+/* Bottom Row Layout */
+.hud-bottom-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
+    width: 100%;
+}
+
+/* Glassmorphic Industrial Card */
+.glass-panel {
+    background-color: #0F172AE6;
+    border-width: 1px;
+    border-color: rgba(245, 158, 11, 0.45);
+    border-top-width: 2px;
+    border-top-color: #F59E0B;
+    border-radius: 6px;
+    padding: 12px 14px;
+}
+
+.panel-header {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: #F59E0B;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(245, 158, 11, 0.25);
+    padding-bottom: 4px;
+}
+
+/* Top-Left Vitals Card */
+.vitals-card {
+    width: 290px;
+}
+
+.vital-row {
+    margin-bottom: 8px;
+}
+
+.vital-row-last {
+    margin-bottom: 0;
+}
+
+.vital-label-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+}
+
+.vital-title {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: #CBD5E1;
+}
+
+.vital-value {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: #F8FAFC;
+}
+
+.progress-track {
+    height: 10px;
+    width: 100%;
+    background-color: rgba(15, 23, 42, 0.95);
+    border-width: 1px;
+    border-color: rgba(148, 163, 184, 0.25);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 100%;
+    border-radius: 2px;
+    transition-property: width;
+    transition-duration: 0.15s;
+}
+
+#health-bar-fill {
+    background-color: #EF4444;
+}
+
+#stamina-bar-fill {
+    background-color: #F59E0B;
+}
+
+#rad-bar-fill {
+    background-color: #06B6D4;
+    width: 0%;
+}
+
+/* Top-Center Kingpin Boss Bar */
+#boss-container {
+    width: 440px;
+    background-color: #0F172AE6;
+    border-width: 1px;
+    border-color: rgba(239, 68, 68, 0.65);
+    border-top-width: 3px;
+    border-top-color: #EF4444;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-left: 12px;
+    margin-right: 12px;
+}
+
+.boss-header-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.boss-title {
+    font-size: 13px;
+    -unity-font-style: bold;
+    color: #FCA5A5;
+    letter-spacing: 1px;
+}
+
+#boss-hp-label {
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: #FEF2F2;
+}
+
+.boss-track {
+    height: 14px;
+    width: 100%;
+    background-color: rgba(30, 10, 15, 0.95);
+    border-width: 1px;
+    border-color: rgba(239, 68, 68, 0.5);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+#boss-bar-fill {
+    height: 100%;
+    width: 100%;
+    background-color: #EF4444;
+    transition-property: width;
+    transition-duration: 0.12s;
+}
+
+/* Top-Right Telemetry Card */
+.telemetry-card {
+    width: 310px;
+}
+
+.telemetry-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.telemetry-key {
+    font-size: 11px;
+    color: #94A3B8;
+}
+
+.telemetry-val {
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: #F8FAFC;
+}
+
+#shift-label {
+    color: #F59E0B;
+}
+
+#zone-label {
+    color: #06B6D4;
+}
+
+#rats-label {
+    color: #34D399;
+}
+
+#score-label {
+    color: #FBBF24;
+}
+
+.objective-box {
+    margin-top: 6px;
+    padding: 7px 9px;
+    background-color: rgba(6, 182, 212, 0.10);
+    border-left-width: 3px;
+    border-left-color: #06B6D4;
+    border-radius: 3px;
+}
+
+.objective-heading {
+    font-size: 10px;
+    -unity-font-style: bold;
+    color: #06B6D4;
+    margin-bottom: 2px;
+}
+
+#objective-label {
+    font-size: 12px;
+    color: #E2E8F0;
+    white-space: normal;
+}
+
+/* Bottom-Left Collapsible [F1] Protocol Overlay */
+#protocol-panel {
+    width: 320px;
+}
+
+.protocol-item {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.protocol-key {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: #F59E0B;
+    background-color: rgba(245, 158, 11, 0.14);
+    border-width: 1px;
+    border-color: rgba(245, 158, 11, 0.35);
+    border-radius: 3px;
+    padding: 1px 6px;
+    min-width: 68px;
+    -unity-text-align: middle-center;
+}
+
+.protocol-desc {
+    font-size: 11px;
+    color: #CBD5E1;
+    flex-grow: 1;
+    margin-left: 8px;
+}
+
+.protocol-footer {
+    margin-top: 4px;
+    font-size: 10px;
+    color: #64748B;
+}
+
+/* Bottom-Right Sonar Badge */
+.sonar-badge {
+    background-color: #0F172AE6;
+    border-width: 1px;
+    border-color: rgba(6, 182, 212, 0.55);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.sonar-badge-text {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: #06B6D4;
+}
+
+/* Center End-Game Modal */
+#endgame-modal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(2, 6, 23, 0.72);
+    justify-content: center;
+    align-items: center;
+}
+
+.endgame-card {
+    width: 420px;
+    background-color: #0F172AE6;
+    border-width: 2px;
+    border-color: #F59E0B;
+    border-radius: 8px;
+    padding: 24px 28px;
+    align-items: center;
+}
+
+#endgame-title {
+    font-size: 24px;
+    -unity-font-style: bold;
+    color: #F59E0B;
+    margin-bottom: 10px;
+    -unity-text-align: middle-center;
+}
+
+#endgame-subtitle {
+    font-size: 14px;
+    color: #E2E8F0;
+    margin-bottom: 20px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+}
+
+#restart-button {
+    height: 38px;
+    min-width: 190px;
+    background-color: #F59E0B;
+    color: #0F172A;
+    font-size: 13px;
+    -unity-font-style: bold;
+    border-width: 0;
+    border-radius: 4px;
+    padding: 6px 18px;
+}
+
+#restart-button:hover {
+    background-color: #FBBF24;
+}
+
+#restart-button:active {
+    background-color: #D97706;
+}
