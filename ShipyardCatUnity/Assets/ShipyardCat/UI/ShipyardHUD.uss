@@ -817,3 +817,120 @@ ProgressBar,
 .score-accent {
     color: #F59E0B;
 }
+
+/* Top Bar Single-Row Layout & Compact Pills */
+.top-bar-left {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    flex-grow: 1;
+}
+
+.top-bar-actions {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.stat-caption {
+    font-size: 10px;
+    color: #94A3B8;
+    -unity-font-style: bold;
+    margin-right: 5px;
+}
+
+.stat-subvalue {
+    font-size: 10px;
+    color: #CBD5E1;
+    margin-left: 5px;
+}
+
+.accent-amber { color: #F59E0B; }
+.accent-cyan { color: #06B6D4; }
+.accent-red { color: #EF4444; }
+
+.hud-btn {
+    padding: 4px 10px;
+    margin-left: 6px;
+    font-size: 11px;
+    min-height: 28px;
+}
+
+.hud-btn-amber {
+    border-color: #F59E0B;
+    color: #FDE68A;
+}
+
+.hud-btn-danger {
+    background-color: rgba(153, 27, 27, 0.85);
+    border-color: #EF4444;
+    color: #FEE2E2;
+}
+
+/* Vitals Card & Progress Meter Bars */
+.card-header {
+    font-size: 11px;
+    color: #F59E0B;
+    -unity-font-style: bold;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+}
+
+.meter-row {
+    margin-bottom: 6px;
+}
+
+.meter-row-compact {
+    margin-bottom: 0;
+}
+
+.meter-header {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.meter-label {
+    font-size: 10px;
+    color: #94A3B8;
+    -unity-font-style: bold;
+}
+
+.meter-value {
+    font-size: 10px;
+    color: #F8FAFC;
+    -unity-font-style: bold;
+}
+
+.meter-track {
+    height: 8px;
+    min-height: 8px;
+    width: 100%;
+    background-color: rgba(15, 23, 42, 0.95);
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: rgba(148, 163, 184, 0.25);
+    overflow: hidden;
+}
+
+.dual-meter-tracks {
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.meter-track-half {
+    width: 48%;
+}
+
+.meter-fill {
+    height: 100%;
+    width: 100%;
+    border-radius: 3px;
+}
+
+.fill-health { background-color: #EF4444; }
+.fill-stamina { background-color: #22C55E; }
+.fill-rad { background-color: #C026D3; width: 0%; }
+.fill-warmth { background-color: #F59E0B; width: 85%; }
+.fill-fullness { background-color: #38BDF8; width: 90%; }
+.fill-boss { background-color: #DC2626; }

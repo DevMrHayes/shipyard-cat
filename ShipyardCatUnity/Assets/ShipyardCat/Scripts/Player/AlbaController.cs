@@ -453,11 +453,6 @@ namespace ShipyardCat.Player
 
         private void ToggleNightShift()
         {
-            DiurnalShiftManager shiftManager = DiurnalShiftManager.Instance != null
-                ? DiurnalShiftManager.Instance
-                : FindAnyObjectByType<DiurnalShiftManager>();
-
-            shiftManager?.ToggleNightShift();
             OnToggleNightShiftRequested?.Invoke();
         }
 
