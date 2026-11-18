@@ -36,7 +36,7 @@ namespace ShipyardCat.Editor
             if (urpLit == null)
                 throw new System.Exception("Universal Render Pipeline/Lit shader not found.");
 
-            var asphaltMat = CreatePBRMaterial("AsphaltYardMat", urpLit, ShipyardPalette.CharcoalAsphalt,
+            var asphaltMat = CreatePBRMaterial("AsphaltYardMat", urpLit, new Color(0.32f, 0.35f, 0.40f),
                 "Assets/ShipyardCat/Imported/Textures/asphalt_diff_1k.jpg",
                 "Assets/ShipyardCat/Imported/Textures/asphalt_nor_1k.jpg",
                 "Assets/ShipyardCat/Imported/Textures/asphalt_ao_1k.jpg",
@@ -136,6 +136,14 @@ namespace ShipyardCat.Editor
             havenZone.IsSanctuary = true;
             havenZone.Radius = 7f;
 
+            // Cat Haven Canopy & Plaza Props near Spawn (-10, 0, -20) for rich silhouette & scale
+            CreateBox("CatHaven_CanopyRoof", worldRoot.transform, new Vector3(-15f, 2.8f, -45f), new Vector3(7f, 0.25f, 7f), safetyAmberMat);
+            CreateBox("CatHaven_PillarNW", worldRoot.transform, new Vector3(-18f, 1.4f, -48f), new Vector3(0.3f, 2.8f, 0.3f), steelMat);
+            CreateBox("CatHaven_PillarNE", worldRoot.transform, new Vector3(-12f, 1.4f, -48f), new Vector3(0.3f, 2.8f, 0.3f), steelMat);
+            CreateBox("CargoContainer_Navy1", worldRoot.transform, new Vector3(-2f, 1.3f, -26f), new Vector3(2.5f, 2.6f, 6.1f), waterMat);
+            CreateBox("CargoContainer_Amber2", worldRoot.transform, new Vector3(-2f, 1.3f, -18f), new Vector3(2.5f, 2.6f, 6.1f), safetyAmberMat);
+            CreateBox("CableSpool_Rack", worldRoot.transform, new Vector3(-18f, 0.8f, -15f), new Vector3(2.2f, 1.6f, 2.2f), steelMat);
+
             var vault = CreateBox("RadiationVault_Bunker", worldRoot.transform, new Vector3(45f, 3f, -60f), new Vector3(14f, 6f, 14f), safetyAmberMat);
             var radZone = vault.AddComponent<RadiationZone>();
             radZone.ZoneType = ShipyardZone.DryDock2_SSNVirginia;
@@ -191,6 +199,16 @@ namespace ShipyardCat.Editor
             var vitals = albaGo.AddComponent<CatVitals>();
             var sonar = albaGo.AddComponent<WhiskersSonarController>();
             var albaCtrl = albaGo.AddComponent<AlbaController>();
+
+            // Subtle warm rim/aura light on Alba so she separates cleanly from asphalt
+            var albaLightGo = new GameObject("Alba_RimLight");
+            albaLightGo.transform.SetParent(albaGo.transform, false);
+            albaLightGo.transform.localPosition = new Vector3(0f, 1.4f, -0.4f);
+            var albaLight = albaLightGo.AddComponent<Light>();
+            albaLight.type = LightType.Point;
+            albaLight.color = ShipyardPalette.DaySunWarm;
+            albaLight.intensity = 2.4f;
+            albaLight.range = 8f;
 
             // Visual body for Alba (loads cat.glb or builds stylized feline fallback)
             var catPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ShipyardCat/Imported/Models/cat.glb");
@@ -315,6 +333,7 @@ namespace ShipyardCat.Editor
             if (uxml != null) uiDoc.visualTreeAsset = uxml;
             var hudCtrl = hudGo.AddComponent<ShipyardHUDController>();
             var shellCtrl = hudGo.AddComponent<GameShellController>();
+            shellCtrl.Configure(uiDoc, albaGo.transform, mainCam);
 
             // Save Scene & Assets
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/ShipyardMain.unity");

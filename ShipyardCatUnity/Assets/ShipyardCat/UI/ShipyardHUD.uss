@@ -734,3 +734,86 @@ ProgressBar,
     border-color: #FDE68A;
     color: #0F172A;
 }
+
+/* Explicit Progress Bar Tracks & Fills */
+.stat-row {
+    margin-bottom: 6px;
+}
+
+.stat-label-row {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+.stat-name {
+    font-size: 10px;
+    color: #94A3B8;
+    -unity-font-style: bold;
+}
+
+.stat-value {
+    font-size: 10px;
+    color: #F8FAFC;
+    -unity-font-style: bold;
+}
+
+.bar-track {
+    height: 8px;
+    min-height: 8px;
+    width: 100%;
+    background-color: rgba(15, 23, 42, 0.92);
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: rgba(148, 163, 184, 0.25);
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    width: 100%;
+    border-radius: 3px;
+}
+
+.health-fill {
+    background-color: #EF4444;
+}
+
+.stamina-fill {
+    background-color: #22C55E;
+}
+
+.rad-fill {
+    background-color: #C026D3;
+    width: 0%;
+}
+
+.tally-row {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top-width: 1px;
+    border-top-color: rgba(148, 163, 184, 0.2);
+}
+
+.tally-badge {
+    flex-direction: row;
+    align-items: center;
+}
+
+.tally-caption {
+    font-size: 10px;
+    color: #94A3B8;
+    margin-right: 4px;
+}
+
+.tally-number {
+    font-size: 13px;
+    color: #F8FAFC;
+    -unity-font-style: bold;
+}
+
+.score-accent {
+    color: #F59E0B;
+}

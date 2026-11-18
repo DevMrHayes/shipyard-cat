@@ -35,9 +35,9 @@ namespace ShipyardCat.Core
         [SerializeField] private Camera mainCamera;
 
         [Header("Title Camera Orbit")]
-        [SerializeField] private float orbitRadius = 38f;
-        [SerializeField] private float orbitHeight = 16f;
-        [SerializeField] private float orbitSpeedDeg = 6f;
+        [SerializeField] private float orbitRadius = 5.5f;
+        [SerializeField] private float orbitHeight = 1.9f;
+        [SerializeField] private float orbitSpeedDeg = 10f;
 
         private AlbaController _albaController;
         private Behaviour _cameraRig;
@@ -101,6 +101,12 @@ namespace ShipyardCat.Core
             if (CurrentState == GameState.TitleLogin)
             {
                 UpdateTitleOrbit();
+                var kb = UnityEngine.InputSystem.Keyboard.current;
+                if (kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame))
+                {
+                    BeginShift();
+                    return;
+                }
             }
 
             if (WasPausePressedThisFrame())

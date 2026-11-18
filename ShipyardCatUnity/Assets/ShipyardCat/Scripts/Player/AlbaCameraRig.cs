@@ -9,16 +9,16 @@ namespace ShipyardCat.Player
     public class AlbaCameraRig : MonoBehaviour
     {
         [SerializeField] private Transform target;
-        [SerializeField] private float distance = 4.2f;
-        [SerializeField] private float minDistance = 1.2f;
-        [SerializeField] private float heightOffset = 0.85f;
+        [SerializeField] private float distance = 2.6f;
+        [SerializeField] private float minDistance = 0.9f;
+        [SerializeField] private float heightOffset = 0.55f;
         [SerializeField] private float yawSpeed = 120f;
         [SerializeField] private float pitchSpeed = 80f;
-        [SerializeField] private float followSmooth = 12f;
+        [SerializeField] private float followSmooth = 14f;
         [SerializeField] private LayerMask collisionMask = ~0;
 
         private float _yaw = 0f;
-        private float _pitch = 18f;
+        private float _pitch = 12f;
         private float _currentDist;
 
         private void Awake()
