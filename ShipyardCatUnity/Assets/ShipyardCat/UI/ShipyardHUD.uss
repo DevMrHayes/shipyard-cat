@@ -1,4 +1,9 @@
-/* Shipyard Cat - Industrial Naval Glassmorphic HUD Stylesheet (Unity 6 UI Toolkit) */
+/* ShipyardHUD.uss - Dark Industrial Marine Theme (Unity 6 UI Toolkit) */
+
+* {
+    margin: 0;
+    padding: 0;
+}
 
 .hidden {
     display: none;
@@ -10,332 +15,722 @@
     top: 0;
     right: 0;
     bottom: 0;
-    padding: 18px;
+    width: 100%;
+    height: 100%;
     flex-direction: column;
     justify-content: space-between;
-}
-
-/* Top Row Layout */
-.hud-top-row {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-start;
-    width: 100%;
-}
-
-/* Bottom Row Layout */
-.hud-bottom-row {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-end;
-    width: 100%;
-}
-
-/* Glassmorphic Industrial Card */
-.glass-panel {
-    background-color: #0F172AE6;
-    border-width: 1px;
-    border-color: rgba(245, 158, 11, 0.45);
-    border-top-width: 2px;
-    border-top-color: #F59E0B;
-    border-radius: 6px;
-    padding: 12px 14px;
-}
-
-.panel-header {
-    font-size: 11px;
-    -unity-font-style: bold;
-    color: #F59E0B;
-    letter-spacing: 1px;
-    margin-bottom: 8px;
-    border-bottom-width: 1px;
-    border-bottom-color: rgba(245, 158, 11, 0.25);
-    padding-bottom: 4px;
-}
-
-/* Top-Left Vitals Card */
-.vitals-card {
-    width: 290px;
-}
-
-.vital-row {
-    margin-bottom: 8px;
-}
-
-.vital-row-last {
-    margin-bottom: 0;
-}
-
-.vital-label-row {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 3px;
-}
-
-.vital-title {
-    font-size: 11px;
-    -unity-font-style: bold;
-    color: #CBD5E1;
-}
-
-.vital-value {
-    font-size: 11px;
-    -unity-font-style: bold;
+    padding: 16px;
     color: #F8FAFC;
+    font-size: 14px;
 }
 
-.progress-track {
-    height: 10px;
-    width: 100%;
-    background-color: rgba(15, 23, 42, 0.95);
+/* Shared Panel / Card Styling */
+.panel-card,
+.hud-card {
+    background-color: rgba(15, 23, 42, 0.92);
+    border-color: rgba(245, 158, 11, 0.45);
     border-width: 1px;
-    border-color: rgba(148, 163, 184, 0.25);
-    border-radius: 3px;
-    overflow: hidden;
+    border-radius: 10px;
+    padding: 12px 16px;
 }
 
-.progress-fill {
-    height: 100%;
-    width: 100%;
-    border-radius: 2px;
-    transition-property: width;
-    transition-duration: 0.15s;
-}
-
-#health-bar-fill {
-    background-color: #EF4444;
-}
-
-#stamina-bar-fill {
-    background-color: #F59E0B;
-}
-
-#rad-bar-fill {
-    background-color: #06B6D4;
-    width: 0%;
-}
-
-/* Top-Center Kingpin Boss Bar */
-#boss-container {
-    width: 440px;
-    background-color: #0F172AE6;
-    border-width: 1px;
-    border-color: rgba(239, 68, 68, 0.65);
-    border-top-width: 3px;
-    border-top-color: #EF4444;
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-left: 12px;
-    margin-right: 12px;
-}
-
-.boss-header-row {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-}
-
-.boss-title {
+.card-title {
+    color: #F59E0B;
     font-size: 13px;
     -unity-font-style: bold;
-    color: #FCA5A5;
     letter-spacing: 1px;
+    margin-bottom: 8px;
 }
 
-#boss-hp-label {
+.muted-text {
+    color: #94A3B8;
     font-size: 12px;
-    -unity-font-style: bold;
-    color: #FEF2F2;
 }
 
-.boss-track {
-    height: 14px;
-    width: 100%;
-    background-color: rgba(30, 10, 15, 0.95);
-    border-width: 1px;
-    border-color: rgba(239, 68, 68, 0.5);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-#boss-bar-fill {
-    height: 100%;
-    width: 100%;
-    background-color: #EF4444;
-    transition-property: width;
-    transition-duration: 0.12s;
-}
-
-/* Top-Right Telemetry Card */
-.telemetry-card {
-    width: 310px;
-}
-
-.telemetry-row {
+/* Top Bar */
+#top-bar {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 5px;
+    background-color: rgba(15, 23, 42, 0.92);
+    border-color: rgba(245, 158, 11, 0.5);
+    border-width: 1px;
+    border-radius: 10px;
+    padding: 10px 16px;
+    min-height: 52px;
+    flex-shrink: 0;
 }
 
-.telemetry-key {
-    font-size: 11px;
+.top-stats-group {
+    flex-direction: row;
+    align-items: center;
+    flex-grow: 1;
+}
+
+.stat-pill {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgba(30, 41, 59, 0.85);
+    border-color: rgba(148, 163, 184, 0.25);
+    border-width: 1px;
+    border-radius: 6px;
+    padding: 5px 12px;
+    margin-right: 10px;
+}
+
+.stat-label {
     color: #94A3B8;
-}
-
-.telemetry-val {
-    font-size: 12px;
+    font-size: 11px;
     -unity-font-style: bold;
+    margin-right: 6px;
+}
+
+.stat-value {
     color: #F8FAFC;
-}
-
-#shift-label {
-    color: #F59E0B;
-}
-
-#zone-label {
-    color: #06B6D4;
-}
-
-#rats-label {
-    color: #34D399;
+    font-size: 14px;
+    -unity-font-style: bold;
 }
 
 #score-label {
-    color: #FBBF24;
-}
-
-.objective-box {
-    margin-top: 6px;
-    padding: 7px 9px;
-    background-color: rgba(6, 182, 212, 0.10);
-    border-left-width: 3px;
-    border-left-color: #06B6D4;
-    border-radius: 3px;
-}
-
-.objective-heading {
-    font-size: 10px;
+    color: #F59E0B;
+    font-size: 15px;
     -unity-font-style: bold;
+    margin-right: 14px;
+}
+
+#wave-label {
     color: #06B6D4;
-    margin-bottom: 2px;
+    font-size: 14px;
+    -unity-font-style: bold;
+    margin-right: 14px;
 }
 
-#objective-label {
-    font-size: 12px;
-    color: #E2E8F0;
-    white-space: normal;
+#integrity-label {
+    color: #22C55E;
+    font-size: 14px;
+    -unity-font-style: bold;
+    margin-right: 14px;
 }
 
-/* Bottom-Left Collapsible [F1] Protocol Overlay */
-#protocol-panel {
-    width: 320px;
+#vermin-label {
+    color: #EF4444;
+    font-size: 14px;
+    -unity-font-style: bold;
 }
 
-.protocol-item {
+.top-actions-group {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Buttons */
+Button,
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+    background-color: rgba(30, 41, 59, 0.95);
+    border-color: rgba(245, 158, 11, 0.6);
+    border-width: 1px;
+    border-radius: 8px;
+    color: #F8FAFC;
+    font-size: 13px;
+    -unity-font-style: bold;
+    padding: 8px 16px;
+    -unity-text-align: middle-center;
+    transition-property: background-color, border-color, color;
+    transition-duration: 0.12s;
+}
+
+Button:hover,
+.btn-secondary:hover {
+    background-color: rgba(245, 158, 11, 0.22);
+    border-color: #F59E0B;
+    color: #FEF3C7;
+}
+
+Button:active,
+.btn-secondary:active {
+    background-color: rgba(245, 158, 11, 0.38);
+    border-color: #FBBF24;
+}
+
+.btn-primary {
+    background-color: #F59E0B;
+    border-color: #FBBF24;
+    color: #0F172A;
+    font-size: 14px;
+    padding: 10px 22px;
+}
+
+.btn-primary:hover {
+    background-color: #FBBF24;
+    border-color: #FDE68A;
+    color: #0F172A;
+}
+
+.btn-primary:active {
+    background-color: #D97706;
+    border-color: #F59E0B;
+    color: #0F172A;
+}
+
+.btn-danger {
+    background-color: rgba(127, 29, 29, 0.85);
+    border-color: #EF4444;
+    color: #FEE2E2;
+}
+
+.btn-danger:hover {
+    background-color: #EF4444;
+    border-color: #FCA5A5;
+    color: #0F172A;
+}
+
+#btn-protocol {
+    margin-right: 8px;
+    border-color: rgba(6, 182, 212, 0.65);
+    color: #CFFAFE;
+}
+
+#btn-protocol:hover {
+    background-color: rgba(6, 182, 212, 0.25);
+    border-color: #06B6D4;
+}
+
+#btn-camera {
+    border-color: rgba(245, 158, 11, 0.65);
+}
+
+/* Middle HUD Layer */
+#hud-middle {
     flex-direction: row;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
+    align-items: flex-start;
+    flex-grow: 1;
+    margin-top: 12px;
+    margin-bottom: 12px;
 }
 
-.protocol-key {
+/* Vitals Card */
+#vitals-card {
+    background-color: rgba(15, 23, 42, 0.92);
+    border-color: rgba(245, 158, 11, 0.45);
+    border-width: 1px;
+    border-radius: 10px;
+    padding: 12px 14px;
+    width: 268px;
+    min-width: 240px;
+    flex-basis: 268px;
+    flex-shrink: 0;
+}
+
+.vital-row {
+    flex-direction: column;
+    margin-bottom: 8px;
+    width: 100%;
+}
+
+.vital-label {
+    color: #CBD5E1;
     font-size: 11px;
     -unity-font-style: bold;
-    color: #F59E0B;
-    background-color: rgba(245, 158, 11, 0.14);
+    margin-bottom: 3px;
+}
+
+/* Progress Bars (WebGL safe explicit widths) */
+ProgressBar,
+.unity-progress-bar {
+    width: 100%;
+    min-width: 180px;
+    flex-basis: 18px;
+    height: 18px;
+    min-height: 16px;
+}
+
+.unity-progress-bar__container {
+    width: 100%;
+    min-width: 180px;
+    height: 18px;
+    min-height: 16px;
+}
+
+.unity-progress-bar__background {
+    background-color: rgba(30, 41, 59, 0.95);
+    border-color: rgba(148, 163, 184, 0.3);
     border-width: 1px;
-    border-color: rgba(245, 158, 11, 0.35);
-    border-radius: 3px;
-    padding: 1px 6px;
-    min-width: 68px;
+    border-radius: 5px;
+    width: 100%;
+    height: 100%;
+}
+
+.unity-progress-bar__progress {
+    border-radius: 4px;
+    margin: 1px;
+}
+
+.unity-progress-bar__title {
+    color: #F8FAFC;
+    font-size: 10px;
+    -unity-font-style: bold;
     -unity-text-align: middle-center;
 }
 
-.protocol-desc {
-    font-size: 11px;
-    color: #CBD5E1;
-    flex-grow: 1;
-    margin-left: 8px;
+#bar-health {
+    width: 100%;
+    min-width: 210px;
+    flex-basis: 20px;
+    height: 20px;
+    margin-bottom: 6px;
 }
 
-.protocol-footer {
-    margin-top: 4px;
-    font-size: 10px;
-    color: #64748B;
+#bar-health .unity-progress-bar__progress {
+    background-color: #EF4444;
 }
 
-/* Bottom-Right Sonar Badge */
-.sonar-badge {
-    background-color: #0F172AE6;
+#bar-stamina {
+    width: 100%;
+    min-width: 210px;
+    flex-basis: 18px;
+    height: 18px;
+    margin-bottom: 6px;
+}
+
+#bar-stamina .unity-progress-bar__progress {
+    background-color: #22C55E;
+}
+
+#bar-focus {
+    width: 100%;
+    min-width: 210px;
+    flex-basis: 18px;
+    height: 18px;
+    margin-bottom: 6px;
+}
+
+#bar-focus .unity-progress-bar__progress {
+    background-color: #06B6D4;
+}
+
+#bar-warmth {
+    width: 100%;
+    min-width: 210px;
+    flex-basis: 18px;
+    height: 18px;
+    margin-bottom: 6px;
+}
+
+#bar-warmth .unity-progress-bar__progress {
+    background-color: #F59E0B;
+}
+
+#bar-fullness {
+    width: 100%;
+    min-width: 210px;
+    flex-basis: 18px;
+    height: 18px;
+}
+
+#bar-fullness .unity-progress-bar__progress {
+    background-color: #A855F7;
+}
+
+/* Boss Card */
+#boss-card {
+    background-color: rgba(15, 23, 42, 0.92);
+    border-color: rgba(239, 68, 68, 0.75);
     border-width: 1px;
-    border-color: rgba(6, 182, 212, 0.55);
-    border-radius: 6px;
-    padding: 8px 12px;
+    border-radius: 10px;
+    padding: 10px 16px;
+    width: 380px;
+    min-width: 320px;
+    flex-basis: 380px;
+    align-self: flex-start;
 }
 
-.sonar-badge-text {
-    font-size: 11px;
+#boss-name-label {
+    color: #FCA5A5;
+    font-size: 13px;
     -unity-font-style: bold;
-    color: #06B6D4;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    -unity-text-align: middle-center;
 }
 
-/* Center End-Game Modal */
-#endgame-modal {
+#bar-boss {
+    width: 100%;
+    min-width: 280px;
+    flex-basis: 22px;
+    height: 22px;
+}
+
+#bar-boss .unity-progress-bar__progress {
+    background-color: #EF4444;
+}
+
+/* Toast Banner */
+#toast-banner {
+    align-self: center;
+    background-color: rgba(15, 23, 42, 0.92);
+    border-color: #06B6D4;
+    border-width: 1px;
+    border-radius: 8px;
+    padding: 8px 20px;
+    color: #E0F2FE;
+    font-size: 13px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-bottom: 10px;
+}
+
+/* Bottom Dock */
+#bottom-dock {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-shrink: 0;
+}
+
+/* Toolbar & Slots */
+#toolbar {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgba(15, 23, 42, 0.92);
+    border-color: rgba(245, 158, 11, 0.45);
+    border-width: 1px;
+    border-radius: 10px;
+    padding: 8px 10px;
+}
+
+.toolbar-slot,
+#slot-0,
+#slot-1,
+#slot-2,
+#slot-3,
+#slot-4 {
+    width: 72px;
+    min-width: 68px;
+    height: 68px;
+    background-color: rgba(30, 41, 59, 0.9);
+    border-color: rgba(148, 163, 184, 0.35);
+    border-width: 1px;
+    border-radius: 8px;
+    margin-right: 8px;
+    padding: 6px;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    transition-property: background-color, border-color;
+    transition-duration: 0.12s;
+}
+
+#slot-4 {
+    margin-right: 0;
+}
+
+.toolbar-slot:hover,
+#slot-0:hover,
+#slot-1:hover,
+#slot-2:hover,
+#slot-3:hover,
+#slot-4:hover {
+    background-color: rgba(245, 158, 11, 0.18);
+    border-color: #F59E0B;
+}
+
+.toolbar-slot.active,
+.slot-active {
+    background-color: rgba(245, 158, 11, 0.25);
+    border-color: #F59E0B;
+    border-width: 2px;
+}
+
+/* Mission Card */
+#mission-card {
+    background-color: rgba(15, 23, 42, 0.92);
+    border-color: rgba(6, 182, 212, 0.55);
+    border-width: 1px;
+    border-radius: 10px;
+    padding: 12px 16px;
+    width: 310px;
+    min-width: 260px;
+    flex-basis: 310px;
+}
+
+#mission-title {
+    color: #06B6D4;
+    font-size: 13px;
+    -unity-font-style: bold;
+    letter-spacing: 0.8px;
+    margin-bottom: 4px;
+}
+
+#mission-desc {
+    color: #E2E8F0;
+    font-size: 12px;
+    white-space: normal;
+    margin-bottom: 6px;
+}
+
+#mission-progress {
+    color: #F59E0B;
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+/* Fullscreen Modal Overlays */
+.modal-overlay,
+#title-login-overlay,
+#pause-overlay,
+#protocol-overlay,
+#endgame-overlay {
     position: absolute;
     left: 0;
     top: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(2, 6, 23, 0.72);
+    width: 100%;
+    height: 100%;
+    background-color: rgba(7, 11, 20, 0.78);
     justify-content: center;
     align-items: center;
+    padding: 24px;
 }
 
-.endgame-card {
-    width: 420px;
-    background-color: #0F172AE6;
-    border-width: 2px;
+#title-login-overlay {
+    background-color: rgba(15, 23, 42, 0.42);
+}
+
+.modal-card,
+#title-login-card,
+#pause-card,
+#protocol-card,
+#endgame-card {
+    background-color: rgba(15, 23, 42, 0.92);
     border-color: #F59E0B;
-    border-radius: 8px;
+    border-width: 1px;
+    border-radius: 12px;
     padding: 24px 28px;
+    width: 440px;
+    min-width: 360px;
+    max-width: 560px;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.overlay-title {
+    color: #F59E0B;
+    font-size: 24px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+}
+
+.overlay-subtitle {
+    color: #06B6D4;
+    font-size: 12px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    letter-spacing: 1px;
+    margin-bottom: 18px;
+}
+
+#auth-status-label {
+    color: #06B6D4;
+    background-color: rgba(6, 182, 212, 0.12);
+    border-color: rgba(6, 182, 212, 0.4);
+    border-width: 1px;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    -unity-text-align: middle-center;
+    margin-bottom: 14px;
+}
+
+/* Callsign Input (Explicit flex-basis and width for WebGL Flexbox) */
+#callsign-input {
+    width: 100%;
+    min-width: 280px;
+    flex-basis: 42px;
+    height: 42px;
+    margin-bottom: 16px;
+    flex-direction: row;
     align-items: center;
 }
 
-#endgame-title {
-    font-size: 24px;
+#callsign-input .unity-text-field__label {
+    color: #CBD5E1;
+    font-size: 12px;
     -unity-font-style: bold;
-    color: #F59E0B;
-    margin-bottom: 10px;
-    -unity-text-align: middle-center;
+    min-width: 90px;
+    margin-right: 8px;
 }
 
-#endgame-subtitle {
+#callsign-input .unity-text-field__input {
+    background-color: rgba(30, 41, 59, 0.95);
+    border-color: rgba(245, 158, 11, 0.55);
+    border-width: 1px;
+    border-radius: 6px;
+    color: #F8FAFC;
     font-size: 14px;
-    color: #E2E8F0;
-    margin-bottom: 20px;
-    white-space: normal;
-    -unity-text-align: middle-center;
-}
-
-#restart-button {
-    height: 38px;
-    min-width: 190px;
-    background-color: #F59E0B;
-    color: #0F172A;
-    font-size: 13px;
     -unity-font-style: bold;
-    border-width: 0;
-    border-radius: 4px;
-    padding: 6px 18px;
+    padding: 6px 10px;
+    flex-grow: 1;
+    width: 220px;
+    min-width: 180px;
+    height: 36px;
 }
 
-#restart-button:hover {
+#callsign-input .unity-text-field__input:focus {
+    border-color: #06B6D4;
+}
+
+#btn-begin-shift {
+    width: 100%;
+    min-height: 44px;
+    background-color: #F59E0B;
+    border-color: #FBBF24;
+    color: #0F172A;
+    font-size: 15px;
+    -unity-font-style: bold;
+    letter-spacing: 1px;
+}
+
+#btn-begin-shift:hover {
+    background-color: #FBBF24;
+    border-color: #FDE68A;
+    color: #0F172A;
+}
+
+/* Pause Overlay Controls & Sliders */
+#music-slider,
+#sfx-slider {
+    width: 100%;
+    min-width: 280px;
+    flex-basis: 32px;
+    height: 32px;
+    margin-bottom: 12px;
+    flex-direction: row;
+    align-items: center;
+}
+
+#music-slider .unity-slider__label,
+#sfx-slider .unity-slider__label {
+    color: #CBD5E1;
+    font-size: 12px;
+    -unity-font-style: bold;
+    min-width: 110px;
+}
+
+#music-slider .unity-base-slider__input,
+#sfx-slider .unity-base-slider__input {
+    flex-grow: 1;
+    min-width: 160px;
+}
+
+.unity-base-slider__tracker {
+    background-color: rgba(30, 41, 59, 0.95);
+    border-color: rgba(148, 163, 184, 0.4);
+    border-width: 1px;
+    border-radius: 4px;
+    height: 8px;
+}
+
+.unity-base-slider__fill {
+    background-color: #06B6D4;
+    border-radius: 4px;
+}
+
+.unity-base-slider__dragger {
+    background-color: #F59E0B;
+    border-color: #FDE68A;
+    border-width: 1px;
+    border-radius: 8px;
+    width: 16px;
+    height: 16px;
+    margin-top: -4px;
+}
+
+.unity-base-slider__dragger:hover {
     background-color: #FBBF24;
 }
 
-#restart-button:active {
-    background-color: #D97706;
+#btn-resume {
+    background-color: #22C55E;
+    border-color: #4ADE80;
+    color: #0F172A;
+    margin-bottom: 10px;
+    min-height: 40px;
+}
+
+#btn-resume:hover {
+    background-color: #4ADE80;
+    border-color: #86EFAC;
+    color: #0F172A;
+}
+
+#btn-pause-restart {
+    margin-bottom: 10px;
+    min-height: 38px;
+}
+
+#btn-quit-title {
+    border-color: rgba(239, 68, 68, 0.7);
+    color: #FCA5A5;
+    min-height: 38px;
+}
+
+#btn-quit-title:hover {
+    background-color: rgba(239, 68, 68, 0.25);
+    border-color: #EF4444;
+    color: #FEE2E2;
+}
+
+/* Protocol & Endgame Overlays */
+#protocol-overlay .modal-card,
+#protocol-card {
+    border-color: #06B6D4;
+    width: 520px;
+    max-width: 620px;
+}
+
+#btn-close-protocol {
+    margin-top: 16px;
+    border-color: #06B6D4;
+    color: #CFFAFE;
+}
+
+#btn-close-protocol:hover {
+    background-color: rgba(6, 182, 212, 0.25);
+    border-color: #22D3EE;
+}
+
+#endgame-title {
+    color: #F59E0B;
+    font-size: 22px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-bottom: 10px;
+}
+
+#endgame-summary {
+    color: #E2E8F0;
+    font-size: 13px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    margin-bottom: 18px;
+}
+
+#btn-restart {
+    background-color: #F59E0B;
+    border-color: #FBBF24;
+    color: #0F172A;
+    min-height: 42px;
+}
+
+#btn-restart:hover {
+    background-color: #FBBF24;
+    border-color: #FDE68A;
+    color: #0F172A;
 }

@@ -196,9 +196,25 @@ namespace ShipyardCat.Editor
             var catPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ShipyardCat/Imported/Models/cat.glb");
             if (catPrefab != null)
             {
-                var catModel = (GameObject)PrefabUtility.InstantiatePrefab(catPrefab, albaGo.transform);
+                var scaleWrapper = new GameObject("Alba_ScaleWrapper");
+                scaleWrapper.transform.SetParent(albaGo.transform, false);
+                scaleWrapper.transform.localScale = Vector3.one * 1.45f; // ~0.72m long, proportional to shipyard
+
+                var catModel = (GameObject)PrefabUtility.InstantiatePrefab(catPrefab, scaleWrapper.transform);
                 catModel.name = "Alba_GLB_Model";
                 catModel.transform.localPosition = Vector3.zero;
+                if (catModel.GetComponent<Animator>() == null)
+                    catModel.AddComponent<Animator>();
+
+                var albaAnim = albaGo.AddComponent<AlbaAnimationDriver>();
+                albaAnim.SetClips(
+                    LoadClip("Assets/ShipyardCat/Imported/Models/cat.glb", "Cat|Idle_00-IP"),
+                    LoadClip("Assets/ShipyardCat/Imported/Models/cat.glb", "Cat|Walk-IP"),
+                    LoadClip("Assets/ShipyardCat/Imported/Models/cat.glb", "Cat|Run-IP"),
+                    LoadClip("Assets/ShipyardCat/Imported/Models/cat.glb", "Cat|Sprint-IP"),
+                    LoadClip("Assets/ShipyardCat/Imported/Models/cat.glb", "Cat|Jump_Run-IP"),
+                    LoadClip("Assets/ShipyardCat/Imported/Models/cat.glb", "Cat|Attack_Right-IP")
+                );
             }
             else
             {
@@ -244,10 +260,22 @@ namespace ShipyardCat.Editor
                 col.center = new Vector3(0f, 0.25f, 0f);
                 if (ratPrefab != null)
                 {
-                    var ratMesh = (GameObject)PrefabUtility.InstantiatePrefab(ratPrefab, ratGo.transform);
+                    var ratWrapper = new GameObject("Rat_ScaleWrapper");
+                    ratWrapper.transform.SetParent(ratGo.transform, false);
+                    ratWrapper.transform.localRotation = Quaternion.Euler(0f, 180f, 0f); // Snout forward (+Z)
+                    ratWrapper.transform.localScale = Vector3.one * 0.22f; // Realistic ~0.44m rat vs Alba
+
+                    var ratMesh = (GameObject)PrefabUtility.InstantiatePrefab(ratPrefab, ratWrapper.transform);
                     ratMesh.name = "Rat_GLB_Model";
                     ratMesh.transform.localPosition = Vector3.zero;
-                    ratMesh.transform.localRotation = Quaternion.Euler(0f, 180f, 0f); // Snout forward (+Z)
+                    if (ratMesh.GetComponent<Animator>() == null)
+                        ratMesh.AddComponent<Animator>();
+
+                    var ratAnim = ratGo.AddComponent<RatAnimationDriver>();
+                    ratAnim.SetClips(
+                        LoadClip("Assets/ShipyardCat/Imported/Models/rat.glb", "Armature|Idle"),
+                        LoadClip("Assets/ShipyardCat/Imported/Models/rat.glb", "Armature|Run")
+                    );
                 }
                 else
                 {
@@ -263,7 +291,7 @@ namespace ShipyardCat.Editor
                 ratGo.AddComponent<RatPreyAI>();
             }
 
-            // 14. UI Toolkit HUD Setup
+            // 14. UI Toolkit HUD & GameShell Setup
             var panelPath = "Assets/ShipyardCat/Settings/ShipyardPanelSettings.asset";
             var panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(panelPath);
             if (panelSettings == null)
@@ -273,6 +301,12 @@ namespace ShipyardCat.Editor
                 panelSettings.referenceResolution = new Vector2Int(1920, 1080);
                 AssetDatabase.CreateAsset(panelSettings, panelPath);
             }
+            var defaultTheme = AssetDatabase.LoadAssetAtPath<ThemeStyleSheet>("Assets/UI Toolkit/UnityThemes/UnityDefaultRuntimeTheme.tss");
+            if (defaultTheme != null)
+            {
+                panelSettings.themeStyleSheet = defaultTheme;
+                EditorUtility.SetDirty(panelSettings);
+            }
 
             var hudGo = new GameObject("ShipyardHUD");
             var uiDoc = hudGo.AddComponent<UIDocument>();
@@ -280,12 +314,54 @@ namespace ShipyardCat.Editor
             var uxml = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/ShipyardCat/UI/ShipyardHUD.uxml");
             if (uxml != null) uiDoc.visualTreeAsset = uxml;
             var hudCtrl = hudGo.AddComponent<ShipyardHUDController>();
+            var shellCtrl = hudGo.AddComponent<GameShellController>();
 
             // Save Scene & Assets
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/ShipyardMain.unity");
             AssetDatabase.SaveAssets();
 
             return "ShipyardMain.unity assembled: PBR materials, Dry Docks 1/2/12, Fab Super-Shop, NavMesh baked, Alba, Kingpin, 8 Rats, VFX, Audio, and UI Toolkit HUD.";
+        }
+
+        private static AnimationClip LoadClip(string assetPath, string clipName)
+        {
+            AnimationClip found = null;
+            var assets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+            foreach (var a in assets)
+            {
+                if (a is AnimationClip clip && clip.name == clipName)
+                {
+                    found = clip;
+                    break;
+                }
+            }
+            if (found == null)
+            {
+                foreach (var a in assets)
+                {
+                    if (a is AnimationClip clip && !clip.name.StartsWith("__preview__") && clip.name.Contains(clipName))
+                    {
+                        found = clip;
+                        break;
+                    }
+                }
+            }
+            if (found == null) return null;
+            if (!found.legacy) return found;
+
+            // glTFast imports clips as Legacy; clone to non-legacy .anim asset for PlayableGraph/Animator
+            EnsureFolder("Assets/ShipyardCat/Animations");
+            string safeName = found.name.Replace("|", "_").Replace("/", "_").Replace("\\", "_");
+            string animPath = $"Assets/ShipyardCat/Animations/{safeName}.anim";
+            var existing = AssetDatabase.LoadAssetAtPath<AnimationClip>(animPath);
+            if (existing != null && !existing.legacy)
+                return existing;
+
+            var clone = Object.Instantiate(found);
+            clone.name = safeName;
+            clone.legacy = false;
+            AssetDatabase.CreateAsset(clone, animPath);
+            return clone;
         }
 
         private static void EnsureFolder(string path)

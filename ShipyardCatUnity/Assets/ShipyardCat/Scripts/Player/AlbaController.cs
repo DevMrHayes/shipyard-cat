@@ -60,11 +60,13 @@ namespace ShipyardCat.Player
         private Transform _backLeftLeg;
         private Transform _backRightLeg;
         private Transform _headPivot;
+        private AlbaAnimationDriver _animDriver;
 
         private void Awake()
         {
             _characterController = GetComponent<CharacterController>();
             Vitals = GetComponent<CatVitals>();
+            _animDriver = GetComponent<AlbaAnimationDriver>();
 
             ConfigureCharacterController();
             EnsureProceduralCatVisuals();
@@ -128,6 +130,8 @@ namespace ShipyardCat.Player
 
             _swipeCooldownTimer = swipeCooldown;
             _swipeAnimTimer = 0.22f;
+            if (_animDriver == null) _animDriver = GetComponent<AlbaAnimationDriver>();
+            _animDriver?.TriggerAttack();
 
             ShipyardAudioManager.Instance?.PlaySFX("Swipe", transform.position);
 
@@ -164,6 +168,8 @@ namespace ShipyardCat.Player
 
             _verticalVelocity = Mathf.Max(_verticalVelocity, 4.5f);
             _pounceHitTargets.Clear();
+            if (_animDriver == null) _animDriver = GetComponent<AlbaAnimationDriver>();
+            _animDriver?.TriggerPounce();
 
             ShipyardAudioManager.Instance?.PlaySFX("Pounce", transform.position);
 
