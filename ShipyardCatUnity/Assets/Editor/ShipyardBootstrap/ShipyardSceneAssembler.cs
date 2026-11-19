@@ -76,73 +76,45 @@ namespace ShipyardCat.Editor
             var walkableRoot = new GameObject("WalkableNavMeshGeometry");
             walkableRoot.transform.SetParent(worldRoot.transform);
 
-            // Main Yard Slab (X: [-220, 60], Z: [-105, 300] => size 280 x 405, center (-80, -0.5, 97.5))
-            CreateBox("YardAsphaltGround", walkableRoot.transform, new Vector3(-80f, -0.5f, 97.5f), new Vector3(280f, 1f, 405f), asphaltMat);
+            // Cutout Yard Asphalt Slabs (top strictly Y = 0.000) Partitioning X: [-220, 56], Z: [-105, 300]
+            // Leaves genuine open sunken basins for DD2 [-198,-162]x[52,208], DD12 [-156,-74]x[76,300], and DD1 [-62,-28]x[-17,67]
+            CreateYardCutoutStrip("YardAsphalt_WestEdge", walkableRoot.transform, -220f, -198f, -105f, 300f, asphaltMat);
+            CreateYardCutoutStrip("YardAsphalt_DD2_South", walkableRoot.transform, -198f, -162f, -105f, 52f, asphaltMat);
+            CreateYardCutoutStrip("YardAsphalt_DD2_North", walkableRoot.transform, -198f, -162f, 208f, 300f, asphaltMat);
+            CreateYardCutoutStrip("YardAsphalt_Between_DD2_DD12", walkableRoot.transform, -162f, -156f, -105f, 300f, asphaltMat);
+            CreateYardCutoutStrip("YardAsphalt_DD12_South", walkableRoot.transform, -156f, -74f, -105f, 76f, asphaltMat);
+            CreateYardCutoutStrip("YardAsphalt_Between_DD12_DD1", walkableRoot.transform, -74f, -62f, -105f, 300f, asphaltMat);
+            CreateYardCutoutStrip("YardAsphalt_DD1_South", walkableRoot.transform, -62f, -28f, -105f, -17f, asphaltMat);
+            CreateYardCutoutStrip("YardAsphalt_DD1_North", walkableRoot.transform, -62f, -28f, 67f, 300f, asphaltMat);
+            CreateYardCutoutStrip("YardAsphalt_MainEastApron", walkableRoot.transform, -28f, 56f, -105f, 300f, asphaltMat);
 
-            // James River Backdrop (East edge X > 60)
-            CreateBox("JamesRiverWater", worldRoot.transform, new Vector3(130f, -1.5f, 97.5f), new Vector3(140f, 1f, 460f), waterMat, false);
-
-            // Perimeter Security Fence enclosing X: [-220, 60], Z: [-105, 300]
+            // Perimeter Security Fence enclosing X: [-220, 56], Z: [-105, 300] (East waterfront stays open to pier)
             var fenceRoot = new GameObject("PerimeterSecurityFence");
             fenceRoot.transform.SetParent(worldRoot.transform);
             CreateBox("Fence_West", fenceRoot.transform, new Vector3(-220f, 2f, 97.5f), new Vector3(1f, 4f, 405f), steelMat);
-            CreateBox("Fence_North", fenceRoot.transform, new Vector3(-80f, 2f, 300f), new Vector3(280f, 4f, 1f), steelMat);
-            CreateBox("Fence_South", fenceRoot.transform, new Vector3(-80f, 2f, -105f), new Vector3(280f, 4f, 1f), steelMat);
-            CreateBox("Fence_East", fenceRoot.transform, new Vector3(60f, 2f, 97.5f), new Vector3(1f, 4f, 405f), steelMat);
+            CreateBox("Fence_North", fenceRoot.transform, new Vector3(-82f, 2f, 300f), new Vector3(276f, 4f, 1f), steelMat);
+            CreateBox("Fence_South", fenceRoot.transform, new Vector3(-82f, 2f, -105f), new Vector3(276f, 4f, 1f), steelMat);
+            CreateBox("Seawall_Curb_South", fenceRoot.transform, new Vector3(56f, 0.25f, -80f), new Vector3(0.6f, 0.5f, 50f), safetyAmberMat);
+            CreateBox("Seawall_Curb_North", fenceRoot.transform, new Vector3(56f, 0.25f, 220f), new Vector3(0.6f, 0.5f, 160f), safetyAmberMat);
 
-            // 3. Dry Dock 1 (Kingpin Arena) at (-45, -2, 20) with walkable floor + ramp
-            var dd1 = new GameObject("DryDock1_KingpinArena");
-            dd1.transform.SetParent(walkableRoot.transform);
-            CreateBox("DD1_BasinFloor", dd1.transform, new Vector3(-45f, -2.5f, 20f), new Vector3(36f, 1f, 44f), concreteMat);
-            CreateBox("DD1_Curb_West", dd1.transform, new Vector3(-63.5f, -0.5f, 20f), new Vector3(1f, 3f, 44f), safetyAmberMat);
-            CreateBox("DD1_Curb_East", dd1.transform, new Vector3(-26.5f, -0.5f, 20f), new Vector3(1f, 3f, 44f), safetyAmberMat);
-            var dd1Ramp = CreateBox("DD1_DescentRamp", dd1.transform, new Vector3(-45f, -1.0f, -4f), new Vector3(8f, 0.5f, 14f), concreteMat);
-            dd1Ramp.transform.rotation = Quaternion.Euler(12f, 0f, 0f);
-
-            // 4. Dry Dock 12 (CVN-80 Carrier + Big Blue Gantry Crane) at (15, 0, 50)
-            var dd12 = new GameObject("DryDock12_CVN80");
-            dd12.transform.SetParent(worldRoot.transform);
-            CreateBox("CVN80_Hull", dd12.transform, new Vector3(15f, 2.5f, 50f), new Vector3(26f, 6f, 90f), steelMat);
-            CreateBox("CVN80_FlightDeck", walkableRoot.transform, new Vector3(15f, 5.6f, 50f), new Vector3(28f, 0.4f, 92f), asphaltMat);
-            var cvnGangway = CreateBox("CVN80_Gangway", walkableRoot.transform, new Vector3(-2f, 2.8f, 44f), new Vector3(14f, 0.4f, 4f), safetyAmberMat);
-            cvnGangway.transform.rotation = Quaternion.Euler(0f, 0f, 22f);
-            // Big Blue Gantry Legs
-            CreateBox("BigBlue_LegW", dd12.transform, new Vector3(-5f, 18f, 50f), new Vector3(3f, 36f, 3f), steelMat);
-            CreateBox("BigBlue_LegE", dd12.transform, new Vector3(35f, 18f, 50f), new Vector3(3f, 36f, 3f), steelMat);
-            CreateBox("BigBlue_Bridge", dd12.transform, new Vector3(15f, 36f, 50f), new Vector3(46f, 4f, 5f), safetyAmberMat);
-
-            // 5. Dry Dock 2 (Virginia-Class Submarine Berth) at (-180, 0, 110)
-            var dd2 = new GameObject("DryDock2_SSNVirginia");
-            dd2.transform.SetParent(worldRoot.transform);
-            CreateBox("DD2_BasinFloor", walkableRoot.transform, new Vector3(-180f, -2.5f, 110f), new Vector3(32f, 1f, 95f), concreteMat);
-            var subHull = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            subHull.name = "SSN_Virginia_Hull";
-            subHull.transform.SetParent(dd2.transform);
-            subHull.transform.position = new Vector3(-180f, 1.5f, 110f);
-            subHull.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            subHull.transform.localScale = new Vector3(10f, 38f, 10f);
-            subHull.GetComponent<Renderer>().sharedMaterial = subMat;
-            CreateBox("SSN_Virginia_Sail", dd2.transform, new Vector3(-180f, 7.5f, 120f), new Vector3(2.8f, 5f, 8f), subMat);
-
-            // Steam Vents along Dry Dock 2
-            CreateVFXNode("DD2_SteamVent_1", worldRoot.transform, new Vector3(-180f, 1.5f, 85f), WeldingAndSteamVFX.Mode.SteamVent);
-            CreateVFXNode("DD2_SteamVent_2", worldRoot.transform, new Vector3(-180f, 1.5f, 135f), WeldingAndSteamVFX.Mode.SteamVent);
-
-            // 6. Heavy Steel Fab Super-Shop at (-115, 0, 240)
+            // 6. Heavy Steel Fab Super-Shop at West Industrial Bay (-168, 0, -25) (clear of DD2 & DD12)
             var fabShop = new GameObject("HeavySteelFabSuperShop");
             fabShop.transform.SetParent(worldRoot.transform);
-            CreateBox("FabShop_Roof", fabShop.transform, new Vector3(-115f, 14f, 240f), new Vector3(52f, 1.2f, 82f), steelMat);
-            CreateBox("FabShop_WallW", fabShop.transform, new Vector3(-140.5f, 7f, 240f), new Vector3(1.2f, 14f, 82f), steelMat);
-            CreateBox("FabShop_WallE", fabShop.transform, new Vector3(-89.5f, 7f, 240f), new Vector3(1.2f, 14f, 82f), steelMat);
-            CreateBox("FabShop_WallN", fabShop.transform, new Vector3(-115f, 7f, 280.5f), new Vector3(52f, 14f, 1.2f), steelMat);
-            CreateBox("FabShop_TrimSW", fabShop.transform, new Vector3(-140.5f, 7f, 199f), new Vector3(1.5f, 14.2f, 1.5f), safetyAmberMat);
-            CreateBox("FabShop_TrimSE", fabShop.transform, new Vector3(-89.5f, 7f, 199f), new Vector3(1.5f, 14.2f, 1.5f), safetyAmberMat);
-            // Welding Spark Stations inside Super-Shop
-            CreateVFXNode("FabShop_Welder_1", worldRoot.transform, new Vector3(-105f, 1.8f, 225f), WeldingAndSteamVFX.Mode.WeldingSparks);
-            CreateVFXNode("FabShop_Welder_2", worldRoot.transform, new Vector3(-125f, 1.8f, 255f), WeldingAndSteamVFX.Mode.WeldingSparks);
+            CreateBox("FabShop_Roof", fabShop.transform, new Vector3(-168f, 14f, -25f), new Vector3(44f, 1.2f, 64f), steelMat);
+            CreateBox("FabShop_WallW", fabShop.transform, new Vector3(-189.4f, 7f, -25f), new Vector3(1.2f, 14f, 64f), steelMat);
+            CreateBox("FabShop_WallS", fabShop.transform, new Vector3(-168f, 7f, -56.4f), new Vector3(44f, 14f, 1.2f), steelMat);
+            CreateBox("FabShop_TrimNW", fabShop.transform, new Vector3(-189.4f, 7f, 6.4f), new Vector3(1.5f, 14.2f, 1.5f), safetyAmberMat);
+            CreateBox("FabShop_TrimNE", fabShop.transform, new Vector3(-146.6f, 7f, 6.4f), new Vector3(1.5f, 14.2f, 1.5f), safetyAmberMat);
+            // Welding Spark Stations inside Super-Shop & Dock Rims
+            CreateVFXNode("FabShop_Welder_1", worldRoot.transform, new Vector3(-160f, 1.8f, -15f), WeldingAndSteamVFX.Mode.WeldingSparks);
+            CreateVFXNode("FabShop_Welder_2", worldRoot.transform, new Vector3(-175f, 1.8f, -35f), WeldingAndSteamVFX.Mode.WeldingSparks);
+            CreateVFXNode("DD1_Rim_Welder", worldRoot.transform, new Vector3(-30f, 2.2f, 15f), WeldingAndSteamVFX.Mode.WeldingSparks);
+            CreateVFXNode("DD1_Rim_Steam", worldRoot.transform, new Vector3(-32f, 0.5f, 40f), WeldingAndSteamVFX.Mode.SteamVent);
+            CreateVFXNode("DD2_SteamVent_1", worldRoot.transform, new Vector3(-180f, 1.2f, 95f), WeldingAndSteamVFX.Mode.SteamVent);
+            CreateVFXNode("DD2_SteamVent_2", worldRoot.transform, new Vector3(-180f, 1.2f, 165f), WeldingAndSteamVFX.Mode.SteamVent);
 
-            // 7. Cat Haven Sanctuary (-15, 0, -45) & Radiation Vault (45, 0, -60)
-            var haven = CreateBox("CatHaven_SanctuaryPad", walkableRoot.transform, new Vector3(-15f, 0.1f, -45f), new Vector3(10f, 0.2f, 10f), sanctuaryMat);
+            // 7. Cat Haven Sanctuary (-15, 0, -45) & Radiation Vault (42, 0, -60)
+            var haven = CreateBox("CatHaven_SanctuaryPad", walkableRoot.transform, new Vector3(-15f, 0.06f, -45f), new Vector3(10f, 0.12f, 10f), sanctuaryMat);
             var havenZone = haven.AddComponent<RadiationZone>();
             havenZone.ZoneType = ShipyardZone.CatHavenSanctuary;
             havenZone.IsSanctuary = true;
@@ -156,21 +128,26 @@ namespace ShipyardCat.Editor
             CreateBox("CargoContainer_Amber2", worldRoot.transform, new Vector3(-2f, 1.3f, -18f), new Vector3(2.5f, 2.6f, 6.1f), safetyAmberMat);
             CreateBox("CableSpool_Rack", worldRoot.transform, new Vector3(-18f, 0.8f, -15f), new Vector3(2.2f, 1.6f, 2.2f), steelMat);
 
-            var vault = CreateBox("RadiationVault_Bunker", worldRoot.transform, new Vector3(45f, 3f, -60f), new Vector3(14f, 6f, 14f), safetyAmberMat);
+            var vault = CreateBox("RadiationVault_Bunker", worldRoot.transform, new Vector3(42f, 3f, -60f), new Vector3(14f, 6f, 14f), safetyAmberMat);
             var radZone = vault.AddComponent<RadiationZone>();
             radZone.ZoneType = ShipyardZone.DryDock2_SSNVirginia;
             radZone.IsSanctuary = false;
             radZone.Radius = 14f;
 
-            // 7b. Detailed Shipyard Landmarks (Tugboat Dorothy, East Pier, Cat Motel, Gate 4, Walkable Interiors)
+            // 7b. Canonical Shipyard Landmarks + Hero Details (DD1 Catwalk, Big Blue Sign, CVN-80, Rail Flatcar)
             ShipyardLandmarkBuilder.BuildAllLandmarks(walkableRoot.transform, concreteMat, steelMat, subMat, waterMat, safetyAmberMat, sanctuaryMat);
+            DryDockHeroBuilder.BuildDryDockHeroDetails(walkableRoot.transform, concreteMat, steelMat, safetyAmberMat);
+            CarrierAndCraneBuilder.BuildCraneSignageAndShipDetails(worldRoot.transform, steelMat, safetyAmberMat);
+            YardPropsAndRailBuilder.BuildYardRailsAndProps(worldRoot.transform, steelMat, safetyAmberMat);
 
-            // 8. High-Mast Stadium Floodlights
+            // 8. High-Mast Stadium Floodlights, Wet Puddles & Twilight Skybox
+            VisualBaselineSetup.ApplyTwilightSkybox();
             var floodlights = new List<Light>();
             floodlights.Add(CreateFloodlight("Floodlight_SouthYard", worldRoot.transform, new Vector3(-20f, 26f, -30f)));
             floodlights.Add(CreateFloodlight("Floodlight_DryDock1", worldRoot.transform, new Vector3(-45f, 26f, 20f)));
             floodlights.Add(CreateFloodlight("Floodlight_DryDock2", worldRoot.transform, new Vector3(-175f, 28f, 110f)));
-            floodlights.Add(CreateFloodlight("Floodlight_FabShop", worldRoot.transform, new Vector3(-115f, 26f, 230f)));
+            floodlights.Add(CreateFloodlight("Floodlight_FabShop", worldRoot.transform, new Vector3(-165f, 26f, -25f)));
+            WetPuddleAndAtmosphereBuilder.BuildAtmosphereAndPuddles(worldRoot.transform, floodlights);
 
             // 9. Bake NavMesh on Walkable Geometry
             var navSurface = walkableRoot.AddComponent<NavMeshSurface>();
@@ -186,6 +163,7 @@ namespace ShipyardCat.Editor
             managersGo.AddComponent<TacticalRadarController>();
             managersGo.AddComponent<GeigerAudioSynth>();
             managersGo.AddComponent<SpatialAudioWiring>();
+            managersGo.AddComponent<ShipyardProgressBridge>();
 
             var diurnal = managersGo.AddComponent<DiurnalShiftManager>();
             var sunLight = GameObject.Find("ShipyardSunLight")?.GetComponent<Light>();
@@ -260,6 +238,10 @@ namespace ShipyardCat.Editor
                 BuildStylizedAlbaVisual(albaGo.transform, urpLit);
             }
 
+            // Apply Alba Tuxedo Coat + Fluorescent Orange Collar + Brass NNS Tag + Live Dosimeter
+            var albaVisualRig = albaGo.AddComponent<AlbaVisualRig>();
+            albaVisualRig.BuildOrRefreshVisuals();
+
             // Wire AlbaCameraRig on Main Camera
             var mainCam = Camera.main;
             if (mainCam != null)
@@ -271,29 +253,68 @@ namespace ShipyardCat.Editor
             var enemiesRoot = new GameObject("Enemies");
             enemiesRoot.transform.SetParent(worldRoot.transform, false);
 
-            // 12. Dockyard Kingpin Boss in Dry Dock 1 Basin (-45, -1.9, 25)
-            var kingpinGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            kingpinGo.name = "DockyardKingpin_Boss";
+            var ratPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ShipyardCat/Imported/Models/rat.glb");
+
+            // 12. Dockyard Kingpin Boss in Dry Dock 1 Basin (-45, -3.5, 25) - Scarred Giant Norway Rat GLB + Arena Rig
+            var kingpinGo = new GameObject("DockyardKingpin_Boss");
             kingpinGo.transform.SetParent(enemiesRoot.transform, false);
-            kingpinGo.transform.position = new Vector3(-45f, -1.4f, 25f);
-            kingpinGo.transform.localScale = new Vector3(1.8f, 1.3f, 2.2f);
-            kingpinGo.GetComponent<Renderer>().sharedMaterial = kingpinMat;
+            kingpinGo.transform.position = new Vector3(-45f, -3.5f, 25f);
+            var kpCol = kingpinGo.AddComponent<CapsuleCollider>();
+            kpCol.center = new Vector3(0f, 0.7f, 0f);
+            kpCol.radius = 0.85f;
+            kpCol.height = 1.9f;
+            if (ratPrefab != null)
+            {
+                var kpWrapper = new GameObject("Kingpin_ScaleWrapper");
+                kpWrapper.transform.SetParent(kingpinGo.transform, false);
+                kpWrapper.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                kpWrapper.transform.localScale = Vector3.one * 0.78f;
+
+                var kpMesh = (GameObject)PrefabUtility.InstantiatePrefab(ratPrefab, kpWrapper.transform);
+                kpMesh.name = "Rat_GLB_Model";
+                kpMesh.transform.localPosition = Vector3.zero;
+                if (kpMesh.GetComponent<Animator>() == null) kpMesh.AddComponent<Animator>();
+
+                var kpScarMat = CreateSimpleMaterial("KingpinScarredFurMat", urpLit, new Color(0.24f, 0.19f, 0.18f), 0.1f, 0.25f);
+                foreach (var rend in kpMesh.GetComponentsInChildren<Renderer>(true))
+                {
+                    rend.sharedMaterial = kpScarMat;
+                }
+                var kpAnim = kingpinGo.AddComponent<RatAnimationDriver>();
+                kpAnim.SetClips(
+                    LoadClip("Assets/ShipyardCat/Imported/Models/rat.glb", "Armature|Idle"),
+                    LoadClip("Assets/ShipyardCat/Imported/Models/rat.glb", "Armature|Run")
+                );
+            }
+            var kpEyeMat = CreateSimpleMaterial("KingpinRedEyeMat", urpLit, Color.red, 0f, 0.9f);
+            kpEyeMat.EnableKeyword("_EMISSION");
+            kpEyeMat.SetColor("_EmissionColor", Color.red * 3.5f);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                var eye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                eye.name = side < 0 ? "KingpinEye_L" : "KingpinEye_R";
+                eye.transform.SetParent(kingpinGo.transform, false);
+                eye.transform.localPosition = new Vector3(side * 0.14f, 0.95f, 1.05f);
+                eye.transform.localScale = Vector3.one * 0.08f;
+                eye.GetComponent<Renderer>().sharedMaterial = kpEyeMat;
+                Object.DestroyImmediate(eye.GetComponent<Collider>());
+            }
             kingpinGo.AddComponent<UnityEngine.AI.NavMeshAgent>();
             kingpinGo.AddComponent<KingpinBossAI>();
+            kingpinGo.AddComponent<KingpinArenaRig>();
 
-            // 13. Spawn Rat Prey across the Yard
+            // 13. Spawn Rat Prey across solid Yard Aprons & DD1 Basin
             var ratSpawns = new[]
             {
                 new Vector3(-14f, 0.3f, -10f),
                 new Vector3(-22f, 0.3f, 5f),
                 new Vector3(-6f, 0.3f, 15f),
-                new Vector3(-55f, 0.3f, 45f),
-                new Vector3(-110f, 0.3f, 220f),
-                new Vector3(-125f, 0.3f, 250f),
-                new Vector3(-165f, 0.3f, 95f),
+                new Vector3(-45f, -3.5f, 45f),   // Inside DD1 basin
+                new Vector3(-68f, 0.3f, 65f),    // Apron between DD1 & DD12
+                new Vector3(-15f, 0.3f, 85f),    // North East apron
+                new Vector3(-159f, 0.3f, 95f),   // Apron between DD2 & DD12
                 new Vector3(5f, 0.3f, -35f)
             };
-            var ratPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ShipyardCat/Imported/Models/rat.glb");
             for (int i = 0; i < ratSpawns.Length; i++)
             {
                 var ratGo = new GameObject($"RatPrey_{i + 1}");
@@ -335,68 +356,147 @@ namespace ShipyardCat.Editor
                 ratGo.AddComponent<RatPreyAI>();
             }
 
-            // 13b. Lieutenant Cobalt Boss on CVN-80 Flight Deck
-            var cobaltGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            cobaltGo.name = "LieutenantCobalt_Boss";
+            // 13b. Lieutenant Cobalt Boss on CVN-80 Flight Deck (Tinted Mutant Feline Model)
+            var cobaltGo = new GameObject("LieutenantCobalt_Boss");
             cobaltGo.transform.SetParent(enemiesRoot.transform, false);
-            cobaltGo.transform.position = new Vector3(15f, 6.2f, 65f);
-            cobaltGo.transform.localScale = new Vector3(1.1f, 0.85f, 1.3f);
-            cobaltGo.GetComponent<Renderer>().sharedMaterial = kingpinMat;
+            cobaltGo.transform.position = new Vector3(-115f, 7.1f, 225f);
+            var cbCol = cobaltGo.AddComponent<CapsuleCollider>();
+            cbCol.center = new Vector3(0f, 0.6f, 0f);
+            cbCol.radius = 0.55f;
+            cbCol.height = 1.4f;
+            var cobaltMat = CreateSimpleMaterial("CobaltMutantMat", urpLit, new Color(0.08f, 0.24f, 0.55f), 0.3f, 0.6f);
+            cobaltMat.EnableKeyword("_EMISSION");
+            cobaltMat.SetColor("_EmissionColor", new Color(0.1f, 0.65f, 1.0f) * 1.4f);
+            if (catPrefab != null)
+            {
+                var cbWrap = new GameObject("Cobalt_ScaleWrapper");
+                cbWrap.transform.SetParent(cobaltGo.transform, false);
+                cbWrap.transform.localScale = Vector3.one * 2.15f;
+                var cbMesh = (GameObject)PrefabUtility.InstantiatePrefab(catPrefab, cbWrap.transform);
+                cbMesh.name = "Cobalt_GLB_Model";
+                foreach (var rend in cbMesh.GetComponentsInChildren<Renderer>(true)) rend.sharedMaterial = cobaltMat;
+            }
             cobaltGo.AddComponent<UnityEngine.AI.NavMeshAgent>();
             cobaltGo.AddComponent<LieutenantCobaltBossAI>();
 
-            // 13c. Mutant Cats (Scout, Prowler, Enforcer)
+            // 13c. Mutant Cats (Scout, Prowler, Enforcer) with tinted cat silhouettes
             var mutantSpawns = new[]
             {
-                (name: "MutantCat_Scout", pos: new Vector3(-95f, 0.3f, 80f)),
-                (name: "MutantCat_Prowler", pos: new Vector3(-135f, 0.3f, 140f)),
-                (name: "MutantCat_Enforcer", pos: new Vector3(-115f, 0.3f, 205f))
+                (name: "MutantCat_Scout", pos: new Vector3(-95f, 0.3f, 55f)),
+                (name: "MutantCat_Prowler", pos: new Vector3(-68f, 0.3f, 125f)),
+                (name: "MutantCat_Enforcer", pos: new Vector3(-115f, 7.1f, 190f))
             };
+            var mutantMat = CreateSimpleMaterial("MutantCatFeralMat", urpLit, new Color(0.18f, 0.42f, 0.28f), 0.2f, 0.4f);
+            mutantMat.EnableKeyword("_EMISSION");
+            mutantMat.SetColor("_EmissionColor", new Color(0.15f, 0.9f, 0.35f) * 0.6f);
             foreach (var m in mutantSpawns)
             {
-                var mGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                mGo.name = m.name;
+                var mGo = new GameObject(m.name);
                 mGo.transform.SetParent(enemiesRoot.transform, false);
                 mGo.transform.position = m.pos;
-                mGo.transform.localScale = new Vector3(0.7f, 0.55f, 0.9f);
-                mGo.GetComponent<Renderer>().sharedMaterial = ratMat;
+                var mcCol = mGo.AddComponent<CapsuleCollider>();
+                mcCol.center = new Vector3(0f, 0.45f, 0f);
+                mcCol.radius = 0.4f;
+                mcCol.height = 1.0f;
+                if (catPrefab != null)
+                {
+                    var mWrap = new GameObject("Mutant_ScaleWrapper");
+                    mWrap.transform.SetParent(mGo.transform, false);
+                    mWrap.transform.localScale = Vector3.one * 1.55f;
+                    var mMesh = (GameObject)PrefabUtility.InstantiatePrefab(catPrefab, mWrap.transform);
+                    mMesh.name = "Mutant_GLB_Model";
+                    foreach (var rend in mMesh.GetComponentsInChildren<Renderer>(true)) rend.sharedMaterial = mutantMat;
+                }
                 mGo.AddComponent<UnityEngine.AI.NavMeshAgent>();
                 mGo.AddComponent<MutantCatAI>();
             }
 
-            // 13d. Shipbuilders, Colony Sanctuary Cats & Seagull Flock
+            // 13d. Shipbuilders (Coveralls + Safety Vest + Hardhat), Colony Cats (GLB) & Seagull Flock
             var npcsRoot = new GameObject("ShipyardNPCs");
             npcsRoot.transform.SetParent(worldRoot.transform, false);
             var workerPositions = new[]
             {
-                new Vector3(4f, 0.5f, -45f),
-                new Vector3(-18f, 0.5f, -25f),
-                new Vector3(20f, 0.5f, 26f),
-                new Vector3(-30f, 0.5f, 10f)
+                new Vector3(4f, 0.0f, -45f),
+                new Vector3(-18f, 0.0f, -25f),
+                new Vector3(-36f, -3.9f, 18f),
+                new Vector3(-30f, 0.0f, 10f)
             };
+            var coverallMat = CreateSimpleMaterial("WorkerCoverallMat", urpLit, new Color(0.12f, 0.16f, 0.24f), 0.1f, 0.25f);
             for (int w = 0; w < workerPositions.Length; w++)
             {
-                var wGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                wGo.name = $"Shipbuilder_{w + 1}";
+                var wGo = new GameObject($"Shipbuilder_{w + 1}");
                 wGo.transform.SetParent(npcsRoot.transform, false);
                 wGo.transform.position = workerPositions[w];
-                wGo.GetComponent<Renderer>().sharedMaterial = safetyAmberMat;
+                var wCol = wGo.AddComponent<CapsuleCollider>();
+                wCol.center = new Vector3(0f, 0.9f, 0f);
+                wCol.radius = 0.35f;
+                wCol.height = 1.8f;
+
+                var legs = CreateBox("Legs", wGo.transform, new Vector3(0f, 0.45f, 0f), new Vector3(0.42f, 0.9f, 0.26f), coverallMat, false);
+                var vest = CreateBox("SafetyVest", wGo.transform, new Vector3(0f, 1.18f, 0f), new Vector3(0.48f, 0.56f, 0.3f), safetyAmberMat, false);
+                var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                head.name = "Head";
+                head.transform.SetParent(wGo.transform, false);
+                head.transform.localPosition = new Vector3(0f, 1.62f, 0f);
+                head.transform.localScale = Vector3.one * 0.26f;
+                head.GetComponent<Renderer>().sharedMaterial = concreteMat;
+                Object.DestroyImmediate(head.GetComponent<Collider>());
+                var hardhat = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                hardhat.name = "HardHat";
+                hardhat.transform.SetParent(wGo.transform, false);
+                hardhat.transform.localPosition = new Vector3(0f, 1.74f, 0f);
+                hardhat.transform.localScale = new Vector3(0.32f, 0.08f, 0.34f);
+                hardhat.GetComponent<Renderer>().sharedMaterial = safetyAmberMat;
+                Object.DestroyImmediate(hardhat.GetComponent<Collider>());
                 wGo.AddComponent<ShipbuilderNPC>();
             }
+            var colonyMat = CreateSimpleMaterial("ColonyCalicoMat", urpLit, new Color(0.86f, 0.56f, 0.28f), 0.05f, 0.3f);
             for (int c = 0; c < 3; c++)
             {
-                var cGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                cGo.name = $"ColonyCat_{c + 1}";
+                var cGo = new GameObject($"ColonyCat_{c + 1}");
                 cGo.transform.SetParent(npcsRoot.transform, false);
-                cGo.transform.position = new Vector3(16f + c * 2f, 0.35f, -26f);
-                cGo.transform.localScale = new Vector3(0.55f, 0.45f, 0.65f);
-                cGo.GetComponent<Renderer>().sharedMaterial = sanctuaryMat;
+                cGo.transform.position = new Vector3(16f + c * 1.8f, 0.14f, -26f);
+                if (catPrefab != null)
+                {
+                    var cw = new GameObject("Colony_ScaleWrapper");
+                    cw.transform.SetParent(cGo.transform, false);
+                    cw.transform.localScale = Vector3.one * 1.3f;
+                    var cm = (GameObject)PrefabUtility.InstantiatePrefab(catPrefab, cw.transform);
+                    cm.name = "Colony_GLB_Model";
+                    foreach (var rend in cm.GetComponentsInChildren<Renderer>(true)) rend.sharedMaterial = colonyMat;
+                }
                 cGo.AddComponent<ColonyCatNPC>();
             }
             var flockGo = new GameObject("SeagullFlock");
             flockGo.transform.SetParent(worldRoot.transform, false);
             flockGo.transform.position = new Vector3(42f, 16f, 20f);
             flockGo.AddComponent<SeagullFlock>();
+
+            // 13e. Glowing Narrative Collectibles (JMAF, Apprentice School, Gate 4, Cat Motel)
+            var pickupsRoot = new GameObject("ShipyardCollectibles");
+            pickupsRoot.transform.SetParent(worldRoot.transform, false);
+            var collectibleMat = CreateSimpleMaterial("CollectibleGlowMat", urpLit, ShipyardPalette.SonarCyan, 0.3f, 0.9f);
+            collectibleMat.EnableKeyword("_EMISSION");
+            collectibleMat.SetColor("_EmissionColor", ShipyardPalette.SonarCyan * 2.4f);
+            var pickupDefs = new[]
+            {
+                (id: "jmaf_blueprints", label: "JMAF Reactor Blueprints", obj: "jmaf", pos: new Vector3(-25f, 0.85f, -35f)),
+                (id: "apprentice_badge", label: "Apprentice School Wrench Badge", obj: "apprentice", pos: new Vector3(22f, 0.85f, 35f)),
+                (id: "gate4_pass", label: "Gate 4 Security Pass", obj: "gate4", pos: new Vector3(8f, 0.85f, -49f)),
+                (id: "catmotel_tuna", label: "Cat Motel Tuna Cache", obj: "sanctuary", pos: new Vector3(18f, 0.85f, -28f))
+            };
+            foreach (var p in pickupDefs)
+            {
+                var pGo = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                pGo.name = $"Collectible_{p.id}";
+                pGo.transform.SetParent(pickupsRoot.transform, false);
+                pGo.transform.position = p.pos;
+                pGo.transform.localScale = new Vector3(0.45f, 0.45f, 0.45f);
+                pGo.GetComponent<Renderer>().sharedMaterial = collectibleMat;
+                Object.DestroyImmediate(pGo.GetComponent<Collider>());
+                var ci = pGo.AddComponent<CollectibleItem>();
+                ci.Configure(p.id, p.label, p.obj, 150, 25f);
+            }
 
             // 14. UI Toolkit HUD & GameShell Setup
             var panelPath = "Assets/ShipyardCat/Settings/ShipyardPanelSettings.asset";
@@ -585,6 +685,14 @@ namespace ShipyardCat.Editor
             collar.transform.localScale = new Vector3(0.24f, 0.05f, 0.24f);
             collar.GetComponent<Renderer>().sharedMaterial = collarMat;
             Object.DestroyImmediate(collar.GetComponent<Collider>());
+        }
+
+        private static void CreateYardCutoutStrip(string name, Transform parent, float minX, float maxX, float minZ, float maxZ, Material mat)
+        {
+            float w = maxX - minX;
+            float l = maxZ - minZ;
+            if (w <= 0.1f || l <= 0.1f) return;
+            CreateBox(name, parent, new Vector3((minX + maxX) * 0.5f, -0.5f, (minZ + maxZ) * 0.5f), new Vector3(w, 1f, l), mat);
         }
     }
 }

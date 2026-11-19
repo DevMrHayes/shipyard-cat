@@ -340,13 +340,22 @@ namespace ShipyardCat.Player
                 return Vector2.zero;
             }
 
+            return ComputeMoveInput(
+                keyboard.wKey.isPressed,
+                keyboard.sKey.isPressed,
+                keyboard.aKey.isPressed,
+                keyboard.dKey.isPressed);
+        }
+
+        public static Vector2 ComputeMoveInput(bool w, bool s, bool a, bool d)
+        {
             float x = 0f;
             float y = 0f;
 
-            if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed) y += 1f;
-            if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed) y -= 1f;
-            if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed) x += 1f;
-            if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed) x -= 1f;
+            if (w) y += 1f;
+            if (s) y -= 1f;
+            if (d) x += 1f;
+            if (a) x -= 1f;
 
             Vector2 input = new Vector2(x, y);
             if (input.sqrMagnitude > 1f)

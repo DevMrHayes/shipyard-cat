@@ -18,7 +18,7 @@ namespace ShipyardCat.World
         }
 
         [Header("Clock Settings")]
-        [SerializeField, Range(0f, 24f)] private float startTimeOfDay = 7.0f;
+        [SerializeField, Range(0f, 24f)] private float startTimeOfDay = 17.75f;
         [SerializeField] private float dayLengthInMinutes = 12.0f;
         [SerializeField] private bool advanceTimeAutomatically = true;
 
@@ -37,9 +37,10 @@ namespace ShipyardCat.World
         [SerializeField] private float nightMoonIntensity = 0.30f;
         [SerializeField] private float floodlightIntensity = 6.5f;
 
-        public float TimeOfDay { get; private set; } = 7.0f;
-        public ShiftPeriod CurrentShift { get; private set; } = ShiftPeriod.FirstShift_Day;
-        public bool IsNight => TimeOfDay >= 18.0f || TimeOfDay < 6.0f;
+        public float TimeOfDay { get; private set; } = 17.75f;
+        public ShiftPeriod CurrentShift { get; private set; } = ShiftPeriod.SecondShift_Dusk;
+        public bool IsNight => TimeOfDay >= 19.0f || TimeOfDay < 6.0f;
+        public bool AreFloodlightsActive => CurrentShift != ShiftPeriod.FirstShift_Day;
 
         public string CurrentTimeString
         {
@@ -139,7 +140,10 @@ namespace ShipyardCat.World
 
         public void ToggleNightShift()
         {
-            float targetHour = IsNight ? 7.0f : 20.0f;
+            // Cycle cleanly: Dusk (17:45) -> Night (23:30) -> Day (09:30) -> Dusk (17:45)
+            float targetHour = CurrentShift == ShiftPeriod.SecondShift_Dusk
+                ? 23.5f
+                : (CurrentShift == ShiftPeriod.ThirdShift_Night ? 9.5f : 17.75f);
             SetTimeOfDay(targetHour);
         }
 
@@ -225,7 +229,7 @@ namespace ShipyardCat.World
 
         private static ShiftPeriod EvaluateShiftPeriod(float hour)
         {
-            if (hour >= 18.0f || hour < 6.0f)
+            if (hour >= 19.0f || hour < 6.0f)
             {
                 return ShiftPeriod.ThirdShift_Night;
             }
@@ -258,8 +262,14 @@ namespace ShipyardCat.World
             var mainCam = Camera.main;
             if (mainCam != null)
             {
-                mainCam.clearFlags = IsNight ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
+                mainCam.clearFlags = CameraClearFlags.Skybox;
                 mainCam.backgroundColor = fogColor;
+            }
+
+            if (RenderSettings.skybox != null && RenderSettings.skybox.HasProperty("_Exposure"))
+            {
+                float skyExposure = IsNight ? 0.38f : (CurrentShift == ShiftPeriod.SecondShift_Dusk ? 0.92f : 1.25f);
+                RenderSettings.skybox.SetFloat("_Exposure", skyExposure);
             }
 
             if (sunLight != null)
@@ -271,10 +281,10 @@ namespace ShipyardCat.World
 
             if (forceFloodlights)
             {
-                bool nightActive = IsNight;
+                bool lampsOn = AreFloodlightsActive;
                 for (int i = 0; i < _registeredFloodlights.Count; i++)
                 {
-                    ApplyFloodlightEntry(_registeredFloodlights[i], nightActive);
+                    ApplyFloodlightEntry(_registeredFloodlights[i], lampsOn);
                 }
             }
         }

@@ -47,7 +47,7 @@ namespace ShipyardCat
                 Keyboard keyboard = Keyboard.current;
                 if (keyboard != null && keyboard.mKey.wasPressedThisFrame)
                 {
-                    IsFullMapOpen = !IsFullMapOpen;
+                    ToggleFullMap();
                 }
 
                 _blips.Clear();
@@ -66,6 +66,8 @@ namespace ShipyardCat
                 CollectBlips(_kingpinBosses, KindKingpinBoss, albaPos, radiusSqr, invRadius);
                 CollectBlips(_lieutenantCobaltBosses, KindLieutenantCobaltBoss, albaPos, radiusSqr, invRadius);
             }
+
+            public void ToggleFullMap() => IsFullMapOpen = !IsFullMapOpen;
 
             public void RefreshTrackedTargets()
             {

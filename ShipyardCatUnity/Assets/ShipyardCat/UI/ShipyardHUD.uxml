@@ -1,196 +1,183 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-<Style src="project://database/Assets/ShipyardCat/UI/ShipyardHUD.uss" />
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/ShipyardCat/UI/ShipyardHUD.uss" />
+
     <ui:VisualElement name="hud-root" class="hud-root" picking-mode="Ignore">
-        <!-- Top Status Bar -->
-        <ui:VisualElement name="top-bar" class="top-bar glass-panel" picking-mode="Ignore">
-            <ui:VisualElement class="top-bar-left" picking-mode="Ignore">
-                <ui:VisualElement class="stat-pill">
-                    <ui:Label text="SHIFT" class="stat-caption" />
-                    <ui:Label name="shift-label" text="DAY SHIFT // 01" class="stat-value accent-amber" />
-                </ui:VisualElement>
-                <ui:VisualElement class="stat-pill">
-                    <ui:Label text="ZONE" class="stat-caption" />
-                    <ui:Label name="zone-label" text="DRY DOCK ALPHA" class="stat-value" />
-                </ui:VisualElement>
-                <ui:VisualElement class="stat-pill">
-                    <ui:Label text="WAVE" class="stat-caption" />
-                    <ui:Label name="wave-label" text="WAVE 1" class="stat-value" />
-                </ui:VisualElement>
-                <ui:VisualElement class="stat-pill">
-                    <ui:Label text="VERMIN" class="stat-caption" />
-                    <ui:Label name="rats-label" text="0 / 10" class="stat-value accent-red" />
-                    <ui:Label name="vermin-label" text="ACTIVE: 0" class="stat-subvalue" />
-                </ui:VisualElement>
-                <ui:VisualElement class="stat-pill">
-                    <ui:Label text="HULL" class="stat-caption" />
-                    <ui:Label name="integrity-label" text="100%" class="stat-value accent-cyan" />
-                </ui:VisualElement>
-                <ui:VisualElement class="stat-pill">
-                    <ui:Label text="SCORE" class="stat-caption" />
-                    <ui:Label name="score-label" text="0000" class="stat-value accent-amber" />
-                </ui:VisualElement>
-            </ui:VisualElement>
+        <!-- Gameplay HUD Layer -->
+        <ui:VisualElement name="gameplay-hud-layer" class="gameplay-hud-layer" picking-mode="Ignore">
 
-            <ui:VisualElement class="top-bar-actions">
-                <ui:Button name="btn-night-shift" text="NIGHT SHIFT" class="hud-btn hud-btn-amber" />
-                <ui:Button name="btn-camera" text="CAM" class="hud-btn" />
-                <ui:Button name="btn-protocol" text="PROTOCOL" class="hud-btn" />
-                <ui:Button name="btn-restart" text="RESET" class="hud-btn hud-btn-danger" />
-            </ui:VisualElement>
-        </ui:VisualElement>
-
-        <!-- Middle HUD Region -->
-        <ui:VisualElement name="mid-hud" class="mid-hud" picking-mode="Ignore">
-            <!-- Vitals Card (Top-Left) -->
-            <ui:VisualElement name="vitals-card" class="vitals-card glass-panel" picking-mode="Ignore">
-                <ui:Label text="ALBA // UNIT-09 VITALS" class="card-header" />
-
-                <ui:VisualElement class="meter-row" picking-mode="Ignore">
-                    <ui:VisualElement class="meter-header" picking-mode="Ignore">
-                        <ui:Label text="HEALTH" class="meter-label" />
-                        <ui:Label name="health-label" text="100 / 100" class="meter-value" />
-                    </ui:VisualElement>
-                    <ui:VisualElement class="meter-track" picking-mode="Ignore">
-                        <ui:VisualElement name="health-bar-fill" class="meter-fill fill-health" picking-mode="Ignore" />
-                        <ui:VisualElement name="bar-health" class="meter-fill-mirror" picking-mode="Ignore" />
-                    </ui:VisualElement>
-                </ui:VisualElement>
-
-                <ui:VisualElement class="meter-row" picking-mode="Ignore">
-                    <ui:VisualElement class="meter-header" picking-mode="Ignore">
-                        <ui:Label text="STAMINA" class="meter-label" />
-                        <ui:Label name="stamina-label" text="100 / 100" class="meter-value" />
-                    </ui:VisualElement>
-                    <ui:VisualElement class="meter-track" picking-mode="Ignore">
-                        <ui:VisualElement name="stamina-bar-fill" class="meter-fill fill-stamina" picking-mode="Ignore" />
-                        <ui:VisualElement name="bar-stamina" class="meter-fill-mirror" picking-mode="Ignore" />
-                    </ui:VisualElement>
-                </ui:VisualElement>
-
-                <ui:VisualElement class="meter-row" picking-mode="Ignore">
-                    <ui:VisualElement class="meter-header" picking-mode="Ignore">
-                        <ui:Label text="RAD / FOCUS" class="meter-label" />
-                        <ui:Label name="rad-label" text="0%" class="meter-value" />
-                    </ui:VisualElement>
-                    <ui:VisualElement class="meter-track" picking-mode="Ignore">
-                        <ui:VisualElement name="rad-bar-fill" class="meter-fill fill-rad" picking-mode="Ignore" />
-                        <ui:VisualElement name="bar-focus" class="meter-fill-mirror" picking-mode="Ignore" />
-                    </ui:VisualElement>
-                </ui:VisualElement>
-
-                <ui:VisualElement class="meter-row meter-row-compact" picking-mode="Ignore">
-                    <ui:VisualElement class="meter-header" picking-mode="Ignore">
-                        <ui:Label text="WARMTH" class="meter-label" />
-                        <ui:Label text="FULLNESS" class="meter-label" />
-                    </ui:VisualElement>
-                    <ui:VisualElement class="dual-meter-tracks" picking-mode="Ignore">
-                        <ui:VisualElement class="meter-track meter-track-half" picking-mode="Ignore">
-                            <ui:VisualElement name="bar-warmth" class="meter-fill fill-warmth" picking-mode="Ignore" />
+            <!-- Top-Left Column: Minimal 3-Bar Vitals + Floating Diamond Objective -->
+            <ui:VisualElement name="left-hud-column" class="left-hud-column" picking-mode="Ignore">
+                <ui:VisualElement name="vitals-card" class="vitals-card" picking-mode="Ignore">
+                    <ui:VisualElement class="vital-row" picking-mode="Ignore">
+                        <ui:Label text="♥" class="vital-glyph vital-glyph-health" picking-mode="Ignore" />
+                        <ui:VisualElement name="bar-health" class="vital-bar-track bar-health" picking-mode="Ignore">
+                            <ui:VisualElement name="health-bar-fill" class="vital-bar-fill health-bar-fill" style="width: 100%;" picking-mode="Ignore" />
                         </ui:VisualElement>
-                        <ui:VisualElement class="meter-track meter-track-half" picking-mode="Ignore">
-                            <ui:VisualElement name="bar-fullness" class="meter-fill fill-fullness" picking-mode="Ignore" />
+                        <ui:Label name="health-label" text="100/100" class="vital-value-label" picking-mode="Ignore" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="vital-row" picking-mode="Ignore">
+                        <ui:Label text="⚡" class="vital-glyph vital-glyph-stamina" picking-mode="Ignore" />
+                        <ui:VisualElement name="bar-stamina" class="vital-bar-track bar-stamina" picking-mode="Ignore">
+                            <ui:VisualElement name="stamina-bar-fill" class="vital-bar-fill stamina-bar-fill" style="width: 100%;" picking-mode="Ignore" />
                         </ui:VisualElement>
+                        <ui:Label name="stamina-label" text="100/100" class="vital-value-label" picking-mode="Ignore" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="vital-row" picking-mode="Ignore">
+                        <ui:Label text="☢" class="vital-glyph vital-glyph-rad" picking-mode="Ignore" />
+                        <ui:VisualElement name="bar-rad" class="vital-bar-track bar-rad" picking-mode="Ignore">
+                            <ui:VisualElement name="rad-bar-fill" class="vital-bar-fill rad-bar-fill" style="width: 0%;" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                        <ui:Label name="rad-label" text="0%" class="vital-value-label" picking-mode="Ignore" />
+                    </ui:VisualElement>
+
+                    <!-- Legacy / secondary vital bar anchors retained for controller & test compatibility -->
+                    <ui:VisualElement name="bar-focus" class="vital-bar-track legacy-hidden" style="display: none;" picking-mode="Ignore" />
+                    <ui:VisualElement name="bar-warmth" class="vital-bar-track legacy-hidden" style="display: none;" picking-mode="Ignore" />
+                    <ui:VisualElement name="bar-fullness" class="vital-bar-track legacy-hidden" style="display: none;" picking-mode="Ignore" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="mission-card" class="mission-card" picking-mode="Ignore">
+                    <ui:VisualElement class="mission-header" picking-mode="Ignore">
+                        <ui:Label text="◆" class="mission-diamond" picking-mode="Ignore" />
+                        <ui:Label name="mission-title" text="ACTIVE DIRECTIVE" class="mission-title" picking-mode="Ignore" />
+                        <ui:Label name="mission-progress" text="0/1" class="mission-progress" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:Label name="objective-label" text="Patrol Drydock Sector 1" class="objective-label" picking-mode="Ignore" />
+                    <ui:Label name="mission-desc" text="Clear vermin nests and inspect bulkhead integrity." class="mission-desc" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Top-Center Column: Compact Utility Strip, Slim Boss Bar & Toast -->
+            <ui:VisualElement name="top-center-column" class="top-center-column" picking-mode="Ignore">
+                <ui:VisualElement name="top-bar" class="top-bar">
+                    <ui:VisualElement class="top-bar-telemetry" picking-mode="Ignore">
+                        <ui:Label name="shift-label" text="DAY SHIFT" class="telemetry-chip shift-chip" picking-mode="Ignore" />
+                        <ui:Label name="zone-label" text="SLIPWAY A" class="telemetry-chip" picking-mode="Ignore" />
+                        <ui:Label name="wave-label" text="WAVE 1" class="telemetry-chip" picking-mode="Ignore" />
+                        <ui:Label name="rats-label" text="RATS 0" class="telemetry-chip" picking-mode="Ignore" />
+                        <ui:Label name="vermin-label" text="VERMIN 0" class="telemetry-chip" picking-mode="Ignore" />
+                        <ui:Label name="integrity-label" text="HULL 100%" class="telemetry-chip" picking-mode="Ignore" />
+                        <ui:Label name="score-label" text="SCORE 0" class="telemetry-chip score-chip" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="top-bar-actions">
+                        <ui:Button name="btn-night-shift" text="NIGHT" class="utility-btn" />
+                        <ui:Button name="btn-camera" text="CAM" class="utility-btn" />
+                        <ui:Button name="btn-protocol" text="PROTOCOL" class="utility-btn" />
+                        <ui:Button name="btn-logbook" text="LOGBOOK" class="utility-btn" />
+                        <ui:Button name="btn-restart" text="RESTART" class="utility-btn utility-btn-warn" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-            </ui:VisualElement>
 
-            <!-- Boss Card (Top-Center, hidden when no boss active) -->
-            <ui:VisualElement name="boss-card" class="boss-card glass-panel hidden" picking-mode="Ignore">
-                <ui:VisualElement class="boss-header" picking-mode="Ignore">
-                    <ui:Label name="boss-name-label" text="APEX BILGE KING" class="boss-title" />
-                    <ui:Label name="boss-health-label" text="1000 / 1000" class="boss-hp-text" />
+                <ui:VisualElement name="boss-card" class="boss-card" style="display: none;" picking-mode="Ignore">
+                    <ui:VisualElement class="boss-header" picking-mode="Ignore">
+                        <ui:Label name="boss-name-label" text="DOCKYARD MATRIARCH" class="boss-name-label" picking-mode="Ignore" />
+                        <ui:Label name="boss-health-label" text="1000 / 1000" class="boss-health-label" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="bar-boss" class="boss-bar-track bar-boss" picking-mode="Ignore">
+                        <ui:VisualElement name="boss-health-fill" class="boss-health-fill" style="width: 100%;" picking-mode="Ignore" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement class="meter-track boss-track" picking-mode="Ignore">
-                    <ui:VisualElement name="boss-health-fill" class="meter-fill fill-boss" picking-mode="Ignore" />
-                    <ui:VisualElement name="bar-boss" class="meter-fill-mirror" picking-mode="Ignore" />
+
+                <ui:VisualElement name="toast-banner" class="toast-banner" style="display: none;" picking-mode="Ignore">
+                    <ui:Label name="toast-label" text="" class="toast-label" picking-mode="Ignore" />
                 </ui:VisualElement>
             </ui:VisualElement>
-        </ui:VisualElement>
 
-        <!-- Toast Banner -->
-        <ui:VisualElement name="toast-banner" class="toast-banner glass-panel hidden" picking-mode="Ignore">
-            <ui:Label name="toast-label" text="SECTOR ALERT" class="toast-text" />
-        </ui:VisualElement>
-
-        <!-- Bottom Dock -->
-        <ui:VisualElement name="bottom-dock" class="bottom-dock" picking-mode="Ignore">
-            <ui:VisualElement name="toolbar" class="toolbar glass-panel">
-                <ui:Button name="slot-0" text="1 CLAW" class="toolbar-slot toolbar-slot-active" />
-                <ui:Button name="slot-1" text="2 POUNCE" class="toolbar-slot" />
-                <ui:Button name="slot-2" text="3 TORCH" class="toolbar-slot" />
-                <ui:Button name="slot-3" text="4 RATION" class="toolbar-slot" />
-                <ui:Button name="slot-4" text="5 PING" class="toolbar-slot" />
+            <!-- Top-Right: 146x146 Circular Radar with Inner Range Rings -->
+            <ui:VisualElement name="radar-card" class="radar-card" picking-mode="Ignore">
+                <ui:VisualElement name="radar-circle" class="radar-circle" style="width: 146px; height: 146px;" picking-mode="Ignore">
+                    <ui:VisualElement name="radar-ring-outer" class="radar-ring radar-ring-outer" picking-mode="Ignore" />
+                    <ui:VisualElement name="radar-ring-mid" class="radar-ring radar-ring-mid" picking-mode="Ignore" />
+                    <ui:VisualElement name="radar-ring-inner" class="radar-ring radar-ring-inner" picking-mode="Ignore" />
+                    <ui:VisualElement class="radar-axis-h" picking-mode="Ignore" />
+                    <ui:VisualElement class="radar-axis-v" picking-mode="Ignore" />
+                    <ui:VisualElement name="radar-blips-layer" class="radar-blips-layer" picking-mode="Ignore" />
+                    <ui:VisualElement name="radar-player-arrow" class="radar-player-arrow" picking-mode="Ignore" />
+                </ui:VisualElement>
             </ui:VisualElement>
 
-            <ui:VisualElement name="mission-card" class="mission-card glass-panel" picking-mode="Ignore">
-                <ui:Label name="mission-title" text="ACTIVE DIRECTIVE" class="card-header" />
-                <ui:Label name="objective-label" text="Clear vermin infestation from Dry Dock Alpha." class="mission-objective" />
-                <ui:Label name="mission-desc" text="Patrol crane rails and reactor bulkheads." class="mission-desc" />
-                <ui:Label name="mission-progress" text="0 / 10 CLEARED" class="mission-progress" />
+            <!-- Bottom-Center: Contextual Prompt & Docked Action Toolbar -->
+            <ui:VisualElement name="bottom-center-column" class="bottom-center-column" picking-mode="Ignore">
+                <ui:VisualElement name="contextual-prompt-bar" class="contextual-prompt-bar" style="display: none;" picking-mode="Ignore">
+                    <ui:Label name="contextual-prompt-label" text="[E] INSPECT" class="contextual-prompt-label" picking-mode="Ignore" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="bottom-dock" class="bottom-dock">
+                    <ui:VisualElement name="toolbar" class="toolbar">
+                        <ui:Button name="slot-0" text="1 CLAW" class="toolbar-slot active" />
+                        <ui:Button name="slot-1" text="2 POUNCE" class="toolbar-slot" />
+                        <ui:Button name="slot-2" text="3 TORCH" class="toolbar-slot" />
+                        <ui:Button name="slot-3" text="4 BAIT" class="toolbar-slot" />
+                        <ui:Button name="slot-4" text="5 MEDKIT" class="toolbar-slot" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
 
         <!-- Title / Login Overlay -->
-        <ui:VisualElement name="title-login-overlay" class="modal-overlay">
-            <ui:VisualElement name="title-login-card" class="modal-card title-login-card glass-panel">
-                <ui:Label text="SHIPYARD CAT // SECTOR 07" class="title-kicker" />
-                <ui:Label text="ALBA PROTOCOL" class="title-heading" />
-                <ui:Label text="DRY DOCK VERMIN CONTAINMENT &amp; REACTOR PATROL" class="title-subtitle" />
-
-                <ui:VisualElement class="login-field-group">
-                    <ui:Label text="OPERATOR CALLSIGN" class="field-label" />
-                    <ui:TextField name="callsign-input" value="ALBA-01" max-length="16" class="callsign-input" />
-                </ui:VisualElement>
-
-                <ui:Label name="auth-status-label" text="INITIALIZING UGS LINK..." class="auth-status-label" />
-
-                <ui:Button name="btn-begin-shift" text="BEGIN SHIFT" class="primary-action-btn" />
+        <ui:VisualElement name="title-login-overlay" class="modal-overlay title-login-overlay">
+            <ui:VisualElement name="title-login-card" class="modal-card title-login-card">
+                <ui:Label text="SHIPYARD CAT" class="title-logo" />
+                <ui:Label text="DRY-DOCK SURVIVAL &amp; PEST CONTROL" class="title-subtitle" />
+                <ui:TextField name="callsign-input" label="OPERATOR CALLSIGN" value="WHISKERS-01" class="callsign-input" />
+                <ui:Label name="auth-status-label" text="READY FOR SHIFT CHECK-IN" class="auth-status-label" />
+                <ui:Button name="btn-begin-shift" text="BEGIN SHIFT" class="primary-btn" />
             </ui:VisualElement>
         </ui:VisualElement>
 
         <!-- Pause Overlay -->
-        <ui:VisualElement name="pause-overlay" class="modal-overlay hidden">
-            <ui:VisualElement class="modal-card pause-card glass-panel">
-                <ui:Label text="SHIFT SUSPENDED" class="modal-title" />
-                <ui:Label text="SYSTEM &amp; AUDIO CALIBRATION" class="modal-subtitle" />
-
-                <ui:VisualElement class="slider-group">
-                    <ui:Label text="MUSIC VOLUME" class="field-label" />
-                    <ui:Slider name="music-slider" low-value="0" high-value="1" value="0.7" class="hud-slider" />
-                </ui:VisualElement>
-
-                <ui:VisualElement class="slider-group">
-                    <ui:Label text="SFX VOLUME" class="field-label" />
-                    <ui:Slider name="sfx-slider" low-value="0" high-value="1" value="0.85" class="hud-slider" />
-                </ui:VisualElement>
-
-                <ui:VisualElement class="modal-btn-stack">
-                    <ui:Button name="btn-resume" text="RESUME SHIFT" class="primary-action-btn" />
-                    <ui:Button name="btn-pause-restart" text="RESTART SHIFT" class="secondary-action-btn" />
-                    <ui:Button name="btn-quit-title" text="RETURN TO TITLE" class="danger-action-btn" />
+        <ui:VisualElement name="pause-overlay" class="modal-overlay pause-overlay" style="display: none;">
+            <ui:VisualElement class="modal-card pause-card">
+                <ui:Label text="SHIFT PAUSED" class="modal-title" />
+                <ui:Slider name="music-slider" label="MUSIC VOLUME" low-value="0" high-value="1" value="0.7" class="settings-slider" />
+                <ui:Slider name="sfx-slider" label="SFX VOLUME" low-value="0" high-value="1" value="0.85" class="settings-slider" />
+                <ui:VisualElement class="modal-actions">
+                    <ui:Button name="btn-resume" text="RESUME SHIFT" class="primary-btn" />
+                    <ui:Button name="btn-pause-restart" text="RESTART SHIFT" class="secondary-btn" />
+                    <ui:Button name="btn-quit-title" text="RETURN TO TITLE" class="secondary-btn" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Protocol Overlay -->
-        <ui:VisualElement name="protocol-overlay" class="modal-overlay hidden">
-            <ui:VisualElement class="modal-card protocol-card glass-panel">
-                <ui:Label text="SHIPYARD CONTAINMENT PROTOCOL" class="modal-title" />
-                <ui:Label text="1. MOVE: WASD / ARROWS  |  SPRINT: SHIFT  |  JUMP / POUNCE: SPACE" class="protocol-line" />
-                <ui:Label text="2. CLAW STRIKE: LEFT CLICK / F  |  PAUSE: ESC / P" class="protocol-line" />
-                <ui:Label text="3. ELIMINATE BILGE VERMIN BEFORE HULL INTEGRITY DROPS TO ZERO." class="protocol-line" />
-                <ui:Label text="4. MONITOR RADIATION EXPOSURE NEAR REACTOR BULKHEADS." class="protocol-line" />
-                <ui:Button name="btn-close-protocol" text="ACKNOWLEDGE" class="primary-action-btn" />
+        <!-- Protocol / Controls Overlay -->
+        <ui:VisualElement name="protocol-overlay" class="modal-overlay protocol-overlay" style="display: none;">
+            <ui:VisualElement class="modal-card protocol-card">
+                <ui:Label text="DOCKYARD FIELD PROTOCOL" class="modal-title" />
+                <ui:Label text="1. MOVE: WASD | ORBIT CAMERA: ARROWS / RMB | SPRINT: SHIFT | JUMP: SPACE" class="protocol-line" />
+                <ui:Label text="2. STRIKE / INTERACT: LMB / E | SLOTS: 1-5 | PAUSE: ESC" class="protocol-line" />
+                <ui:Label text="3. MONITOR RADIATION IN REACTOR BAYS &amp; PROTECT HULL INTEGRITY." class="protocol-line" />
+                <ui:Button name="btn-close-protocol" text="ACKNOWLEDGE" class="primary-btn" />
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Endgame Overlay -->
-        <ui:VisualElement name="endgame-overlay" class="modal-overlay hidden">
-            <ui:VisualElement class="modal-card endgame-card glass-panel">
+        <!-- Logbook & Perks Overlay -->
+        <ui:VisualElement name="logbook-overlay" class="modal-overlay logbook-overlay" style="display: none;">
+            <ui:VisualElement class="modal-card logbook-card">
+                <ui:Label text="SHIPYARD LOGBOOK" class="modal-title" />
+                <ui:VisualElement class="logbook-stats-row">
+                    <ui:Label name="logbook-rank-label" text="RANK: APPRENTICE MOUSER" class="logbook-stat-chip" />
+                    <ui:Label name="logbook-xp-label" text="XP: 0 / 100" class="logbook-stat-chip" />
+                </ui:VisualElement>
+                <ui:ScrollView name="logbook-acts-container" class="logbook-acts-container" />
+                <ui:VisualElement class="perk-grid">
+                    <ui:Button name="btn-perk-agility" text="AGILITY PERK" class="perk-btn" />
+                    <ui:Button name="btn-perk-stealth" text="STEALTH PERK" class="perk-btn" />
+                    <ui:Button name="btn-perk-combat" text="COMBAT PERK" class="perk-btn" />
+                    <ui:Button name="btn-perk-rad" text="RAD RESIST PERK" class="perk-btn" />
+                </ui:VisualElement>
+                <ui:Button name="btn-close-logbook" text="CLOSE LOGBOOK" class="primary-btn" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Endgame Summary Overlay -->
+        <ui:VisualElement name="endgame-overlay" class="modal-overlay endgame-overlay" style="display: none;">
+            <ui:VisualElement class="modal-card endgame-card">
                 <ui:Label name="endgame-title" text="SHIFT COMPLETE" class="modal-title" />
-                <ui:Label name="endgame-subtitle" text="SECTOR SECURED" class="modal-subtitle" />
-                <ui:Label name="endgame-summary" text="ALL VERMIN CONTAINED." class="protocol-line" />
-                <ui:Button name="btn-endgame-restart" text="DEPLOY NEXT SHIFT" class="primary-action-btn" />
+                <ui:Label name="endgame-subtitle" text="SECTOR STATUS REPORT" class="modal-subtitle" />
+                <ui:Label name="endgame-summary" text="Vermin Eliminated: 0 | Final Score: 0" class="endgame-summary" />
+                <ui:Button name="btn-endgame-restart" text="START NEW SHIFT" class="primary-btn" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

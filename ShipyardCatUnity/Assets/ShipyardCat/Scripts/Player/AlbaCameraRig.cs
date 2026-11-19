@@ -9,16 +9,16 @@ namespace ShipyardCat.Player
     public class AlbaCameraRig : MonoBehaviour
     {
         [SerializeField] private Transform target;
-        [SerializeField] private float distance = 1.95f;
-        [SerializeField] private float minDistance = 0.8f;
-        [SerializeField] private float heightOffset = 0.45f;
+        [SerializeField] private float distance = 2.4f;
+        [SerializeField] private float minDistance = 0.85f;
+        [SerializeField] private float heightOffset = 0.58f;
         [SerializeField] private float yawSpeed = 120f;
         [SerializeField] private float pitchSpeed = 80f;
         [SerializeField] private float followSmooth = 14f;
         [SerializeField] private LayerMask collisionMask = ~0;
 
         private float _yaw = 0f;
-        private float _pitch = 10f;
+        private float _pitch = 12f;
         private float _currentDist;
 
         private void Awake()
@@ -81,6 +81,7 @@ namespace ShipyardCat.Player
 
             _currentDist = Mathf.Lerp(_currentDist, targetDist, Time.deltaTime * followSmooth);
             Vector3 desiredPos = pivot + backDir * _currentDist;
+            if (desiredPos.y < 0.25f) desiredPos.y = 0.25f;
             transform.position = Vector3.Lerp(transform.position, desiredPos, Time.deltaTime * followSmooth);
             transform.LookAt(pivot);
         }

@@ -1,55 +1,96 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using ShipyardCat.AI;
-using ShipyardCat.Core;
+using UnityEngine.Rendering;
 
 namespace ShipyardCat.Player
 {
     public class WhiskersSonarController : MonoBehaviour
     {
-        private struct MaterialEmissionSnapshot
-        {
-            public bool HadEmissionKeyword;
-            public bool HasEmissionProperty;
-            public Color OriginalEmissionColor;
-        }
+        private const int RingCount = 4;
+        private const int RingSegments = 48;
+        private const float MinRingRadius = 0.8f;
+        private const float MaxRingRadius = 24f;
+        private const float HighlightRadius = 28f;
+        private const float HighlightRadiusSqr = HighlightRadius * HighlightRadius;
 
-        [Header("Sonar Timing & Range")]
-        [SerializeField] private float pulseInterval = 1.6f;
-        [SerializeField] private float pulseDuration = 0.85f;
-        [SerializeField] private float maxPulseRadius = 24f;
-        [SerializeField] private float emissionIntensity = 2.25f;
-
-        [Header("Visual Feedback")]
-        [SerializeField] private float maxLightIntensity = 6f;
-        [SerializeField] private float lightRange = 18f;
-        [SerializeField] private float ringWidth = 0.14f;
-        [SerializeField] private int ringSegments = 48;
+        private static readonly Color ElectricCyan = new Color(0f, 240f / 255f, 1f, 1f);
+        private static readonly Color PhosphorGreenBoost = new Color(0.15f, 1f, 0.42f, 1f) * 2.2f;
+        private static readonly Color ThermalAmberBoost = new Color(1f, 0.52f, 0.05f, 1f) * 2.5f;
+        private static readonly float[] RingPhaseOffsets = { 0f, 0.25f, 0.5f, 0.75f };
 
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
-        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
-        private static readonly int ColorId = Shader.PropertyToID("_Color");
         private const string EmissionKeyword = "_EMISSION";
 
-        private readonly Dictionary<Material, MaterialEmissionSnapshot> _cachedMaterials =
-            new Dictionary<Material, MaterialEmissionSnapshot>();
+        [Header("Sonar Pulse Visuals")]
+        [SerializeField] private float pulseDuration = 2.4f;
+        [SerializeField] private float ringWidth = 0.12f;
+        [SerializeField] private float groundYOffset = 0.06f;
 
-        private readonly List<Material> _staleMaterialsBuffer = new List<Material>();
+        [Header("Sonar Ground Light")]
+        [SerializeField] private Light sonarPointLight;
+        [SerializeField] private float lightHeight = 0.65f;
+        [SerializeField] private float lightRange = 12f;
+        [SerializeField] private float lightIntensity = 3.2f;
 
-        private Light _sonarLight;
-        private LineRenderer _pulseRing;
+        private readonly LineRenderer[] _rings = new LineRenderer[RingCount];
+        private readonly Vector3[] _ringPositions = new Vector3[RingSegments];
+        private readonly float[] _cosTable = new float[RingSegments];
+        private readonly float[] _sinTable = new float[RingSegments];
+
+        private readonly Collider[] _overlapBuffer = new Collider[128];
+        private readonly List<MonoBehaviour> _tempBehaviours = new List<MonoBehaviour>(16);
+        private readonly List<Renderer> _tempRenderers = new List<Renderer>(16);
+        private readonly List<HighlightedTarget> _highlightedTargets = new List<HighlightedTarget>(32);
+        private readonly HashSet<int> _highlightedTargetIds = new HashSet<int>();
+
         private Material _ringMaterial;
-        private float _pulseTimer;
-        private float _pulseElapsed;
-        private bool _isPulsing;
+        private Transform _visualRoot;
+        private bool _visualsInitialized;
+        private bool _trigInitialized;
+        private bool _ownsPointLight;
+        private float _sonarTime;
 
         public bool IsSonarActive { get; private set; }
+        public int ActiveRingCount => RingCount;
+
+        private struct MaterialSnapshot
+        {
+            public Material Material;
+            public Color OriginalEmissionColor;
+            public bool HadEmissionKeyword;
+            public MaterialGlobalIlluminationFlags OriginalGiFlags;
+            public bool HasEmissionProperty;
+        }
+
+        private sealed class HighlightedTarget
+        {
+            public int InstanceId;
+            public MonoBehaviour Component;
+            public readonly List<MaterialSnapshot> Snapshots = new List<MaterialSnapshot>(4);
+        }
 
         private void Awake()
         {
-            EnsureVisualRig();
-            SetVisualsActive(false);
+            EnsureTrigTable();
+            EnsureVisualsInitialized();
+            SetVisualsEnabled(IsSonarActive);
+        }
+
+        private void OnEnable()
+        {
+            if (IsSonarActive)
+            {
+                EnsureVisualsInitialized();
+                SetVisualsEnabled(true);
+                UpdateRings(_sonarTime);
+                UpdatePointLight();
+
+                if (Application.isPlaying)
+                {
+                    RefreshHighlightsFullScan();
+                }
+            }
         }
 
         private void Update()
@@ -59,37 +100,51 @@ namespace ShipyardCat.Player
                 return;
             }
 
-            _pulseTimer -= Time.deltaTime;
-            if (_pulseTimer <= 0f)
+            float duration = Mathf.Max(0.1f, pulseDuration);
+            _sonarTime += Time.deltaTime;
+            if (_sonarTime >= duration)
             {
-                TriggerPulse();
-                _pulseTimer = Mathf.Max(0.25f, pulseInterval);
+                _sonarTime -= duration;
             }
 
-            UpdatePulseVisuals(Time.deltaTime);
-            RefreshHighlightedTargets();
+            UpdateRings(_sonarTime);
+            UpdatePointLight();
+
+            if (Application.isPlaying)
+            {
+                UpdateHighlightsRuntime();
+            }
         }
 
         private void OnDisable()
         {
-            if (IsSonarActive)
-            {
-                SetSonarActive(false);
-            }
-            else
-            {
-                RestoreAllMaterials();
-            }
+            SetVisualsEnabled(false);
+            RestoreAllHighlights();
         }
 
         private void OnDestroy()
         {
-            RestoreAllMaterials();
+            RestoreAllHighlights();
+
             if (_ringMaterial != null)
             {
-                Destroy(_ringMaterial);
+                DestroyObjectSafe(_ringMaterial);
                 _ringMaterial = null;
             }
+
+            if (_visualRoot != null)
+            {
+                DestroyObjectSafe(_visualRoot.gameObject);
+                _visualRoot = null;
+            }
+
+            if (_ownsPointLight && sonarPointLight != null)
+            {
+                DestroyObjectSafe(sonarPointLight.gameObject);
+                sonarPointLight = null;
+            }
+
+            _visualsInitialized = false;
         }
 
         public void ToggleSonar()
@@ -99,298 +154,461 @@ namespace ShipyardCat.Player
 
         public void SetSonarActive(bool active)
         {
-            if (IsSonarActive == active)
+            if (IsSonarActive == active && _visualsInitialized)
             {
+                if (!active)
+                {
+                    SetVisualsEnabled(false);
+                    RestoreAllHighlights();
+                }
                 return;
             }
 
             IsSonarActive = active;
 
-            if (IsSonarActive)
+            if (active)
             {
-                _pulseTimer = Mathf.Max(0.25f, pulseInterval);
-                TriggerPulse();
-                RefreshHighlightedTargets();
+                _sonarTime = 0f;
+                EnsureTrigTable();
+                EnsureVisualsInitialized();
+                SetVisualsEnabled(true);
+                UpdateRings(0f);
+                UpdatePointLight();
+
+                if (Application.isPlaying)
+                {
+                    RefreshHighlightsFullScan();
+                }
             }
             else
             {
-                _isPulsing = false;
-                SetVisualsActive(false);
-                RestoreAllMaterials();
+                SetVisualsEnabled(false);
+                RestoreAllHighlights();
             }
         }
 
-        public void TriggerPulse()
+        private void EnsureTrigTable()
         {
-            _isPulsing = true;
-            _pulseElapsed = 0f;
-            SetVisualsActive(true);
-            ShipyardAudioManager.Instance?.PlaySFX("Sonar", transform.position);
-        }
-
-        private void EnsureVisualRig()
-        {
-            if (_sonarLight == null)
+            if (_trigInitialized)
             {
-                var lightObj = new GameObject("WhiskersSonarLight");
-                lightObj.transform.SetParent(transform, false);
-                lightObj.transform.localPosition = new Vector3(0f, 0.75f, 0.25f);
-
-                _sonarLight = lightObj.AddComponent<Light>();
-                _sonarLight.type = LightType.Point;
-                _sonarLight.color = ShipyardPalette.ThermalPreyAmber;
-                _sonarLight.range = lightRange;
-                _sonarLight.intensity = 0f;
-                _sonarLight.shadows = LightShadows.None;
+                return;
             }
 
-            if (_pulseRing == null)
+            float step = (Mathf.PI * 2f) / RingSegments;
+            for (int i = 0; i < RingSegments; i++)
             {
-                var ringObj = new GameObject("WhiskersSonarRing");
-                ringObj.transform.SetParent(transform, false);
-                ringObj.transform.localPosition = new Vector3(0f, 0.15f, 0f);
+                float angle = i * step;
+                _cosTable[i] = Mathf.Cos(angle);
+                _sinTable[i] = Mathf.Sin(angle);
+            }
 
-                _pulseRing = ringObj.AddComponent<LineRenderer>();
-                _pulseRing.useWorldSpace = false;
-                _pulseRing.loop = true;
-                _pulseRing.alignment = LineAlignment.TransformZ;
-                ringObj.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            _trigInitialized = true;
+        }
 
-                _pulseRing.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                _pulseRing.receiveShadows = false;
-                _pulseRing.startWidth = ringWidth;
-                _pulseRing.endWidth = ringWidth;
-                _pulseRing.positionCount = Mathf.Max(12, ringSegments);
+        private void EnsureVisualsInitialized()
+        {
+            if (_visualsInitialized)
+            {
+                return;
+            }
 
-                Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (_ringMaterial == null)
+            {
+                Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
                 if (shader == null)
                 {
                     shader = Shader.Find("Sprites/Default");
                 }
+                if (shader == null)
+                {
+                    shader = Shader.Find("Unlit/Color");
+                }
 
                 if (shader != null)
                 {
-                    _ringMaterial = new Material(shader);
-                    SetRingColor(ShipyardPalette.ThermalPreyAmber);
-                    _pulseRing.sharedMaterial = _ringMaterial;
+                    _ringMaterial = new Material(shader)
+                    {
+                        name = "WhiskersSonarRingMaterial",
+                        hideFlags = HideFlags.DontSave
+                    };
+                    if (_ringMaterial.HasProperty("_BaseColor"))
+                    {
+                        _ringMaterial.SetColor("_BaseColor", Color.white);
+                    }
+                    if (_ringMaterial.HasProperty("_Color"))
+                    {
+                        _ringMaterial.SetColor("_Color", Color.white);
+                    }
                 }
+            }
+
+            if (_visualRoot == null)
+            {
+                var rootGo = new GameObject("WhiskersSonarRings");
+                rootGo.hideFlags = HideFlags.DontSave;
+                _visualRoot = rootGo.transform;
+                _visualRoot.SetParent(transform, false);
+            }
+
+            for (int i = 0; i < RingCount; i++)
+            {
+                if (_rings[i] != null)
+                {
+                    continue;
+                }
+
+                var ringGo = new GameObject($"SonarRing_{i}");
+                ringGo.hideFlags = HideFlags.DontSave;
+                ringGo.transform.SetParent(_visualRoot, false);
+
+                var lr = ringGo.AddComponent<LineRenderer>();
+                lr.useWorldSpace = true;
+                lr.loop = true;
+                lr.positionCount = RingSegments;
+                lr.startWidth = ringWidth;
+                lr.endWidth = ringWidth;
+                lr.alignment = LineAlignment.View;
+                lr.textureMode = LineTextureMode.Stretch;
+                lr.shadowCastingMode = ShadowCastingMode.Off;
+                lr.receiveShadows = false;
+                lr.allowOcclusionWhenDynamic = false;
+                lr.startColor = ElectricCyan;
+                lr.endColor = ElectricCyan;
+
+                if (_ringMaterial != null)
+                {
+                    lr.sharedMaterial = _ringMaterial;
+                }
+
+                _rings[i] = lr;
+            }
+
+            if (sonarPointLight == null)
+            {
+                var lightGo = new GameObject("WhiskersSonarLight");
+                lightGo.hideFlags = HideFlags.DontSave;
+                lightGo.transform.SetParent(transform, false);
+                lightGo.transform.localPosition = new Vector3(0f, lightHeight, 0f);
+
+                sonarPointLight = lightGo.AddComponent<Light>();
+                sonarPointLight.type = LightType.Point;
+                sonarPointLight.color = ElectricCyan;
+                sonarPointLight.range = lightRange;
+                sonarPointLight.intensity = lightIntensity;
+                sonarPointLight.shadows = LightShadows.None;
+                _ownsPointLight = true;
+            }
+
+            _visualsInitialized = true;
+        }
+
+        private void SetVisualsEnabled(bool enabled)
+        {
+            for (int i = 0; i < RingCount; i++)
+            {
+                if (_rings[i] != null)
+                {
+                    _rings[i].enabled = enabled;
+                }
+            }
+
+            if (sonarPointLight != null)
+            {
+                sonarPointLight.enabled = enabled;
             }
         }
 
-        private void SetVisualsActive(bool visible)
+        private void UpdateRings(float elapsed)
         {
-            if (_sonarLight != null)
+            if (!_visualsInitialized)
             {
-                _sonarLight.enabled = visible;
-                if (!visible)
-                {
-                    _sonarLight.intensity = 0f;
-                }
-            }
-
-            if (_pulseRing != null)
-            {
-                _pulseRing.enabled = visible;
-            }
-        }
-
-        private void UpdatePulseVisuals(float dt)
-        {
-            if (!_isPulsing)
-            {
-                if (_sonarLight != null)
-                {
-                    _sonarLight.intensity = Mathf.Lerp(_sonarLight.intensity, maxLightIntensity * 0.2f, dt * 8f);
-                }
-
-                if (_pulseRing != null)
-                {
-                    _pulseRing.enabled = false;
-                }
-
                 return;
             }
 
-            _pulseElapsed += dt;
             float duration = Mathf.Max(0.1f, pulseDuration);
-            float t = Mathf.Clamp01(_pulseElapsed / duration);
+            Vector3 center = transform.position;
+            float groundY = center.y + groundYOffset;
 
-            if (_sonarLight != null)
+            for (int r = 0; r < RingCount; r++)
             {
-                _sonarLight.enabled = true;
-                float pulseEnvelope = Mathf.Sin(t * Mathf.PI);
-                _sonarLight.color = ShipyardPalette.ThermalPreyAmber;
-                _sonarLight.intensity = Mathf.Lerp(maxLightIntensity * 0.25f, maxLightIntensity, pulseEnvelope);
-            }
-
-            if (_pulseRing != null)
-            {
-                _pulseRing.enabled = true;
-                float radius = Mathf.Lerp(0.6f, maxPulseRadius, t);
-                int count = _pulseRing.positionCount;
-                float step = (Mathf.PI * 2f) / count;
-
-                for (int i = 0; i < count; i++)
-                {
-                    float angle = i * step;
-                    _pulseRing.SetPosition(i, new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, 0f));
-                }
-
-                Color ringColor = ShipyardPalette.ThermalPreyAmber;
-                ringColor.a = 1f - t;
-                SetRingColor(ringColor);
-            }
-
-            if (t >= 1f)
-            {
-                _isPulsing = false;
-            }
-        }
-
-        private void SetRingColor(Color color)
-        {
-            if (_pulseRing != null)
-            {
-                _pulseRing.startColor = color;
-                _pulseRing.endColor = color;
-            }
-
-            if (_ringMaterial != null)
-            {
-                if (_ringMaterial.HasProperty(BaseColorId))
-                {
-                    _ringMaterial.SetColor(BaseColorId, color);
-                }
-                else if (_ringMaterial.HasProperty(ColorId))
-                {
-                    _ringMaterial.SetColor(ColorId, color);
-                }
-            }
-        }
-
-        private void RefreshHighlightedTargets()
-        {
-            var activeMaterials = new HashSet<Material>();
-
-            RatPreyAI[] rats = FindObjectsByType<RatPreyAI>(FindObjectsSortMode.None);
-            for (int i = 0; i < rats.Length; i++)
-            {
-                RatPreyAI rat = rats[i];
-                if (rat == null || !rat.IsAlive)
+                LineRenderer lr = _rings[r];
+                if (lr == null)
                 {
                     continue;
                 }
 
-                ApplyTintToObject(rat.gameObject, ShipyardPalette.ThermalPreyAmber, activeMaterials);
+                float phase = Mathf.Repeat(elapsed / duration + RingPhaseOffsets[r], 1f);
+                float radius = Mathf.Lerp(MinRingRadius, MaxRingRadius, phase);
+
+                float fadeIn = Mathf.Clamp01(phase / 0.06f);
+                float fadeOut = 1f - phase;
+                float alpha = fadeIn * fadeOut * fadeOut;
+
+                Color ringColor = new Color(ElectricCyan.r, ElectricCyan.g, ElectricCyan.b, alpha);
+                lr.startColor = ringColor;
+                lr.endColor = ringColor;
+
+                float width = Mathf.Lerp(ringWidth, ringWidth * 0.45f, phase);
+                lr.startWidth = width;
+                lr.endWidth = width;
+
+                for (int s = 0; s < RingSegments; s++)
+                {
+                    _ringPositions[s] = new Vector3(
+                        center.x + _cosTable[s] * radius,
+                        groundY,
+                        center.z + _sinTable[s] * radius
+                    );
+                }
+
+                lr.SetPositions(_ringPositions);
             }
-
-            KingpinBossAI boss = KingpinBossAI.Instance != null
-                ? KingpinBossAI.Instance
-                : FindAnyObjectByType<KingpinBossAI>();
-
-            if (boss != null && boss.IsAlive)
-            {
-                ApplyTintToObject(boss.gameObject, ShipyardPalette.KingpinCrimson, activeMaterials);
-            }
-
-            RestoreInactiveMaterials(activeMaterials);
         }
 
-        private void ApplyTintToObject(GameObject target, Color tint, HashSet<Material> activeMaterials)
+        private void UpdatePointLight()
         {
-            Renderer[] renderers = target.GetComponentsInChildren<Renderer>(false);
-            Color hdrEmission = tint * emissionIntensity;
-
-            for (int r = 0; r < renderers.Length; r++)
+            if (sonarPointLight == null)
             {
-                Renderer rendererComponent = renderers[r];
-                if (rendererComponent == null)
+                return;
+            }
+
+            sonarPointLight.color = ElectricCyan;
+            sonarPointLight.range = lightRange;
+
+            float pulse = 0.85f + 0.15f * Mathf.Sin((_sonarTime / Mathf.Max(0.1f, pulseDuration)) * Mathf.PI * 2f);
+            sonarPointLight.intensity = lightIntensity * pulse;
+
+            if (_ownsPointLight)
+            {
+                sonarPointLight.transform.localPosition = new Vector3(0f, lightHeight, 0f);
+            }
+        }
+
+        private void RefreshHighlightsFullScan()
+        {
+            if (!Application.isPlaying)
+            {
+                return;
+            }
+
+            Vector3 origin = transform.position;
+            MonoBehaviour[] allBehaviours = FindObjectsByType<MonoBehaviour>(
+                FindObjectsInactive.Exclude,
+                FindObjectsSortMode.None
+            );
+
+            for (int i = 0; i < allBehaviours.Length; i++)
+            {
+                MonoBehaviour mb = allBehaviours[i];
+                if (mb == null || !mb.isActiveAndEnabled)
                 {
                     continue;
                 }
 
-                Material[] materials = rendererComponent.materials;
-                for (int m = 0; m < materials.Length; m++)
+                if (!TryGetHighlightColor(mb, out Color boostColor))
                 {
-                    Material mat = materials[m];
+                    continue;
+                }
+
+                if ((mb.transform.position - origin).sqrMagnitude <= HighlightRadiusSqr)
+                {
+                    TryApplyHighlight(mb, boostColor);
+                }
+            }
+        }
+
+        private void UpdateHighlightsRuntime()
+        {
+            Vector3 origin = transform.position;
+
+            for (int i = _highlightedTargets.Count - 1; i >= 0; i--)
+            {
+                HighlightedTarget entry = _highlightedTargets[i];
+                if (entry.Component == null ||
+                    !entry.Component.isActiveAndEnabled ||
+                    (entry.Component.transform.position - origin).sqrMagnitude > HighlightRadiusSqr)
+                {
+                    RestoreTarget(entry);
+                    _highlightedTargetIds.Remove(entry.InstanceId);
+                    _highlightedTargets.RemoveAt(i);
+                }
+            }
+
+            int hitCount = Physics.OverlapSphereNonAlloc(
+                origin,
+                HighlightRadius,
+                _overlapBuffer,
+                ~0,
+                QueryTriggerInteraction.Collide
+            );
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                Collider col = _overlapBuffer[i];
+                if (col == null)
+                {
+                    continue;
+                }
+
+                _tempBehaviours.Clear();
+                col.GetComponentsInParent(false, _tempBehaviours);
+
+                for (int b = 0; b < _tempBehaviours.Count; b++)
+                {
+                    MonoBehaviour mb = _tempBehaviours[b];
+                    if (mb == null || !mb.isActiveAndEnabled)
+                    {
+                        continue;
+                    }
+
+                    if (!TryGetHighlightColor(mb, out Color boostColor))
+                    {
+                        continue;
+                    }
+
+                    if ((mb.transform.position - origin).sqrMagnitude <= HighlightRadiusSqr)
+                    {
+                        TryApplyHighlight(mb, boostColor);
+                    }
+                }
+            }
+        }
+
+        private static bool TryGetHighlightColor(MonoBehaviour behaviour, out Color boostColor)
+        {
+            string typeName = behaviour.GetType().Name;
+            switch (typeName)
+            {
+                case "RatPreyAI":
+                    boostColor = PhosphorGreenBoost;
+                    return true;
+                case "MutantCatAI":
+                case "KingpinBossAI":
+                case "LieutenantCobaltBossAI":
+                    boostColor = ThermalAmberBoost;
+                    return true;
+                default:
+                    boostColor = default;
+                    return false;
+            }
+        }
+
+        private void TryApplyHighlight(MonoBehaviour target, Color boostColor)
+        {
+            if (!Application.isPlaying)
+            {
+                return;
+            }
+
+            int id = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(target);
+            if (!_highlightedTargetIds.Add(id))
+            {
+                return;
+            }
+
+            var entry = new HighlightedTarget
+            {
+                InstanceId = id,
+                Component = target
+            };
+
+            _tempRenderers.Clear();
+            target.GetComponentsInChildren(false, _tempRenderers);
+
+            for (int r = 0; r < _tempRenderers.Count; r++)
+            {
+                Renderer rend = _tempRenderers[r];
+                if (rend == null)
+                {
+                    continue;
+                }
+
+                Material[] mats = rend.materials;
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    Material mat = mats[m];
                     if (mat == null)
                     {
                         continue;
                     }
 
-                    activeMaterials.Add(mat);
-
-                    if (!_cachedMaterials.ContainsKey(mat))
+                    bool hasEmission = mat.HasProperty(EmissionColorId);
+                    var snapshot = new MaterialSnapshot
                     {
-                        bool hasEmissionProp = mat.HasProperty(EmissionColorId);
-                        _cachedMaterials.Add(mat, new MaterialEmissionSnapshot
-                        {
-                            HadEmissionKeyword = mat.IsKeywordEnabled(EmissionKeyword),
-                            HasEmissionProperty = hasEmissionProp,
-                            OriginalEmissionColor = hasEmissionProp ? mat.GetColor(EmissionColorId) : Color.black
-                        });
-                    }
+                        Material = mat,
+                        HasEmissionProperty = hasEmission,
+                        OriginalEmissionColor = hasEmission ? mat.GetColor(EmissionColorId) : Color.black,
+                        HadEmissionKeyword = mat.IsKeywordEnabled(EmissionKeyword),
+                        OriginalGiFlags = mat.globalIlluminationFlags
+                    };
+
+                    entry.Snapshots.Add(snapshot);
 
                     mat.EnableKeyword(EmissionKeyword);
-                    if (mat.HasProperty(EmissionColorId))
+                    mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    if (hasEmission)
                     {
-                        mat.SetColor(EmissionColorId, hdrEmission);
+                        mat.SetColor(EmissionColorId, boostColor);
                     }
                 }
             }
+
+            _highlightedTargets.Add(entry);
         }
 
-        private void RestoreInactiveMaterials(HashSet<Material> activeMaterials)
+        private void RestoreAllHighlights()
         {
-            _staleMaterialsBuffer.Clear();
-
-            foreach (KeyValuePair<Material, MaterialEmissionSnapshot> kvp in _cachedMaterials)
+            for (int i = 0; i < _highlightedTargets.Count; i++)
             {
-                if (kvp.Key == null || !activeMaterials.Contains(kvp.Key))
-                {
-                    _staleMaterialsBuffer.Add(kvp.Key);
-                }
+                RestoreTarget(_highlightedTargets[i]);
             }
 
-            for (int i = 0; i < _staleMaterialsBuffer.Count; i++)
+            _highlightedTargets.Clear();
+            _highlightedTargetIds.Clear();
+        }
+
+        private static void RestoreTarget(HighlightedTarget entry)
+        {
+            for (int i = 0; i < entry.Snapshots.Count; i++)
             {
-                Material mat = _staleMaterialsBuffer[i];
-                if (mat != null && _cachedMaterials.TryGetValue(mat, out MaterialEmissionSnapshot snapshot))
+                MaterialSnapshot snap = entry.Snapshots[i];
+                if (snap.Material == null)
                 {
-                    RestoreMaterial(mat, snapshot);
+                    continue;
                 }
 
-                _cachedMaterials.Remove(mat);
+                if (snap.HasEmissionProperty)
+                {
+                    snap.Material.SetColor(EmissionColorId, snap.OriginalEmissionColor);
+                }
+
+                if (snap.HadEmissionKeyword)
+                {
+                    snap.Material.EnableKeyword(EmissionKeyword);
+                }
+                else
+                {
+                    snap.Material.DisableKeyword(EmissionKeyword);
+                }
+
+                snap.Material.globalIlluminationFlags = snap.OriginalGiFlags;
             }
         }
 
-        private void RestoreAllMaterials()
+        private static void DestroyObjectSafe(UnityEngine.Object obj)
         {
-            foreach (KeyValuePair<Material, MaterialEmissionSnapshot> kvp in _cachedMaterials)
+            if (obj == null)
             {
-                if (kvp.Key != null)
-                {
-                    RestoreMaterial(kvp.Key, kvp.Value);
-                }
+                return;
             }
 
-            _cachedMaterials.Clear();
-        }
-
-        private static void RestoreMaterial(Material mat, MaterialEmissionSnapshot snapshot)
-        {
-            if (snapshot.HasEmissionProperty && mat.HasProperty(EmissionColorId))
+            if (Application.isPlaying)
             {
-                mat.SetColor(EmissionColorId, snapshot.OriginalEmissionColor);
-            }
-
-            if (snapshot.HadEmissionKeyword)
-            {
-                mat.EnableKeyword(EmissionKeyword);
+                Destroy(obj);
             }
             else
             {
-                mat.DisableKeyword(EmissionKeyword);
+                DestroyImmediate(obj);
             }
         }
     }

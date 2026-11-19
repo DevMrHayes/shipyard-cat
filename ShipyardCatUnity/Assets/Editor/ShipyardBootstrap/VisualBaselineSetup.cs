@@ -110,12 +110,12 @@ namespace ShipyardCat.Editor
 
             if (!profile.TryGet<Bloom>(out var bloom))
                 bloom = profile.Add<Bloom>(true);
-            bloom.intensity.Override(0.35f);
-            bloom.threshold.Override(1.1f);
+            bloom.intensity.Override(0.55f);
+            bloom.threshold.Override(0.95f);
 
             if (!profile.TryGet<Vignette>(out var vignette))
                 vignette = profile.Add<Vignette>(true);
-            vignette.intensity.Override(0.22f);
+            vignette.intensity.Override(0.26f);
 
             if (!profile.TryGet<ColorAdjustments>(out var colorAdj))
                 colorAdj = profile.Add<ColorAdjustments>(true);
@@ -131,6 +131,8 @@ namespace ShipyardCat.Editor
             vol.sharedProfile = profile;
             vol.enabled = true;
 
+            ApplyTwilightSkybox();
+
             // 8. Save Scene & Build Settings
             EditorSceneManager.SaveScene(scene, scenePath);
             EditorBuildSettings.scenes = new[]
@@ -140,6 +142,39 @@ namespace ShipyardCat.Editor
             AssetDatabase.SaveAssets();
 
             return "Visual baseline applied and ShipyardMain.unity saved.";
+        }
+
+        public static void ApplyTwilightSkybox()
+        {
+            const string skyMatPath = "Assets/ShipyardCat/Materials/ShipyardTwilightSkyMat.mat";
+            const string hdrPath = "Assets/ShipyardCat/Imported/Environment/evening_sky_1k.hdr";
+            if (!AssetDatabase.IsValidFolder("Assets/ShipyardCat/Materials"))
+            {
+                AssetDatabase.CreateFolder("Assets/ShipyardCat", "Materials");
+            }
+
+            var hdrTex = AssetDatabase.LoadAssetAtPath<Texture>(hdrPath);
+            var skyMat = AssetDatabase.LoadAssetAtPath<Material>(skyMatPath);
+            var panoShader = Shader.Find("Skybox/Panoramic");
+            if (panoShader != null && hdrTex != null)
+            {
+                if (skyMat == null)
+                {
+                    skyMat = new Material(panoShader);
+                    skyMat.name = "ShipyardTwilightSkyMat";
+                    AssetDatabase.CreateAsset(skyMat, skyMatPath);
+                }
+                else if (skyMat.shader != panoShader)
+                {
+                    skyMat.shader = panoShader;
+                }
+                skyMat.SetTexture("_MainTex", hdrTex);
+                if (skyMat.HasProperty("_Exposure")) skyMat.SetFloat("_Exposure", 0.92f);
+                if (skyMat.HasProperty("_Tint")) skyMat.SetColor("_Tint", new Color(0.55f, 0.58f, 0.68f, 1f));
+                EditorUtility.SetDirty(skyMat);
+                RenderSettings.skybox = skyMat;
+                DynamicGI.UpdateEnvironment();
+            }
         }
     }
 }

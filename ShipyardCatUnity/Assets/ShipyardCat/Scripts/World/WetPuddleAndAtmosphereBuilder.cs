@@ -1,0 +1,317 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Rendering;
+
+namespace ShipyardCat.World
+{
+    public static class WetPuddleAndAtmosphereBuilder
+    {
+        private struct PuddleSpec
+        {
+            public readonly float X;
+            public readonly float Z;
+            public readonly float ScaleX;
+            public readonly float ScaleZ;
+            public readonly float RotationY;
+
+            public PuddleSpec(float x, float z, float scaleX, float scaleZ, float rotationY)
+            {
+                X = x;
+                Z = z;
+                ScaleX = scaleX;
+                ScaleZ = scaleZ;
+                RotationY = rotationY;
+            }
+        }
+
+        private static readonly PuddleSpec[] PuddleSpecs =
+        {
+            // Around Alba's spawn (-10, -20) - 5 puddles
+            new PuddleSpec(-10.8f, -18.6f, 4.2f, 2.9f, 18f),
+            new PuddleSpec(-7.4f, -21.8f, 5.1f, 3.6f, 64f),
+            new PuddleSpec(-13.2f, -22.5f, 3.4f, 2.4f, 112f),
+            new PuddleSpec(-8.9f, -16.9f, 2.8f, 2.1f, 145f),
+            new PuddleSpec(-12.1f, -19.7f, 3.7f, 2.6f, 37f),
+
+            // Around rail yard (-25, 10) - 5 puddles
+            new PuddleSpec(-25.4f, 9.5f, 6.2f, 3.8f, 12f),
+            new PuddleSpec(-22.1f, 12.6f, 4.5f, 3.1f, 78f),
+            new PuddleSpec(-28.3f, 8.2f, 5.4f, 3.4f, 134f),
+            new PuddleSpec(-24.0f, 6.8f, 3.6f, 2.5f, 49f),
+            new PuddleSpec(-27.2f, 13.4f, 4.1f, 2.7f, 162f),
+
+            // Around Dry Dock 1 east apron (-22, 20) - 4 puddles
+            new PuddleSpec(-21.5f, 19.6f, 5.8f, 4.0f, 26f),
+            new PuddleSpec(-19.2f, 22.3f, 4.4f, 3.0f, 95f),
+            new PuddleSpec(-24.3f, 21.8f, 4.9f, 3.2f, 148f),
+            new PuddleSpec(-20.8f, 17.5f, 3.5f, 2.3f, 57f),
+
+            // Around Gate 4 (6, -44) - 4 puddles
+            new PuddleSpec(5.6f, -43.4f, 5.6f, 3.7f, 31f),
+            new PuddleSpec(8.7f, -45.2f, 4.3f, 2.9f, 84f),
+            new PuddleSpec(3.4f, -45.8f, 3.9f, 2.6f, 129f),
+            new PuddleSpec(7.1f, -41.6f, 4.8f, 3.1f, 168f)
+        };
+
+        private static readonly Vector2[] PolePositions =
+        {
+            new Vector2(-26f, -25f),
+            new Vector2(-26f, 15f),
+            new Vector2(8f, -25f),
+            new Vector2(8f, 25f),
+            new Vector2(-65f, 45f),
+            new Vector2(26f, -5f)
+        };
+
+        public static void BuildAtmosphereAndPuddles(Transform worldRoot, List<Light> floodlights)
+        {
+            GameObject container = new GameObject("WetPuddlesAndSodiumAtmosphere");
+            if (worldRoot != null)
+            {
+                container.transform.SetParent(worldRoot, false);
+            }
+
+            Material puddleMaterial = CreateWetPuddleMaterial();
+            Material darkSteelMaterial = CreateDarkSteelMaterial();
+            Material sodiumEmissiveMaterial = CreateSodiumEmissiveMaterial();
+
+            BuildPuddles(container.transform, puddleMaterial);
+            BuildSodiumVaporLightPoles(container.transform, darkSteelMaterial, sodiumEmissiveMaterial, floodlights);
+        }
+
+        private static void BuildPuddles(Transform parent, Material puddleMaterial)
+        {
+            GameObject puddlesRoot = new GameObject("WetPuddles");
+            puddlesRoot.transform.SetParent(parent, false);
+
+            for (int i = 0; i < PuddleSpecs.Length; i++)
+            {
+                PuddleSpec spec = PuddleSpecs[i];
+                GameObject puddle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                puddle.name = $"WetPuddle_{i + 1:00}";
+                puddle.transform.SetParent(puddlesRoot.transform, false);
+                puddle.transform.localPosition = new Vector3(spec.X, 0.018f, spec.Z);
+                puddle.transform.localRotation = Quaternion.Euler(0f, spec.RotationY, 0f);
+                puddle.transform.localScale = new Vector3(spec.ScaleX, 0.004f, spec.ScaleZ);
+
+                DestroyColliderImmediateOrRuntime(puddle);
+
+                MeshRenderer renderer = puddle.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.sharedMaterial = puddleMaterial;
+                    renderer.shadowCastingMode = ShadowCastingMode.Off;
+                    renderer.receiveShadows = true;
+                }
+            }
+        }
+
+        private static void BuildSodiumVaporLightPoles(
+            Transform parent,
+            Material darkSteelMaterial,
+            Material sodiumEmissiveMaterial,
+            List<Light> floodlights)
+        {
+            GameObject polesRoot = new GameObject("SodiumVaporLightPoles");
+            polesRoot.transform.SetParent(parent, false);
+
+            Color sodiumColor = new Color(1f, 0.60784316f, 0.21960784f, 1f); // #FF9B38
+
+            for (int i = 0; i < PolePositions.Length; i++)
+            {
+                Vector2 pos = PolePositions[i];
+                GameObject poleRoot = new GameObject($"SodiumVaporPole_{i + 1:00}");
+                poleRoot.transform.SetParent(polesRoot.transform, false);
+                poleRoot.transform.localPosition = new Vector3(pos.x, 0f, pos.y);
+
+                // Orient mast arm generally toward yard center
+                Vector3 toCenter = new Vector3(-pos.x, 0f, -pos.y);
+                if (toCenter.sqrMagnitude > 0.01f)
+                {
+                    poleRoot.transform.localRotation = Quaternion.LookRotation(toCenter.normalized, Vector3.up);
+                }
+
+                // Base plinth (0.45m high)
+                GameObject plinth = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                plinth.name = "PolePlinth";
+                plinth.transform.SetParent(poleRoot.transform, false);
+                plinth.transform.localPosition = new Vector3(0f, 0.225f, 0f);
+                plinth.transform.localScale = new Vector3(0.42f, 0.225f, 0.42f);
+                ApplyMaterial(plinth, darkSteelMaterial, ShadowCastingMode.On);
+
+                // Main 11m dark steel mast (Cylinder primitive height is 2m, so scale Y = 5.5f => 11m)
+                GameObject mast = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                mast.name = "SteelMast";
+                mast.transform.SetParent(poleRoot.transform, false);
+                mast.transform.localPosition = new Vector3(0f, 5.5f, 0f);
+                mast.transform.localScale = new Vector3(0.22f, 5.5f, 0.22f);
+                ApplyMaterial(mast, darkSteelMaterial, ShadowCastingMode.On);
+
+                // Cantilever mast arm at 10.88m
+                GameObject arm = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                arm.name = "MastArm";
+                arm.transform.SetParent(poleRoot.transform, false);
+                arm.transform.localPosition = new Vector3(0f, 10.88f, 0.72f);
+                arm.transform.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+                arm.transform.localScale = new Vector3(0.14f, 0.14f, 1.55f);
+                DestroyColliderImmediateOrRuntime(arm);
+                ApplyMaterial(arm, darkSteelMaterial, ShadowCastingMode.Off);
+
+                // Sleek luminaire head housing
+                GameObject housing = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                housing.name = "LuminaireHousing";
+                housing.transform.SetParent(poleRoot.transform, false);
+                housing.transform.localPosition = new Vector3(0f, 10.95f, 1.45f);
+                housing.transform.localScale = new Vector3(0.52f, 0.18f, 0.88f);
+                DestroyColliderImmediateOrRuntime(housing);
+                ApplyMaterial(housing, darkSteelMaterial, ShadowCastingMode.Off);
+
+                // Glowing Sodium Vapor emitter lens
+                GameObject emitter = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                emitter.name = "SodiumEmitterLens";
+                emitter.transform.SetParent(poleRoot.transform, false);
+                emitter.transform.localPosition = new Vector3(0f, 10.84f, 1.45f);
+                emitter.transform.localScale = new Vector3(0.42f, 0.06f, 0.72f);
+                DestroyColliderImmediateOrRuntime(emitter);
+                ApplyMaterial(emitter, sodiumEmissiveMaterial, ShadowCastingMode.Off);
+
+                // Downward warm #FF9B38 Spot Light (WebGL-safe: LightShadows.None)
+                GameObject lightObj = new GameObject("SodiumVaporLight");
+                lightObj.transform.SetParent(poleRoot.transform, false);
+                lightObj.transform.localPosition = new Vector3(0f, 10.75f, 1.45f);
+                lightObj.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+                Light spotLight = lightObj.AddComponent<Light>();
+                spotLight.type = LightType.Spot;
+                spotLight.color = sodiumColor;
+                spotLight.range = 28f;
+                spotLight.intensity = 32f;
+                spotLight.spotAngle = 115f;
+                spotLight.innerSpotAngle = 62f;
+                spotLight.shadows = LightShadows.None;
+                spotLight.renderMode = LightRenderMode.Auto;
+
+                if (floodlights != null)
+                {
+                    floodlights.Add(spotLight);
+                }
+            }
+        }
+
+        private static Material CreateWetPuddleMaterial()
+        {
+            Shader shader = FindUrpOrFallbackShader();
+            Material mat = new Material(shader)
+            {
+                name = "Mat_WetAsphaltPuddle"
+            };
+
+            Color baseColor = new Color(0.06f, 0.08f, 0.11f, 0.78f);
+            mat.SetColor("_BaseColor", baseColor);
+            mat.SetColor("_Color", baseColor);
+            mat.SetFloat("_Metallic", 0.22f);
+            mat.SetFloat("_Smoothness", 0.94f);
+            mat.SetFloat("_Glossiness", 0.94f);
+
+            // Configure URP Transparent surface for mirror-like wet puddle alpha blend
+            mat.SetFloat("_Surface", 1f);
+            mat.SetFloat("_Blend", 0f);
+            mat.SetFloat("_AlphaClip", 0f);
+            mat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.SetFloat("_SpecularHighlights", 1f);
+            mat.SetFloat("_EnvironmentReflections", 1f);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.renderQueue = (int)RenderQueue.Transparent;
+
+            return mat;
+        }
+
+        private static Material CreateDarkSteelMaterial()
+        {
+            Shader shader = FindUrpOrFallbackShader();
+            Material mat = new Material(shader)
+            {
+                name = "Mat_ShipyardPoleSteel"
+            };
+
+            Color steelColor = new Color(0.11f, 0.13f, 0.16f, 1f);
+            mat.SetColor("_BaseColor", steelColor);
+            mat.SetColor("_Color", steelColor);
+            mat.SetFloat("_Metallic", 0.78f);
+            mat.SetFloat("_Smoothness", 0.48f);
+            mat.SetFloat("_Glossiness", 0.48f);
+            mat.SetFloat("_Surface", 0f);
+
+            return mat;
+        }
+
+        private static Material CreateSodiumEmissiveMaterial()
+        {
+            Shader shader = FindUrpOrFallbackShader();
+            Material mat = new Material(shader)
+            {
+                name = "Mat_SodiumVaporLamp"
+            };
+
+            Color sodiumColor = new Color(1f, 0.60784316f, 0.21960784f, 1f); // #FF9B38
+            mat.SetColor("_BaseColor", sodiumColor);
+            mat.SetColor("_Color", sodiumColor);
+            mat.SetFloat("_Metallic", 0f);
+            mat.SetFloat("_Smoothness", 0.85f);
+            mat.SetFloat("_Surface", 0f);
+
+            mat.EnableKeyword("_EMISSION");
+            mat.SetColor("_EmissionColor", sodiumColor * 3.8f);
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+
+            return mat;
+        }
+
+        private static Shader FindUrpOrFallbackShader()
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null)
+            {
+                shader = Shader.Find("Standard");
+            }
+
+            if (shader == null)
+            {
+                shader = Shader.Find("Sprites/Default");
+            }
+
+            return shader;
+        }
+
+        private static void ApplyMaterial(GameObject target, Material material, ShadowCastingMode shadowMode)
+        {
+            MeshRenderer renderer = target.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = shadowMode;
+            }
+        }
+
+        private static void DestroyColliderImmediateOrRuntime(GameObject target)
+        {
+            Collider col = target.GetComponent<Collider>();
+            if (col == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Object.Destroy(col);
+            }
+            else
+            {
+                Object.DestroyImmediate(col);
+            }
+        }
+    }
+}

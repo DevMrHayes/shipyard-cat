@@ -23,7 +23,7 @@ namespace ShipyardCat.Core
         [Header("Spawn & Loop Settings")]
         [SerializeField] private Vector3 albaSpawnPosition = new Vector3(-10f, 0.5f, -20f);
         [SerializeField] private Vector3 albaSpawnEuler = Vector3.zero;
-        [SerializeField] private float defaultDayStartHour = 13.5f;
+        [SerializeField] private float defaultDayStartHour = 17.75f;
         [SerializeField] private bool pauseOnEndGame = true;
 
         [Header("Service References (Auto-Resolved if Empty)")]

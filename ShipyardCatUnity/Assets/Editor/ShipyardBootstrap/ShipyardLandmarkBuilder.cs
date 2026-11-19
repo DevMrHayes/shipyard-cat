@@ -90,17 +90,22 @@ namespace ShipyardCat.Editor
         #region 1. Dry Dock 1
         private static void BuildDryDock1(Transform parent, Material concreteMat, Material steelMat, Material safetyAmberMat)
         {
+            // Cutout in yard asphalt spans X:[-62,-28], Z:[-17,67]. Keep steps < -0.05m and coping top at +0.12m (zero Y=0 z-fighting).
             Transform root = CreateGroup("DryDock_01", new Vector3(-45f, -1.9f, 25f), parent);
 
             const float basinWidth = 22f;
             const float basinLength = 72f;
 
-            // Dock floor (top surface around y = -3.9 world)
+            // Dock floor (top surface at y = -3.9 world)
             CreateSolidBox("DD1_Floor", root, new Vector3(0f, -2.5f, 0f), new Vector3(basinWidth, 1f, basinLength), concreteMat);
 
-            // Stepped granite altar walls (East, West, South) rising up to ground level (local y = +1.9 -> world 0.0)
+            // Walkable concrete descent ramp on north side from asphalt down into DD1 basin
+            GameObject ramp = CreateSolidBox("DD1_DescentRamp", root, new Vector3(0f, -0.08f, -basinLength * 0.5f + 5.5f), new Vector3(6.5f, 0.35f, 15f), concreteMat);
+            ramp.transform.localRotation = Quaternion.Euler(14.5f, 0f, 0f);
+
+            // Stepped granite altar walls (East, West, South) rising up to local y = +1.84 (world -0.06, strictly below 0.00)
             float[] stepWidths = { 1.8f, 1.8f, 2.4f };
-            float[] stepHeights = { 1.4f, 2.8f, 4.4f };
+            float[] stepHeights = { 1.4f, 2.8f, 4.34f };
 
             float xOffset = basinWidth * 0.5f;
             for (int i = 0; i < stepWidths.Length; i++)
@@ -120,17 +125,21 @@ namespace ShipyardCat.Editor
                 xOffset += w;
             }
 
+            // Raised hazard coping rim (top = world +0.12m, bottom = -0.08m) along West & East rim so no coplanar overlap
+            CreateSolidBox("DD1_Coping_W", root, new Vector3(-16.2f, 1.92f, 0f), new Vector3(1.4f, 0.20f, basinLength + 10.8f), safetyAmberMat);
+            CreateSolidBox("DD1_Coping_E", root, new Vector3(16.2f, 1.92f, 0f), new Vector3(1.4f, 0.20f, basinLength + 10.8f), safetyAmberMat);
+
             // North Caisson Gate
             float gateZ = basinLength * 0.5f + 1.2f;
             CreateSolidBox("DD1_CaissonGate", root, new Vector3(0f, -0.3f, gateZ), new Vector3(basinWidth + 2f, 4.2f, 2.2f), steelMat);
-            CreateSolidBox("DD1_CaissonWalkway", root, new Vector3(0f, 1.85f, gateZ), new Vector3(basinWidth + 3f, 0.25f, 2.6f), concreteMat);
-            CreateSolidBox("DD1_CaissonCurb_N", root, new Vector3(0f, 2.15f, gateZ + 1.15f), new Vector3(basinWidth + 3f, 0.4f, 0.2f), safetyAmberMat);
-            CreateSolidBox("DD1_CaissonCurb_S", root, new Vector3(0f, 2.15f, gateZ - 1.15f), new Vector3(basinWidth + 3f, 0.4f, 0.2f), safetyAmberMat);
+            CreateSolidBox("DD1_CaissonWalkway", root, new Vector3(0f, 1.89f, gateZ), new Vector3(basinWidth + 3f, 0.25f, 2.6f), concreteMat);
+            CreateSolidBox("DD1_CaissonCurb_N", root, new Vector3(0f, 2.19f, gateZ + 1.15f), new Vector3(basinWidth + 3f, 0.4f, 0.2f), safetyAmberMat);
+            CreateSolidBox("DD1_CaissonCurb_S", root, new Vector3(0f, 2.19f, gateZ - 1.15f), new Vector3(basinWidth + 3f, 0.4f, 0.2f), safetyAmberMat);
 
             // Coping safety bollards along east rim
             for (int i = -3; i <= 3; i++)
             {
-                CreateSolidBox($"DD1_Bollard_E_{i + 3}", root, new Vector3(basinWidth * 0.5f + 0.5f, 2.3f, i * 10f), new Vector3(0.4f, 0.8f, 0.4f), safetyAmberMat);
+                CreateSolidBox($"DD1_Bollard_E_{i + 3}", root, new Vector3(basinWidth * 0.5f + 0.5f, 2.35f, i * 10f), new Vector3(0.4f, 0.8f, 0.4f), safetyAmberMat);
             }
         }
         #endregion
@@ -152,9 +161,9 @@ namespace ShipyardCat.Editor
             // Dock basin floor
             CreateSolidBox("DD12_Floor", root, new Vector3(0f, floorTopY - 0.5f, 0f), new Vector3(basinWidth, 1f, basinLength), concreteMat);
 
-            // Stepped concrete dock walls rising from floorTopY to y = 0
+            // Stepped concrete dock walls rising from floorTopY to y = -0.06 (strictly below 0.00 asphalt)
             float[] stepWidths = { 2.5f, 2.5f, 4.0f };
-            float[] stepHeights = { 2.6f, 5.4f, 8.0f };
+            float[] stepHeights = { 2.6f, 5.4f, 7.94f };
 
             float xOff = basinWidth * 0.5f;
             for (int i = 0; i < stepWidths.Length; i++)
@@ -172,6 +181,8 @@ namespace ShipyardCat.Editor
                 CreateSolidBox($"DD12_SouthWall_{i + 1}", root, new Vector3(0f, cy, southZ), new Vector3(basinWidth + i * 5f, h, w), concreteMat);
                 xOff += w;
             }
+            CreateSolidBox("DD12_Coping_W", root, new Vector3(-39.5f, 0.04f, 0f), new Vector3(2.0f, 0.20f, basinLength + 15f), safetyAmberMat);
+            CreateSolidBox("DD12_Coping_E", root, new Vector3(39.5f, 0.04f, 0f), new Vector3(2.0f, 0.20f, basinLength + 15f), safetyAmberMat);
 
             // North Caisson Gate
             float gateZ = basinLength * 0.5f + 2f;
@@ -220,7 +231,7 @@ namespace ShipyardCat.Editor
             Material safetyAmberMat,
             AccentPalette accents)
         {
-            Transform root = CreateGroup("DryDock_02_Submarine", new Vector3(-165f, 0f, 95f), parent);
+            Transform root = CreateGroup("DryDock_02_Submarine", new Vector3(-180f, 0f, 130f), parent);
 
             const float basinWidth = 24f;
             const float basinLength = 140f;
@@ -229,9 +240,9 @@ namespace ShipyardCat.Editor
             // Dock floor
             CreateSolidBox("DD2_Floor", root, new Vector3(0f, floorTopY - 0.5f, 0f), new Vector3(basinWidth, 1f, basinLength), concreteMat);
 
-            // Stepped dock walls rising to ground level y = 0
+            // Stepped dock walls rising to y = -0.06 (strictly below 0.00 asphalt)
             float[] stepWidths = { 1.8f, 1.8f, 2.4f };
-            float[] stepHeights = { 2.0f, 4.0f, 6.0f };
+            float[] stepHeights = { 2.0f, 4.0f, 5.94f };
 
             float xOff = basinWidth * 0.5f;
             for (int i = 0; i < stepWidths.Length; i++)
@@ -367,17 +378,17 @@ namespace ShipyardCat.Editor
             Material safetyAmberMat,
             AccentPalette accents)
         {
-            // East Timber Pier: x = 32, z = -60..140 (length 200m, center z = 40)
-            Transform pierRoot = CreateGroup("East_Timber_Pier", new Vector3(32f, 0f, 40f), parent);
+            // East Timber Pier: outside yard asphalt edge (x = 56..64), z = -60..140 (center x = 60, z = 40)
+            Transform pierRoot = CreateGroup("East_Timber_Pier", new Vector3(60f, 0f, 40f), parent);
             const float pierWidth = 8f;
             const float pierLength = 200f;
 
-            // Walkable deck top at y = 0.25 (low curb-free access along west side)
-            CreateSolidBox("EastPier_Deck", pierRoot, new Vector3(0f, 0.05f, 0f), new Vector3(pierWidth, 0.4f, pierLength), accents.Timber);
-            CreateSolidBox("EastPier_WestRamp", pierRoot, new Vector3(-pierWidth * 0.5f - 0.6f, -0.02f, 0f), new Vector3(1.2f, 0.2f, pierLength), concreteMat);
+            // Walkable deck top at y = +0.28m (never coplanar with y=0 yard asphalt at x<=56)
+            CreateSolidBox("EastPier_Deck", pierRoot, new Vector3(0f, 0.08f, 0f), new Vector3(pierWidth, 0.4f, pierLength), accents.Timber);
+            CreateSolidBox("EastPier_WestApron", pierRoot, new Vector3(-pierWidth * 0.5f - 0.4f, 0.04f, 0f), new Vector3(0.8f, 0.24f, pierLength), concreteMat);
 
             // East edge timber curb
-            CreateSolidBox("EastPier_EastCurb", pierRoot, new Vector3(pierWidth * 0.5f - 0.25f, 0.35f, 0f), new Vector3(0.4f, 0.25f, pierLength), accents.Timber);
+            CreateSolidBox("EastPier_EastCurb", pierRoot, new Vector3(pierWidth * 0.5f - 0.25f, 0.38f, 0f), new Vector3(0.4f, 0.25f, pierLength), accents.Timber);
 
             // Pilings & Mooring Bollards
             for (int z = -96; z <= 96; z += 16)
@@ -385,22 +396,22 @@ namespace ShipyardCat.Editor
                 CreateSolidCylinder($"EastPier_Piling_W_{z}", pierRoot, new Vector3(-pierWidth * 0.42f, -2.0f, z), new Vector3(0.55f, 2.0f, 0.55f), accents.Timber);
                 CreateSolidCylinder($"EastPier_Piling_E_{z}", pierRoot, new Vector3(pierWidth * 0.42f, -2.0f, z), new Vector3(0.55f, 2.0f, 0.55f), accents.Timber);
 
-                CreateSolidCylinder($"EastPier_Bollard_{z}", pierRoot, new Vector3(pierWidth * 0.5f - 0.6f, 0.6f, z), new Vector3(0.45f, 0.4f, 0.45f), safetyAmberMat);
+                CreateSolidCylinder($"EastPier_Bollard_{z}", pierRoot, new Vector3(pierWidth * 0.5f - 0.6f, 0.63f, z), new Vector3(0.45f, 0.4f, 0.45f), safetyAmberMat);
             }
 
-            // James River Water Plane: x=95, y=-1.8, z=60, scale 120x1x380
+            // James River Water Plane: x = 56..236 (center 146, width 180), surface at y = -1.8m
             GameObject waterGo = GameObject.CreatePrimitive(PrimitiveType.Cube);
             waterGo.name = "JamesRiver_Water";
             waterGo.transform.SetParent(parent, false);
-            waterGo.transform.position = new Vector3(95f, -1.8f, 60f);
-            waterGo.transform.localScale = new Vector3(120f, 1f, 380f);
+            waterGo.transform.position = new Vector3(146f, -2.3f, 97.5f);
+            waterGo.transform.localScale = new Vector3(180f, 1f, 460f);
             ApplyMaterial(waterGo, waterMat);
             Object.DestroyImmediate(waterGo.GetComponent<Collider>());
 
             StylizedWaterSurface waterSurface = waterGo.AddComponent<StylizedWaterSurface>();
 
-            // Tugboat Dorothy moored at (44, -1.2, 12)
-            Transform tugRoot = CreateGroup("Tugboat_Dorothy", new Vector3(44f, -1.2f, 12f), parent);
+            // Tugboat Dorothy moored beside the East Pier in the James River at (72, -1.2, 12)
+            Transform tugRoot = CreateGroup("Tugboat_Dorothy", new Vector3(72f, -1.2f, 12f), parent);
 
             CreateSolidBox("Dorothy_HullLower", tugRoot, new Vector3(0f, 0.2f, 0f), new Vector3(6.2f, 2.0f, 18f), accents.TugRed);
             CreateSolidBox("Dorothy_HullUpper", tugRoot, new Vector3(0f, 1.55f, 0f), new Vector3(6.5f, 0.9f, 18.6f), steelMat);

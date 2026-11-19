@@ -1,914 +1,1114 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
-using ShipyardCat.Core;
-using ShipyardCat.World;
-using ShipyardCat.Player;
 using ShipyardCat.AI;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
+using ShipyardCat.Core;
+using ShipyardCat.Player;
+using ShipyardCat.World;
 
 namespace ShipyardCat.UI
 {
     [RequireComponent(typeof(UIDocument))]
     public class ShipyardHUDController : MonoBehaviour
     {
-        private const float ProtocolAutoHideSeconds = 4.5f;
-
-        [Header("UI Assets (Optional Resources Fallback)")]
-        [SerializeField] private VisualTreeAsset hudVisualTree;
-        [SerializeField] private StyleSheet hudStyleSheet;
+        private const int MaxRadarBlips = 48;
+        private const float ToastDurationSeconds = 3.5f;
+        private const float DialogueDurationSeconds = 5.0f;
 
         private UIDocument _uiDocument;
         private VisualElement _root;
+        private bool _isBound;
 
-        // Vitals
+        // Gameplay HUD containers
+        private VisualElement _vitalsCard;
+        private VisualElement _missionCard;
+        private VisualElement _radarCard;
+        private VisualElement _topBar;
+        private VisualElement _bottomDock;
+        private VisualElement _toolbar;
+
+        // Vitals bars & labels
         private VisualElement _healthBarFill;
         private VisualElement _staminaBarFill;
         private VisualElement _radBarFill;
+        private VisualElement _barWarmth;
+        private VisualElement _barFullness;
         private Label _healthLabel;
         private Label _staminaLabel;
         private Label _radLabel;
 
-        // Telemetry
+        // Top bar / stats labels
         private Label _shiftLabel;
         private Label _zoneLabel;
+        private Label _waveLabel;
         private Label _ratsLabel;
+        private Label _verminLabel;
+        private Label _integrityLabel;
         private Label _scoreLabel;
+
+        // Mission labels
         private Label _objectiveLabel;
+        private Label _missionDesc;
+        private Label _missionProgress;
 
-        // Boss
-        private VisualElement _bossContainer;
-        private VisualElement _bossBarFill;
-        private Label _bossHpLabel;
+        // Boss HUD
+        private VisualElement _bossCard;
+        private Label _bossNameLabel;
+        private Label _bossHealthLabel;
+        private VisualElement _bossHealthFill;
 
-        // Protocol Overlay
-        private VisualElement _protocolPanel;
-        private Button _protocolToggleButton;
-        private Button _protocolCloseButton;
-        private VisualElement _vitalsCard;
-        private VisualElement _toolbar;
-        private bool _isProtocolVisible;
-        private float _protocolHideTimer;
-        private int _lastToggleFrame = -1;
+        // Radar
+        private VisualElement _radarCircle;
+        private VisualElement _radarBlipsLayer;
+        private readonly List<RadarBlip> _radarBlipBuffer = new List<RadarBlip>(MaxRadarBlips);
+        private readonly List<VisualElement> _radarBlipPool = new List<VisualElement>(MaxRadarBlips);
+        private int _activeBlipCount;
 
-        // End-Game Modal
-        private VisualElement _endgameModal;
+        // Prompts & toasts
+        private VisualElement _contextualPromptBar;
+        private Label _contextualPromptLabel;
+        private VisualElement _toastBanner;
+        private Label _toastLabel;
+
+        // Buttons & overlays
+        private Button _btnNightShift;
+        private Button _btnProtocol;
+        private Button _btnCloseProtocol;
+        private VisualElement _protocolOverlay;
+
+        private Button _btnLogbook;
+        private Button _btnCloseLogbook;
+        private VisualElement _logbookOverlay;
+        private Label _logbookRankLabel;
+        private Label _logbookXpLabel;
+        private VisualElement _logbookActsContainer;
+        private Button _btnPerkAgility;
+        private Button _btnPerkStealth;
+        private Button _btnPerkCombat;
+        private Button _btnPerkRad;
+
+        private Button _btnRestart;
+        private VisualElement _endgameOverlay;
         private Label _endgameTitle;
         private Label _endgameSubtitle;
-        private Button _restartButton;
+        private Button _btnEndgameRestart;
 
-        // Bound Domain References
-        private CatVitals _boundVitals;
-        private AlbaController _boundAlba;
-        private DiurnalShiftManager _boundShiftManager;
-        private ShipyardGameManager _boundGameManager;
-        private KingpinBossAI _boundBoss;
+        // Scene references
+        private CatVitals _catVitals;
+        private DiurnalShiftManager _shiftManager;
+        private KingpinBossAI _kingpinBoss;
+        private LieutenantCobaltBossAI _cobaltBoss;
+        private TacticalRadarController _radarController;
+        private ShipyardProgressBridge _progressBridge;
+        private MissionManager _missionManager;
+
+        // Subscription tracking
+        private bool _subscribedVitals;
+        private bool _subscribedShift;
+        private bool _subscribedKingpin;
+        private bool _subscribedCobalt;
+        private bool _subscribedProgress;
+        private bool _subscribedMission;
+        private bool _subscribedStatic;
+
+        // Cached state
+        private float _toastTimer;
+        private float _promptTimer;
+        private int _lastRatsCaught;
+        private int _lastActiveVermin;
+        private int _lastDefeatedVermin;
+        private int _agilityTier = 1;
+        private int _stealthTier = 1;
+        private int _combatTier = 1;
+        private int _radTier = 1;
+        private bool _gameplayHudVisible = true;
 
         private void Awake()
         {
             _uiDocument = GetComponent<UIDocument>();
-            EnsurePanelSettings();
         }
 
         private void OnEnable()
         {
-            BuildOrBindVisualTree();
-            TryBindDomainSystems();
-
-            if (_boundVitals != null)
-            {
-                RefreshHUD(_boundVitals);
-            }
+            BindUI();
+            ResolveAndSubscribeSceneReferences();
+            SubscribeStaticEvents();
+            PerformInitialSync();
         }
 
         private void Start()
         {
-            TryBindDomainSystems();
-
-            if (_boundVitals != null)
-            {
-                RefreshHUD(_boundVitals);
-            }
-
-            if (_boundShiftManager != null)
-            {
-                HandleShiftUpdated(_boundShiftManager.CurrentShift, _boundShiftManager.TimeOfDay);
-            }
-
-            if (_boundGameManager != null && !string.IsNullOrEmpty(_boundGameManager.CurrentObjective))
-            {
-                HandleObjectiveUpdated(_boundGameManager.CurrentObjective);
-            }
-
-            if (_boundBoss != null)
-            {
-                HandleBossStateChanged(_boundBoss.Health, _boundBoss.MaxHealth, _boundBoss.IsAggro);
-            }
-            else
-            {
-                SetBossBarVisible(false);
-            }
-        }
-
-        private void Update()
-        {
-            if (_boundVitals == null || _boundAlba == null || _boundShiftManager == null ||
-                _boundGameManager == null || _boundBoss == null)
-            {
-                TryBindDomainSystems();
-            }
-
-#if ENABLE_INPUT_SYSTEM
-            if (_boundAlba == null && Keyboard.current != null && Keyboard.current.f1Key.wasPressedThisFrame)
-            {
-                ToggleProtocolOverlay();
-            }
-#endif
-
-            if (_isProtocolVisible && _protocolHideTimer > 0f)
-            {
-                _protocolHideTimer -= Time.unscaledDeltaTime;
-                if (_protocolHideTimer <= 0f)
-                {
-                    SetProtocolOverlayVisible(false);
-                }
-            }
+            ResolveAndSubscribeSceneReferences();
+            PerformInitialSync();
         }
 
         private void OnDisable()
         {
-            UnbindDomainSystems();
-
-            if (_restartButton != null)
-            {
-                _restartButton.clicked -= HandleRestartClicked;
-            }
-
-            if (_protocolToggleButton != null)
-            {
-                _protocolToggleButton.clicked -= ToggleProtocolOverlay;
-            }
-
-            if (_protocolCloseButton != null)
-            {
-                _protocolCloseButton.clicked -= CloseProtocolOverlay;
-            }
+            UnsubscribeAll();
+            UnbindUI();
         }
 
-        private void CloseProtocolOverlay() => SetProtocolOverlayVisible(false);
-
-        public void SetGameplayHudVisible(bool visible)
+        private void Update()
         {
-            var disp = visible ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_vitalsCard != null) _vitalsCard.style.display = disp;
-            if (_toolbar != null) _toolbar.style.display = disp;
+            var kb = Keyboard.current;
+            if (kb != null && kb.tabKey.wasPressedThisFrame)
+            {
+                ToggleLogbookOverlay();
+            }
+
+            if (_toastTimer > 0f)
+            {
+                _toastTimer -= Time.unscaledDeltaTime;
+                if (_toastTimer <= 0f && _toastBanner != null)
+                {
+                    _toastBanner.style.display = DisplayStyle.None;
+                }
+            }
+
+            if (_promptTimer > 0f)
+            {
+                _promptTimer -= Time.unscaledDeltaTime;
+                if (_promptTimer <= 0f && _contextualPromptBar != null)
+                {
+                    _contextualPromptBar.style.display = DisplayStyle.None;
+                }
+            }
+
+            UpdateRadar();
         }
 
         public void ToggleProtocolOverlay()
         {
-            if (_lastToggleFrame == Time.frameCount)
+            EnsureBound();
+            if (_protocolOverlay == null)
             {
                 return;
             }
 
-            _lastToggleFrame = Time.frameCount;
-            SetProtocolOverlayVisible(!_isProtocolVisible);
+            bool show = _protocolOverlay.style.display != DisplayStyle.Flex;
+            _protocolOverlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (show && _logbookOverlay != null)
+            {
+                _logbookOverlay.style.display = DisplayStyle.None;
+            }
+        }
+
+        public void SetGameplayHudVisible(bool visible)
+        {
+            _gameplayHudVisible = visible;
+            EnsureBound();
+
+            DisplayStyle display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            SetElementDisplay(_vitalsCard, display);
+            SetElementDisplay(_missionCard, display);
+            SetElementDisplay(_radarCard, display);
+            SetElementDisplay(_topBar, display);
+            SetElementDisplay(_bottomDock, display);
+            SetElementDisplay(_toolbar, display);
+
+            if (!visible)
+            {
+                SetElementDisplay(_bossCard, DisplayStyle.None);
+                SetElementDisplay(_contextualPromptBar, DisplayStyle.None);
+            }
         }
 
         public void RefreshHUD(CatVitals vitals)
         {
-            if (_root == null || vitals == null)
+            EnsureBound();
+            if (vitals == null)
             {
                 return;
             }
 
-            float hpNorm = vitals.MaxHealth > 0f ? Mathf.Clamp01(vitals.Health / vitals.MaxHealth) : 0f;
-            float stamNorm = vitals.MaxStamina > 0f ? Mathf.Clamp01(vitals.Stamina / vitals.MaxStamina) : 0f;
-            float radNorm = vitals.MaxRadiation > 0f ? Mathf.Clamp01(vitals.Radiation / vitals.MaxRadiation) : 0f;
+            float healthRatio = vitals.MaxHealth > 0f ? Mathf.Clamp01(vitals.Health / vitals.MaxHealth) : 0f;
+            float staminaRatio = vitals.MaxStamina > 0f ? Mathf.Clamp01(vitals.Stamina / vitals.MaxStamina) : 0f;
+            float radRatio = vitals.MaxRadiation > 0f ? Mathf.Clamp01(vitals.Radiation / vitals.MaxRadiation) : 0f;
 
             if (_healthBarFill != null)
             {
-                _healthBarFill.style.width = new Length(hpNorm * 100f, LengthUnit.Percent);
-                _healthBarFill.style.backgroundColor = hpNorm <= 0.3f
-                    ? new Color(0.92f, 0.24f, 0.24f, 1f)
-                    : (hpNorm <= 0.6f ? new Color(0.95f, 0.65f, 0.16f, 1f) : new Color(0.20f, 0.84f, 0.48f, 1f));
+                _healthBarFill.style.width = Length.Percent(healthRatio * 100f);
             }
 
             if (_staminaBarFill != null)
             {
-                _staminaBarFill.style.width = new Length(stamNorm * 100f, LengthUnit.Percent);
+                _staminaBarFill.style.width = Length.Percent(staminaRatio * 100f);
             }
 
             if (_radBarFill != null)
             {
-                _radBarFill.style.width = new Length(radNorm * 100f, LengthUnit.Percent);
-                _radBarFill.style.backgroundColor = radNorm >= 0.7f
-                    ? new Color(0.95f, 0.28f, 0.22f, 1f)
-                    : new Color(0.18f, 0.90f, 0.78f, 1f);
+                _radBarFill.style.width = Length.Percent(radRatio * 100f);
+            }
+
+            if (_barWarmth != null)
+            {
+                float warmthPct = _shiftManager != null && _shiftManager.FormattedShiftName != null &&
+                                  _shiftManager.FormattedShiftName.IndexOf("Night", StringComparison.OrdinalIgnoreCase) >= 0
+                    ? 75f
+                    : 100f;
+                _barWarmth.style.width = Length.Percent(warmthPct);
+            }
+
+            if (_barFullness != null)
+            {
+                _barFullness.style.width = Length.Percent(Mathf.Lerp(50f, 100f, healthRatio));
             }
 
             if (_healthLabel != null)
             {
-                _healthLabel.text = $"{Mathf.CeilToInt(vitals.Health)} / {Mathf.CeilToInt(vitals.MaxHealth)}";
+                _healthLabel.text = $"{Mathf.CeilToInt(vitals.Health)}/{Mathf.CeilToInt(vitals.MaxHealth)}";
             }
 
             if (_staminaLabel != null)
             {
-                _staminaLabel.text = $"{Mathf.CeilToInt(vitals.Stamina)} / {Mathf.CeilToInt(vitals.MaxStamina)}";
+                _staminaLabel.text = $"{Mathf.CeilToInt(vitals.Stamina)}/{Mathf.CeilToInt(vitals.MaxStamina)}";
             }
 
             if (_radLabel != null)
             {
-                _radLabel.text = $"{vitals.Radiation:0.0} mSv";
+                _radLabel.text = $"{Mathf.RoundToInt(radRatio * 100f)}%";
             }
 
+            _lastRatsCaught = vitals.RatsCaught;
             if (_ratsLabel != null)
             {
-                _ratsLabel.text = $"{vitals.RatsCaught} / 10";
+                _ratsLabel.text = $"Rats: {_lastRatsCaught}";
             }
 
-            if (_scoreLabel != null)
-            {
-                _scoreLabel.text = $"{vitals.Score:N0}";
-            }
-
-            UpdateZoneDisplay(vitals.CurrentZone);
+            UpdateScoreLabel();
 
             if (vitals.IsVictorious)
             {
-                ShowEndgameModal(
-                    "SHIPYARD SECURED — VICTORY",
-                    $"Kingpin neutralized! Rats Caught: {vitals.RatsCaught} | Final Score: {vitals.Score:N0}");
+                ShowEndgame(true);
             }
             else if (vitals.IsFainted)
             {
-                ShowEndgameModal(
-                    "ALBA FAINTED — MEDEVAC",
-                    $"Collapsed on shift. Rats Caught: {vitals.RatsCaught} | Final Score: {vitals.Score:N0}");
-            }
-            else
-            {
-                HideEndgameModal();
+                ShowEndgame(false);
             }
         }
 
-        private void EnsurePanelSettings()
+        private void EnsureBound()
         {
-            if (_uiDocument == null)
+            if (!_isBound)
+            {
+                BindUI();
+            }
+        }
+
+        private void BindUI()
+        {
+            if (_isBound)
             {
                 return;
             }
 
-            if (_uiDocument.panelSettings == null)
-            {
-                PanelSettings runtimeSettings = Resources.Load<PanelSettings>("UI/ShipyardPanelSettings");
-                if (runtimeSettings == null)
-                {
-                    runtimeSettings = ScriptableObject.CreateInstance<PanelSettings>();
-                    runtimeSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
-                    runtimeSettings.referenceResolution = new Vector2Int(1920, 1080);
-                    runtimeSettings.match = 0.5f;
-                }
-
-                _uiDocument.panelSettings = runtimeSettings;
-            }
-        }
-
-        private void BuildOrBindVisualTree()
-        {
             if (_uiDocument == null)
             {
-                return;
+                _uiDocument = GetComponent<UIDocument>();
             }
 
-            if (_uiDocument.visualTreeAsset == null)
-            {
-                VisualTreeAsset tree = hudVisualTree != null
-                    ? hudVisualTree
-                    : Resources.Load<VisualTreeAsset>("UI/ShipyardHUD");
-
-                if (tree != null)
-                {
-                    _uiDocument.visualTreeAsset = tree;
-                }
-            }
-
-            _root = _uiDocument.rootVisualElement;
+            _root = _uiDocument != null ? _uiDocument.rootVisualElement : null;
             if (_root == null)
             {
                 return;
             }
 
-            StyleSheet sheet = hudStyleSheet != null
-                ? hudStyleSheet
-                : Resources.Load<StyleSheet>("UI/ShipyardHUD");
+            _vitalsCard = _root.Q<VisualElement>("vitals-card");
+            _missionCard = _root.Q<VisualElement>("mission-card");
+            _radarCard = _root.Q<VisualElement>("radar-card");
+            _topBar = _root.Q<VisualElement>("top-bar");
+            _bottomDock = _root.Q<VisualElement>("bottom-dock");
+            _toolbar = _root.Q<VisualElement>("toolbar");
 
-            if (sheet != null && !_root.styleSheets.Contains(sheet))
-            {
-                _root.styleSheets.Add(sheet);
-            }
-
-            if (_root.Q<VisualElement>("hud-root") == null)
-            {
-                BuildFallbackHierarchy(_root);
-            }
-
-            QueryElements();
-
-            if (_restartButton != null)
-            {
-                _restartButton.clicked -= HandleRestartClicked;
-                _restartButton.clicked += HandleRestartClicked;
-            }
-
-            if (_protocolToggleButton != null)
-            {
-                _protocolToggleButton.clicked -= ToggleProtocolOverlay;
-                _protocolToggleButton.clicked += ToggleProtocolOverlay;
-            }
-
-            if (_protocolCloseButton != null)
-            {
-                _protocolCloseButton.clicked -= CloseProtocolOverlay;
-                _protocolCloseButton.clicked += CloseProtocolOverlay;
-            }
-
-            SetBossBarVisible(false);
-            SetProtocolOverlayVisible(false);
-            HideEndgameModal();
-        }
-
-        private void QueryElements()
-        {
             _healthBarFill = _root.Q<VisualElement>("health-bar-fill");
             _staminaBarFill = _root.Q<VisualElement>("stamina-bar-fill");
             _radBarFill = _root.Q<VisualElement>("rad-bar-fill");
+            _barWarmth = _root.Q<VisualElement>("bar-warmth");
+            _barFullness = _root.Q<VisualElement>("bar-fullness");
             _healthLabel = _root.Q<Label>("health-label");
             _staminaLabel = _root.Q<Label>("stamina-label");
             _radLabel = _root.Q<Label>("rad-label");
 
             _shiftLabel = _root.Q<Label>("shift-label");
             _zoneLabel = _root.Q<Label>("zone-label");
+            _waveLabel = _root.Q<Label>("wave-label");
             _ratsLabel = _root.Q<Label>("rats-label");
+            _verminLabel = _root.Q<Label>("vermin-label");
+            _integrityLabel = _root.Q<Label>("integrity-label");
             _scoreLabel = _root.Q<Label>("score-label");
+
             _objectiveLabel = _root.Q<Label>("objective-label");
+            _missionDesc = _root.Q<Label>("mission-desc");
+            _missionProgress = _root.Q<Label>("mission-progress");
 
-            _bossContainer = _root.Q<VisualElement>("boss-card") ?? _root.Q<VisualElement>("boss-container");
-            _bossBarFill = _root.Q<VisualElement>("boss-health-fill") ?? _root.Q<VisualElement>("boss-bar-fill");
-            _bossHpLabel = _root.Q<Label>("boss-health-label") ?? _root.Q<Label>("boss-hp-label");
+            _bossCard = _root.Q<VisualElement>("boss-card");
+            _bossNameLabel = _root.Q<Label>("boss-name-label");
+            _bossHealthLabel = _root.Q<Label>("boss-health-label");
+            _bossHealthFill = _root.Q<VisualElement>("boss-health-fill");
 
-            _protocolPanel = _root.Q<VisualElement>("protocol-overlay") ?? _root.Q<VisualElement>("protocol-panel");
-            _protocolToggleButton = _root.Q<Button>("btn-protocol") ?? _root.Q<Button>("protocol-toggle-button");
-            _protocolCloseButton = _root.Q<Button>("btn-close-protocol");
-            _vitalsCard = _root.Q<VisualElement>("vitals-card");
-            _toolbar = _root.Q<VisualElement>("toolbar");
+            _radarCircle = _root.Q<VisualElement>("radar-circle");
+            _radarBlipsLayer = _root.Q<VisualElement>("radar-blips-layer");
+            InitializeRadarPool();
 
-            _endgameModal = _root.Q<VisualElement>("endgame-overlay") ?? _root.Q<VisualElement>("endgame-modal");
+            _contextualPromptBar = _root.Q<VisualElement>("contextual-prompt-bar");
+            _contextualPromptLabel = _root.Q<Label>("contextual-prompt-label");
+            _toastBanner = _root.Q<VisualElement>("toast-banner");
+            _toastLabel = _root.Q<Label>("toast-label");
+
+            _btnNightShift = _root.Q<Button>("btn-night-shift");
+            _btnProtocol = _root.Q<Button>("btn-protocol");
+            _btnCloseProtocol = _root.Q<Button>("btn-close-protocol");
+            _protocolOverlay = _root.Q<VisualElement>("protocol-overlay");
+
+            _btnLogbook = _root.Q<Button>("btn-logbook");
+            _btnCloseLogbook = _root.Q<Button>("btn-close-logbook");
+            _logbookOverlay = _root.Q<VisualElement>("logbook-overlay");
+            _logbookRankLabel = _root.Q<Label>("logbook-rank-label");
+            _logbookXpLabel = _root.Q<Label>("logbook-xp-label");
+            _logbookActsContainer = _root.Q<VisualElement>("logbook-acts-container");
+            _btnPerkAgility = _root.Q<Button>("btn-perk-agility");
+            _btnPerkStealth = _root.Q<Button>("btn-perk-stealth");
+            _btnPerkCombat = _root.Q<Button>("btn-perk-combat");
+            _btnPerkRad = _root.Q<Button>("btn-perk-rad");
+
+            _btnRestart = _root.Q<Button>("btn-restart");
+            _endgameOverlay = _root.Q<VisualElement>("endgame-overlay");
             _endgameTitle = _root.Q<Label>("endgame-title");
             _endgameSubtitle = _root.Q<Label>("endgame-subtitle");
-            _restartButton = _root.Q<Button>("btn-endgame-restart") ?? _root.Q<Button>("restart-button");
+            _btnEndgameRestart = _root.Q<Button>("btn-endgame-restart");
+
+            RegisterCallbacks();
+
+            SetElementDisplay(_bossCard, DisplayStyle.None);
+            SetElementDisplay(_contextualPromptBar, DisplayStyle.None);
+            SetElementDisplay(_toastBanner, DisplayStyle.None);
+            SetElementDisplay(_protocolOverlay, DisplayStyle.None);
+            SetElementDisplay(_logbookOverlay, DisplayStyle.None);
+            SetElementDisplay(_endgameOverlay, DisplayStyle.None);
+
+            if (_zoneLabel != null && string.IsNullOrEmpty(_zoneLabel.text))
+            {
+                _zoneLabel.text = "SHIPYARD";
+            }
+
+            SetGameplayHudVisible(_gameplayHudVisible);
+            _isBound = true;
         }
 
-        private void TryBindDomainSystems()
+        private void UnbindUI()
         {
-            if (_boundGameManager == null && ShipyardGameManager.Instance != null)
-            {
-                _boundGameManager = ShipyardGameManager.Instance;
-                _boundGameManager.OnObjectiveUpdated += HandleObjectiveUpdated;
-                if (!string.IsNullOrEmpty(_boundGameManager.CurrentObjective))
-                {
-                    HandleObjectiveUpdated(_boundGameManager.CurrentObjective);
-                }
-            }
-
-            if (_boundShiftManager == null && DiurnalShiftManager.Instance != null)
-            {
-                _boundShiftManager = DiurnalShiftManager.Instance;
-                _boundShiftManager.OnShiftUpdated += HandleShiftUpdated;
-                HandleShiftUpdated(_boundShiftManager.CurrentShift, _boundShiftManager.TimeOfDay);
-            }
-
-            if (_boundAlba == null)
-            {
-                _boundAlba = FindAnyObjectByType<AlbaController>();
-                if (_boundAlba != null)
-                {
-                    _boundAlba.OnToggleProtocolHUDRequested += ToggleProtocolOverlay;
-                }
-            }
-
-            if (_boundVitals == null)
-            {
-                CatVitals vitals = _boundGameManager != null && _boundGameManager.PlayerVitals != null
-                    ? _boundGameManager.PlayerVitals
-                    : (_boundAlba != null && _boundAlba.Vitals != null
-                        ? _boundAlba.Vitals
-                        : FindAnyObjectByType<CatVitals>());
-
-                if (vitals != null)
-                {
-                    _boundVitals = vitals;
-                    _boundVitals.OnVitalsChanged += RefreshHUD;
-                    _boundVitals.OnAlbaFainted += HandleAlbaFainted;
-                    _boundVitals.OnVictory += HandleVictory;
-                    _boundVitals.OnZoneChanged += UpdateZoneDisplay;
-                    RefreshHUD(_boundVitals);
-                }
-            }
-
-            if (_boundBoss == null)
-            {
-                _boundBoss = KingpinBossAI.Instance != null
-                    ? KingpinBossAI.Instance
-                    : FindAnyObjectByType<KingpinBossAI>();
-
-                if (_boundBoss != null)
-                {
-                    _boundBoss.OnBossStateChanged += HandleBossStateChanged;
-                    HandleBossStateChanged(_boundBoss.Health, _boundBoss.MaxHealth, _boundBoss.IsAggro);
-                }
-            }
-        }
-
-        private void UnbindDomainSystems()
-        {
-            if (_boundGameManager != null)
-            {
-                _boundGameManager.OnObjectiveUpdated -= HandleObjectiveUpdated;
-                _boundGameManager = null;
-            }
-
-            if (_boundShiftManager != null)
-            {
-                _boundShiftManager.OnShiftUpdated -= HandleShiftUpdated;
-                _boundShiftManager = null;
-            }
-
-            if (_boundAlba != null)
-            {
-                _boundAlba.OnToggleProtocolHUDRequested -= ToggleProtocolOverlay;
-                _boundAlba = null;
-            }
-
-            if (_boundVitals != null)
-            {
-                _boundVitals.OnVitalsChanged -= RefreshHUD;
-                _boundVitals.OnAlbaFainted -= HandleAlbaFainted;
-                _boundVitals.OnVictory -= HandleVictory;
-                _boundVitals.OnZoneChanged -= UpdateZoneDisplay;
-                _boundVitals = null;
-            }
-
-            if (_boundBoss != null)
-            {
-                _boundBoss.OnBossStateChanged -= HandleBossStateChanged;
-                _boundBoss = null;
-            }
-        }
-
-        private void HandleShiftUpdated(ShiftPeriod shift, float hour24)
-        {
-            if (_shiftLabel == null)
+            if (!_isBound)
             {
                 return;
             }
 
-            int hours = Mathf.FloorToInt(hour24) % 24;
-            int minutes = Mathf.FloorToInt((hour24 - Mathf.Floor(hour24)) * 60f);
-            string shiftText = _boundShiftManager != null && !string.IsNullOrEmpty(_boundShiftManager.FormattedShiftName)
-                ? _boundShiftManager.FormattedShiftName
-                : FormatShiftName(shift);
-
-            _shiftLabel.text = $"{hours:00}:{minutes:00} // {shiftText}";
+            UnregisterCallbacks();
+            _radarBlipPool.Clear();
+            _activeBlipCount = 0;
+            _isBound = false;
         }
 
-        private void UpdateZoneDisplay(ShipyardZone zone)
+        private void RegisterCallbacks()
         {
-            if (_zoneLabel == null)
+            if (_btnNightShift != null) _btnNightShift.clicked += HandleNightShiftClicked;
+            if (_btnProtocol != null) _btnProtocol.clicked += ToggleProtocolOverlay;
+            if (_btnCloseProtocol != null) _btnCloseProtocol.clicked += HandleCloseProtocolClicked;
+            if (_btnLogbook != null) _btnLogbook.clicked += ToggleLogbookOverlay;
+            if (_btnCloseLogbook != null) _btnCloseLogbook.clicked += HandleCloseLogbookClicked;
+            if (_btnPerkAgility != null) _btnPerkAgility.clicked += HandleAgilityPerkClicked;
+            if (_btnPerkStealth != null) _btnPerkStealth.clicked += HandleStealthPerkClicked;
+            if (_btnPerkCombat != null) _btnPerkCombat.clicked += HandleCombatPerkClicked;
+            if (_btnPerkRad != null) _btnPerkRad.clicked += HandleRadPerkClicked;
+            if (_btnRestart != null) _btnRestart.clicked += HandleRestartClicked;
+            if (_btnEndgameRestart != null) _btnEndgameRestart.clicked += HandleRestartClicked;
+            if (_radarCircle != null) _radarCircle.RegisterCallback<ClickEvent>(HandleRadarClicked);
+        }
+
+        private void UnregisterCallbacks()
+        {
+            if (_btnNightShift != null) _btnNightShift.clicked -= HandleNightShiftClicked;
+            if (_btnProtocol != null) _btnProtocol.clicked -= ToggleProtocolOverlay;
+            if (_btnCloseProtocol != null) _btnCloseProtocol.clicked -= HandleCloseProtocolClicked;
+            if (_btnLogbook != null) _btnLogbook.clicked -= ToggleLogbookOverlay;
+            if (_btnCloseLogbook != null) _btnCloseLogbook.clicked -= HandleCloseLogbookClicked;
+            if (_btnPerkAgility != null) _btnPerkAgility.clicked -= HandleAgilityPerkClicked;
+            if (_btnPerkStealth != null) _btnPerkStealth.clicked -= HandleStealthPerkClicked;
+            if (_btnPerkCombat != null) _btnPerkCombat.clicked -= HandleCombatPerkClicked;
+            if (_btnPerkRad != null) _btnPerkRad.clicked -= HandleRadPerkClicked;
+            if (_btnRestart != null) _btnRestart.clicked -= HandleRestartClicked;
+            if (_btnEndgameRestart != null) _btnEndgameRestart.clicked -= HandleRestartClicked;
+            if (_radarCircle != null) _radarCircle.UnregisterCallback<ClickEvent>(HandleRadarClicked);
+        }
+
+        private void InitializeRadarPool()
+        {
+            _radarBlipPool.Clear();
+            _activeBlipCount = 0;
+
+            if (_radarBlipsLayer == null)
             {
                 return;
             }
 
-            _zoneLabel.text = FormatZoneName(zone);
+            _radarBlipsLayer.Clear();
+            for (int i = 0; i < MaxRadarBlips; i++)
+            {
+                var blip = new VisualElement
+                {
+                    pickingMode = PickingMode.Ignore
+                };
+                blip.AddToClassList("radar-blip");
+                blip.style.position = Position.Absolute;
+                blip.style.width = 6;
+                blip.style.height = 6;
+                blip.style.marginLeft = -3;
+                blip.style.marginTop = -3;
+                blip.style.borderTopLeftRadius = 3;
+                blip.style.borderTopRightRadius = 3;
+                blip.style.borderBottomLeftRadius = 3;
+                blip.style.borderBottomRightRadius = 3;
+                blip.style.display = DisplayStyle.None;
+                _radarBlipsLayer.Add(blip);
+                _radarBlipPool.Add(blip);
+            }
         }
 
-        private void HandleObjectiveUpdated(string objective)
+        private void ResolveAndSubscribeSceneReferences()
         {
-            if (_objectiveLabel == null)
+            if (_catVitals == null)
+            {
+                _catVitals = FindFirstObjectByType<CatVitals>();
+            }
+            if (_catVitals != null && !_subscribedVitals)
+            {
+                _catVitals.OnVitalsChanged += HandleVitalsChanged;
+                _catVitals.OnAlbaFainted += HandleAlbaFainted;
+                _catVitals.OnVictory += HandleVictory;
+                _catVitals.OnZoneChanged += HandleZoneChanged;
+                _subscribedVitals = true;
+            }
+
+            if (_shiftManager == null)
+            {
+                _shiftManager = FindFirstObjectByType<DiurnalShiftManager>();
+            }
+            if (_shiftManager != null && !_subscribedShift)
+            {
+                _shiftManager.OnShiftUpdated += HandleShiftUpdated;
+                _subscribedShift = true;
+            }
+
+            if (_kingpinBoss == null)
+            {
+                _kingpinBoss = FindFirstObjectByType<KingpinBossAI>();
+            }
+            if (_kingpinBoss != null && !_subscribedKingpin)
+            {
+                _kingpinBoss.OnBossStateChanged += HandleKingpinStateChanged;
+                _subscribedKingpin = true;
+            }
+
+            if (_cobaltBoss == null)
+            {
+                _cobaltBoss = FindFirstObjectByType<LieutenantCobaltBossAI>();
+            }
+            if (_cobaltBoss != null && !_subscribedCobalt)
+            {
+                _cobaltBoss.OnBossStateChanged += HandleCobaltStateChanged;
+                _subscribedCobalt = true;
+            }
+
+            if (_radarController == null)
+            {
+                _radarController = FindFirstObjectByType<TacticalRadarController>();
+            }
+
+            if (_progressBridge == null)
+            {
+                _progressBridge = FindFirstObjectByType<ShipyardProgressBridge>();
+            }
+            if (_progressBridge != null && !_subscribedProgress)
+            {
+                _progressBridge.OnVerminCountsChanged += HandleVerminCountsChanged;
+                _subscribedProgress = true;
+            }
+
+            if (_missionManager == null)
+            {
+                _missionManager = MissionManager.Instance;
+            }
+            if (_missionManager != null && !_subscribedMission)
+            {
+                _missionManager.OnObjectiveCompleted += HandleObjectiveCompleted;
+                _subscribedMission = true;
+            }
+        }
+
+        private void SubscribeStaticEvents()
+        {
+            if (_subscribedStatic)
             {
                 return;
             }
 
-            _objectiveLabel.text = string.IsNullOrWhiteSpace(objective)
-                ? "PATROL NEWPORT NEWS YARD"
-                : objective;
+            CollectibleItem.OnItemCollected += HandleItemCollected;
+            PounceTrajectoryVisualizer.OnPouncePromptChanged += HandlePouncePromptChanged;
+            ShipbuilderNPC.OnDialogueTriggered += HandleDialogueTriggered;
+            ColonyCatNPC.OnColonyDialogue += HandleColonyDialogue;
+            _subscribedStatic = true;
         }
 
-        private void HandleBossStateChanged(float currentHealth, float maxHealth, bool isAggro)
+        private void UnsubscribeAll()
         {
-            bool showBoss = isAggro && currentHealth > 0f;
-            SetBossBarVisible(showBoss);
+            if (_catVitals != null && _subscribedVitals)
+            {
+                _catVitals.OnVitalsChanged -= HandleVitalsChanged;
+                _catVitals.OnAlbaFainted -= HandleAlbaFainted;
+                _catVitals.OnVictory -= HandleVictory;
+                _catVitals.OnZoneChanged -= HandleZoneChanged;
+                _subscribedVitals = false;
+            }
 
-            if (!showBoss)
+            if (_shiftManager != null && _subscribedShift)
+            {
+                _shiftManager.OnShiftUpdated -= HandleShiftUpdated;
+                _subscribedShift = false;
+            }
+
+            if (_kingpinBoss != null && _subscribedKingpin)
+            {
+                _kingpinBoss.OnBossStateChanged -= HandleKingpinStateChanged;
+                _subscribedKingpin = false;
+            }
+
+            if (_cobaltBoss != null && _subscribedCobalt)
+            {
+                _cobaltBoss.OnBossStateChanged -= HandleCobaltStateChanged;
+                _subscribedCobalt = false;
+            }
+
+            if (_progressBridge != null && _subscribedProgress)
+            {
+                _progressBridge.OnVerminCountsChanged -= HandleVerminCountsChanged;
+                _subscribedProgress = false;
+            }
+
+            if (_missionManager != null && _subscribedMission)
+            {
+                _missionManager.OnObjectiveCompleted -= HandleObjectiveCompleted;
+                _subscribedMission = false;
+            }
+
+            if (_subscribedStatic)
+            {
+                CollectibleItem.OnItemCollected -= HandleItemCollected;
+                PounceTrajectoryVisualizer.OnPouncePromptChanged -= HandlePouncePromptChanged;
+                ShipbuilderNPC.OnDialogueTriggered -= HandleDialogueTriggered;
+                ColonyCatNPC.OnColonyDialogue -= HandleColonyDialogue;
+                _subscribedStatic = false;
+            }
+        }
+
+        private void PerformInitialSync()
+        {
+            if (_catVitals != null)
+            {
+                RefreshHUD(_catVitals);
+            }
+
+            if (_shiftManager != null)
+            {
+                HandleShiftUpdated(_shiftManager.CurrentShift, _shiftManager.TimeOfDay);
+            }
+
+            if (_progressBridge != null)
+            {
+                HandleVerminCountsChanged(_progressBridge.ActiveVerminCount, _progressBridge.DefeatedVerminCount);
+            }
+
+            RefreshMissionDisplay();
+            RefreshLogbook();
+        }
+
+        private void UpdateRadar()
+        {
+            if (_radarController == null || _radarBlipsLayer == null || _radarBlipPool.Count == 0)
             {
                 return;
             }
 
-            float norm = maxHealth > 0f ? Mathf.Clamp01(currentHealth / maxHealth) : 0f;
-            if (_bossBarFill != null)
+            _radarBlipBuffer.Clear();
+            _radarController.GetRadarBlips(_radarBlipBuffer);
+
+            int count = Mathf.Min(_radarBlipBuffer.Count, _radarBlipPool.Count);
+            for (int i = 0; i < count; i++)
             {
-                _bossBarFill.style.width = new Length(norm * 100f, LengthUnit.Percent);
+                RadarBlip data = _radarBlipBuffer[i];
+                VisualElement blip = _radarBlipPool[i];
+
+                float xPct = 50f + Mathf.Clamp(data.normalizedOffset.x, -1f, 1f) * 44f;
+                float yPct = 50f - Mathf.Clamp(data.normalizedOffset.y, -1f, 1f) * 44f;
+
+                blip.style.left = Length.Percent(xPct);
+                blip.style.top = Length.Percent(yPct);
+                blip.style.backgroundColor = GetRadarBlipColor(data.kind);
+                blip.style.display = DisplayStyle.Flex;
             }
 
-            if (_bossHpLabel != null)
+            for (int i = count; i < _activeBlipCount; i++)
             {
-                _bossHpLabel.text = $"THE KINGPIN // {Mathf.CeilToInt(currentHealth)} / {Mathf.CeilToInt(maxHealth)}";
+                _radarBlipPool[i].style.display = DisplayStyle.None;
             }
+
+            _activeBlipCount = count;
+        }
+
+        private static Color GetRadarBlipColor(string kind)
+        {
+            if (string.IsNullOrEmpty(kind))
+            {
+                return new Color(0.85f, 0.9f, 1f, 1f);
+            }
+
+            if (string.Equals(kind, "boss", StringComparison.OrdinalIgnoreCase))
+            {
+                return new Color(1f, 0.2f, 0.25f, 1f);
+            }
+
+            if (string.Equals(kind, "vermin", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(kind, "rat", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(kind, "enemy", StringComparison.OrdinalIgnoreCase))
+            {
+                return new Color(1f, 0.55f, 0.15f, 1f);
+            }
+
+            if (string.Equals(kind, "collectible", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(kind, "item", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(kind, "loot", StringComparison.OrdinalIgnoreCase))
+            {
+                return new Color(1f, 0.85f, 0.2f, 1f);
+            }
+
+            if (string.Equals(kind, "npc", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(kind, "colony", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(kind, "objective", StringComparison.OrdinalIgnoreCase))
+            {
+                return new Color(0.3f, 0.95f, 0.55f, 1f);
+            }
+
+            return new Color(0.4f, 0.85f, 1f, 1f);
+        }
+
+        private void HandleVitalsChanged(CatVitals vitals)
+        {
+            RefreshHUD(vitals);
         }
 
         private void HandleAlbaFainted()
         {
-            if (_boundVitals != null)
-            {
-                RefreshHUD(_boundVitals);
-            }
-            else
-            {
-                ShowEndgameModal("ALBA FAINTED — MEDEVAC", "Collapsed on shift. Restart to resume yard patrol.");
-            }
+            ShowEndgame(false);
         }
 
         private void HandleVictory()
         {
-            if (_boundVitals != null)
+            ShowEndgame(true);
+        }
+
+        private void HandleZoneChanged(ShipyardZone zone)
+        {
+            if (_zoneLabel != null)
             {
-                RefreshHUD(_boundVitals);
-            }
-            else
-            {
-                ShowEndgameModal("SHIPYARD SECURED — VICTORY", "Dry Dock 1 Kingpin defeated!");
+                _zoneLabel.text = zone.ToString().ToUpperInvariant();
             }
         }
 
-        private void HandleRestartClicked()
+        private void HandleShiftUpdated(ShiftPeriod period, float timeOfDay)
         {
-            HideEndgameModal();
-            SetBossBarVisible(false);
-
-            if (ShipyardGameManager.Instance != null)
+            if (_shiftLabel != null && _shiftManager != null)
             {
-                ShipyardGameManager.Instance.RestartMission();
+                _shiftLabel.text = $"{_shiftManager.FormattedShiftName} {_shiftManager.CurrentTimeString}";
             }
-            else
+            else if (_shiftLabel != null)
             {
-                Scene activeScene = SceneManager.GetActiveScene();
-                SceneManager.LoadScene(activeScene.buildIndex);
+                _shiftLabel.text = $"{period}";
             }
         }
 
-        private void SetBossBarVisible(bool visible)
+        private void HandleKingpinStateChanged(float health, float maxHealth, bool isAggro)
         {
-            if (_bossContainer != null)
+            UpdateBossCard("KINGPIN", health, maxHealth, isAggro);
+        }
+
+        private void HandleCobaltStateChanged(float health, float maxHealth, bool isAggro)
+        {
+            UpdateBossCard("LT. COBALT", health, maxHealth, isAggro);
+        }
+
+        private void UpdateBossCard(string bossName, float health, float maxHealth, bool isAggro)
+        {
+            if (_bossCard == null)
             {
-                _bossContainer.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+                return;
+            }
+
+            bool show = _gameplayHudVisible && isAggro && health > 0f;
+            _bossCard.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!show)
+            {
+                return;
+            }
+
+            if (_bossNameLabel != null)
+            {
+                _bossNameLabel.text = bossName;
+            }
+
+            float ratio = maxHealth > 0f ? Mathf.Clamp01(health / maxHealth) : 0f;
+            if (_bossHealthFill != null)
+            {
+                _bossHealthFill.style.width = Length.Percent(ratio * 100f);
+            }
+
+            if (_bossHealthLabel != null)
+            {
+                _bossHealthLabel.text = $"{Mathf.CeilToInt(health)} / {Mathf.CeilToInt(maxHealth)}";
             }
         }
 
-        private void SetProtocolOverlayVisible(bool visible)
+        private void HandleVerminCountsChanged(int active, int defeated)
         {
-            _isProtocolVisible = visible;
-            _protocolHideTimer = visible ? ProtocolAutoHideSeconds : 0f;
+            _lastActiveVermin = active;
+            _lastDefeatedVermin = defeated;
 
-            if (_protocolPanel != null)
+            if (_verminLabel != null)
             {
-                _protocolPanel.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+                _verminLabel.text = $"Vermin: {active} (Cleared: {defeated})";
+            }
+
+            if (_integrityLabel != null)
+            {
+                int integrity = Mathf.Clamp(100 - active * 4, 10, 100);
+                _integrityLabel.text = $"Integrity: {integrity}%";
+            }
+
+            UpdateScoreLabel();
+            RefreshMissionDisplay();
+        }
+
+        private void HandleObjectiveCompleted(MissionObjective objective)
+        {
+            RefreshMissionDisplay();
+            RefreshLogbook();
+            UpdateScoreLabel();
+            ShowToast("Objective Completed!");
+        }
+
+        private void HandleItemCollected(CollectibleItem item)
+        {
+            if (item == null)
+            {
+                return;
+            }
+
+            string label = !string.IsNullOrEmpty(item.DisplayName) ? item.DisplayName : item.ItemId;
+            ShowToast($"Collected: {label}");
+            RefreshMissionDisplay();
+        }
+
+        private void HandlePouncePromptChanged(string prompt)
+        {
+            if (_contextualPromptBar == null || _contextualPromptLabel == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrEmpty(prompt))
+            {
+                if (_promptTimer <= 0f)
+                {
+                    _contextualPromptBar.style.display = DisplayStyle.None;
+                }
+                return;
+            }
+
+            _promptTimer = 0f;
+            _contextualPromptLabel.text = prompt;
+            _contextualPromptBar.style.display = _gameplayHudVisible ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private void HandleDialogueTriggered(string speaker, string line)
+        {
+            ShowDialoguePrompt(speaker, line);
+        }
+
+        private void HandleColonyDialogue(string speaker, string line)
+        {
+            ShowDialoguePrompt(speaker, line);
+        }
+
+        private void ShowDialoguePrompt(string speaker, string line)
+        {
+            if (_contextualPromptBar == null || _contextualPromptLabel == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrEmpty(line))
+            {
+                return;
+            }
+
+            _contextualPromptLabel.text = string.IsNullOrEmpty(speaker) ? line : $"{speaker}: {line}";
+            _contextualPromptBar.style.display = DisplayStyle.Flex;
+            _promptTimer = DialogueDurationSeconds;
+        }
+
+        private void ShowToast(string message)
+        {
+            if (_toastBanner == null || _toastLabel == null || string.IsNullOrEmpty(message))
+            {
+                return;
+            }
+
+            _toastLabel.text = message;
+            _toastBanner.style.display = DisplayStyle.Flex;
+            _toastTimer = ToastDurationSeconds;
+        }
+
+        private void RefreshMissionDisplay()
+        {
+            var missionMgr = _missionManager != null ? _missionManager : MissionManager.Instance;
+            int completed = missionMgr != null ? missionMgr.CompletedCount : 0;
+            int total = missionMgr != null ? missionMgr.TotalCount : 0;
+
+            if (_waveLabel != null)
+            {
+                _waveLabel.text = $"Act {Mathf.Min(completed + 1, Mathf.Max(1, total))}";
+            }
+
+            if (_missionProgress != null)
+            {
+                _missionProgress.text = total > 0 ? $"{completed}/{total} Objectives" : "Patrol Active";
+            }
+
+            string bannerText = _progressBridge != null ? _progressBridge.BuildObjectiveBannerText() : string.Empty;
+            if (_objectiveLabel != null)
+            {
+                _objectiveLabel.text = !string.IsNullOrEmpty(bannerText)
+                    ? bannerText
+                    : "Explore the Shipyard";
+            }
+
+            if (_missionDesc != null)
+            {
+                var activeObj = missionMgr != null ? missionMgr.GetActiveObjective() : null;
+                _missionDesc.text = !string.IsNullOrEmpty(bannerText)
+                    ? bannerText
+                    : (activeObj != null ? activeObj.ToString() : "Keep the docks clear of vermin.");
             }
         }
 
-        private void ShowEndgameModal(string title, string subtitle)
+        private void UpdateScoreLabel()
         {
+            if (_scoreLabel == null)
+            {
+                return;
+            }
+
+            var missionMgr = _missionManager != null ? _missionManager : MissionManager.Instance;
+            int completed = missionMgr != null ? missionMgr.CompletedCount : 0;
+            int score = _lastRatsCaught * 100 + _lastDefeatedVermin * 50 + completed * 250;
+            _scoreLabel.text = $"Score: {score}";
+        }
+
+        private void ToggleLogbookOverlay()
+        {
+            EnsureBound();
+            if (_logbookOverlay == null)
+            {
+                return;
+            }
+
+            bool show = _logbookOverlay.style.display != DisplayStyle.Flex;
+            _logbookOverlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (show)
+            {
+                if (_protocolOverlay != null)
+                {
+                    _protocolOverlay.style.display = DisplayStyle.None;
+                }
+                RefreshLogbook();
+            }
+        }
+
+        private void RefreshLogbook()
+        {
+            var prog = ProgressionSystem.Instance;
+            if (_logbookRankLabel != null)
+            {
+                _logbookRankLabel.text = prog != null
+                    ? $"Rank: {prog.CurrentRankTitle} (Lv.{prog.CurrentLevel})"
+                    : "Rank: Dockyard Stray";
+            }
+
+            if (_logbookXpLabel != null)
+            {
+                _logbookXpLabel.text = prog != null
+                    ? $"XP: {prog.CurrentXP} | Perk Points: {prog.AvailablePerkPoints}"
+                    : "XP: 0 | Perk Points: 0";
+            }
+
+            if (_logbookActsContainer == null)
+            {
+                return;
+            }
+
+            _logbookActsContainer.Clear();
+
+            var missionMgr = _missionManager != null ? _missionManager : MissionManager.Instance;
+            int completed = missionMgr != null ? missionMgr.CompletedCount : 0;
+            int total = missionMgr != null ? missionMgr.TotalCount : 0;
+
+            var summary = new Label($"Objectives Completed: {completed}/{total}");
+            summary.AddToClassList("logbook-act-entry");
+            _logbookActsContainer.Add(summary);
+
+            if (_progressBridge != null)
+            {
+                string objectiveText = _progressBridge.BuildObjectiveBannerText();
+                if (!string.IsNullOrEmpty(objectiveText))
+                {
+                    var current = new Label($"Current: {objectiveText}");
+                    current.AddToClassList("logbook-act-entry");
+                    _logbookActsContainer.Add(current);
+                }
+            }
+
+            var huntStats = new Label($"Rats Caught: {_lastRatsCaught} | Vermin Defeated: {_lastDefeatedVermin}");
+            huntStats.AddToClassList("logbook-act-entry");
+            _logbookActsContainer.Add(huntStats);
+        }
+
+        private void ShowEndgame(bool victory)
+        {
+            if (_endgameOverlay == null)
+            {
+                return;
+            }
+
             if (_endgameTitle != null)
             {
-                _endgameTitle.text = title;
+                _endgameTitle.text = victory ? "SHIPYARD SECURED" : "ALBA FAINTED";
             }
 
             if (_endgameSubtitle != null)
             {
-                _endgameSubtitle.text = subtitle;
+                _endgameSubtitle.text = victory
+                    ? $"Victory! Rats Caught: {_lastRatsCaught} | Vermin Cleared: {_lastDefeatedVermin}"
+                    : $"Rats Caught: {_lastRatsCaught} | Vermin Cleared: {_lastDefeatedVermin}";
             }
 
-            if (_endgameModal != null)
+            _endgameOverlay.style.display = DisplayStyle.Flex;
+        }
+
+        private void HandleNightShiftClicked()
+        {
+            if (_shiftManager == null)
             {
-                _endgameModal.style.display = DisplayStyle.Flex;
+                _shiftManager = FindFirstObjectByType<DiurnalShiftManager>();
             }
-        }
 
-        private void HideEndgameModal()
-        {
-            if (_endgameModal != null)
+            if (_shiftManager != null)
             {
-                _endgameModal.style.display = DisplayStyle.None;
+                _shiftManager.ToggleNightShift();
             }
         }
 
-        private static string FormatShiftName(ShiftPeriod shift)
+        private void HandleCloseProtocolClicked()
         {
-            switch (shift)
+            SetElementDisplay(_protocolOverlay, DisplayStyle.None);
+        }
+
+        private void HandleCloseLogbookClicked()
+        {
+            SetElementDisplay(_logbookOverlay, DisplayStyle.None);
+        }
+
+        private void HandleAgilityPerkClicked()
+        {
+            TryUnlockTieredPerk("Agility", ref _agilityTier, "Agility");
+        }
+
+        private void HandleStealthPerkClicked()
+        {
+            TryUnlockTieredPerk("Stealth", ref _stealthTier, "Stealth");
+        }
+
+        private void HandleCombatPerkClicked()
+        {
+            TryUnlockTieredPerk("Combat", ref _combatTier, "Combat");
+        }
+
+        private void HandleRadPerkClicked()
+        {
+            TryUnlockTieredPerk("RadResist", ref _radTier, "Rad Resist");
+        }
+
+        private void TryUnlockTieredPerk(string prefix, ref int currentTier, string displayName)
+        {
+            var prog = ProgressionSystem.Instance;
+            if (prog == null)
             {
-                case ShiftPeriod.FirstShift_Day:
-                    return "1ST SHIFT (DAY)";
-                case ShiftPeriod.SecondShift_Dusk:
-                    return "2ND SHIFT (DUSK)";
-                case ShiftPeriod.ThirdShift_Night:
-                    return "3RD SHIFT (NIGHT)";
-                default:
-                    return "SHIFT ACTIVE";
+                return;
             }
-        }
 
-        private static string FormatZoneName(ShipyardZone zone)
-        {
-            switch (zone)
+            for (int tier = currentTier; tier <= 4; tier++)
             {
-                case ShipyardZone.YardGeneral:
-                    return "NNSB MAIN PIER";
-                case ShipyardZone.DryDock12_CVN80:
-                    return "DRY DOCK 12 // CVN-80";
-                case ShipyardZone.DryDock2_SSNVirginia:
-                    return "DRY DOCK 2 // SSN RAD ZONE";
-                case ShipyardZone.HeavySteelFabShop:
-                    return "HEAVY STEEL FAB SHOP";
-                case ShipyardZone.CatHavenSanctuary:
-                    return "CAT HAVEN SANCTUARY";
-                case ShipyardZone.DryDock1_KingpinBasin:
-                    return "DRY DOCK 1 // KINGPIN BASIN";
-                default:
-                    return "SHIPYARD";
+                if (prog.TryUnlockPerk($"{prefix}_{tier}"))
+                {
+                    currentTier = tier + 1;
+                    ShowToast($"{displayName} Tier {tier} Unlocked!");
+                    RefreshLogbook();
+                    return;
+                }
+            }
+
+            ShowToast(prog.AvailablePerkPoints <= 0
+                ? "No perk points available."
+                : $"{displayName} already at max tier.");
+        }
+
+        private void HandleRadarClicked(ClickEvent evt)
+        {
+            if (_radarController == null)
+            {
+                _radarController = FindFirstObjectByType<TacticalRadarController>();
+            }
+
+            if (_radarController != null)
+            {
+                _radarController.ToggleFullMap();
             }
         }
 
-        private static void BuildFallbackHierarchy(VisualElement root)
+        private static void HandleRestartClicked()
         {
-            root.Clear();
-
-            Color panelBg = new Color(0.043f, 0.075f, 0.118f, 0.84f);
-            Color borderAmber = new Color(0.95f, 0.68f, 0.16f, 0.85f);
-            Color borderCyan = new Color(0.18f, 0.82f, 0.92f, 0.85f);
-            Color trackBg = new Color(0.10f, 0.14f, 0.20f, 0.95f);
-
-            VisualElement hudRoot = new VisualElement { name = "hud-root" };
-            hudRoot.style.flexGrow = 1f;
-            hudRoot.style.paddingLeft = 20f;
-            hudRoot.style.paddingRight = 20f;
-            hudRoot.style.paddingTop = 18f;
-            hudRoot.style.paddingBottom = 18f;
-            hudRoot.style.justifyContent = Justify.SpaceBetween;
-            hudRoot.pickingMode = PickingMode.Ignore;
-            root.Add(hudRoot);
-
-            VisualElement topRow = new VisualElement();
-            topRow.style.flexDirection = FlexDirection.Row;
-            topRow.style.justifyContent = Justify.SpaceBetween;
-            topRow.style.alignItems = Align.FlexStart;
-            topRow.pickingMode = PickingMode.Ignore;
-            hudRoot.Add(topRow);
-
-            // Top-Left Vitals Card
-            VisualElement vitalsCard = CreateCard(panelBg, borderAmber, 290f);
-            topRow.Add(vitalsCard);
-
-            Label vitalsHeader = new Label("ALBA // YARD PATROL VITALS");
-            vitalsHeader.style.color = borderAmber;
-            vitalsHeader.style.fontSize = 12f;
-            vitalsHeader.style.unityFontStyleAndWeight = FontStyle.Bold;
-            vitalsHeader.style.marginBottom = 6f;
-            vitalsCard.Add(vitalsHeader);
-
-            CreateBarRow(vitalsCard, "HEALTH", "health-bar-fill", "health-label",
-                trackBg, new Color(0.20f, 0.84f, 0.48f, 1f), "100 / 100");
-            CreateBarRow(vitalsCard, "STAMINA", "stamina-bar-fill", "stamina-label",
-                trackBg, new Color(0.96f, 0.72f, 0.18f, 1f), "100 / 100");
-            CreateBarRow(vitalsCard, "RADIATION", "rad-bar-fill", "rad-label",
-                trackBg, new Color(0.18f, 0.90f, 0.78f, 1f), "0.0 mSv");
-
-            // Top-Center Boss Bar
-            VisualElement bossContainer = CreateCard(panelBg, new Color(0.92f, 0.22f, 0.22f, 0.95f), 420f);
-            bossContainer.name = "boss-container";
-            bossContainer.style.display = DisplayStyle.None;
-            topRow.Add(bossContainer);
-
-            Label bossHpLabel = new Label("THE KINGPIN // 300 / 300") { name = "boss-hp-label" };
-            bossHpLabel.style.color = new Color(1f, 0.36f, 0.36f, 1f);
-            bossHpLabel.style.fontSize = 13f;
-            bossHpLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            bossHpLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            bossHpLabel.style.marginBottom = 6f;
-            bossContainer.Add(bossHpLabel);
-
-            VisualElement bossTrack = new VisualElement();
-            bossTrack.style.height = 14f;
-            bossTrack.style.backgroundColor = trackBg;
-            bossTrack.style.borderTopLeftRadius = 4f;
-            bossTrack.style.borderTopRightRadius = 4f;
-            bossTrack.style.borderBottomLeftRadius = 4f;
-            bossTrack.style.borderBottomRightRadius = 4f;
-            bossTrack.style.overflow = Overflow.Hidden;
-            bossContainer.Add(bossTrack);
-
-            VisualElement bossFill = new VisualElement { name = "boss-bar-fill" };
-            bossFill.style.height = new Length(100f, LengthUnit.Percent);
-            bossFill.style.width = new Length(100f, LengthUnit.Percent);
-            bossFill.style.backgroundColor = new Color(0.88f, 0.16f, 0.20f, 1f);
-            bossTrack.Add(bossFill);
-
-            // Top-Right Telemetry Card
-            VisualElement telemetryCard = CreateCard(panelBg, borderCyan, 320f);
-            topRow.Add(telemetryCard);
-
-            Label shiftLabel = CreateTelemetryLabel("shift-label", "13:30 // 1ST SHIFT (DAY)", borderCyan, 13f, FontStyle.Bold);
-            Label zoneLabel = CreateTelemetryLabel("zone-label", "ZONE: NNSB MAIN PIER", Color.white, 12f, FontStyle.Bold);
-            Label ratsLabel = CreateTelemetryLabel("rats-label", "RATS CAUGHT: 0", new Color(0.95f, 0.85f, 0.45f, 1f), 12f, FontStyle.Normal);
-            Label scoreLabel = CreateTelemetryLabel("score-label", "SCORE: 0", new Color(0.75f, 0.92f, 1f, 1f), 12f, FontStyle.Normal);
-            Label objectiveLabel = CreateTelemetryLabel("objective-label", "PATROL NEWPORT NEWS YARD", new Color(0.95f, 0.76f, 0.30f, 1f), 12f, FontStyle.Bold);
-            objectiveLabel.style.whiteSpace = WhiteSpace.Normal;
-
-            telemetryCard.Add(shiftLabel);
-            telemetryCard.Add(zoneLabel);
-            telemetryCard.Add(ratsLabel);
-            telemetryCard.Add(scoreLabel);
-            telemetryCard.Add(objectiveLabel);
-
-            // Bottom Row: Protocol Panel + Toggle Button
-            VisualElement bottomRow = new VisualElement();
-            bottomRow.style.flexDirection = FlexDirection.Column;
-            bottomRow.style.alignItems = Align.FlexStart;
-            bottomRow.pickingMode = PickingMode.Ignore;
-            hudRoot.Add(bottomRow);
-
-            VisualElement protocolPanel = CreateCard(panelBg, borderCyan, 340f);
-            protocolPanel.name = "protocol-panel";
-            protocolPanel.style.marginBottom = 8f;
-            protocolPanel.style.display = DisplayStyle.None;
-            bottomRow.Add(protocolPanel);
-
-            Label protocolTitle = new Label("[F1] NNSB YARD PROTOCOL CONTROLS");
-            protocolTitle.style.color = borderCyan;
-            protocolTitle.style.fontSize = 12f;
-            protocolTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
-            protocolTitle.style.marginBottom = 4f;
-            protocolPanel.Add(protocolTitle);
-
-            Label protocolBody = new Label(
-                "WASD / Arrows: Move   |   Shift: Sprint\n" +
-                "Space: Jump            |   J: Paw Swipe\n" +
-                "F: Pounce Strike       |   Q: Whiskers Sonar\n" +
-                "N: Toggle Night Shift  |   F1: Toggle Controls");
-            protocolBody.style.color = new Color(0.88f, 0.93f, 0.98f, 1f);
-            protocolBody.style.fontSize = 11f;
-            protocolPanel.Add(protocolBody);
-
-            Button protocolBtn = new Button { name = "protocol-toggle-button", text = "[F1] CONTROLS" };
-            protocolBtn.style.backgroundColor = panelBg;
-            protocolBtn.style.color = borderCyan;
-            protocolBtn.style.borderTopWidth = 1f;
-            protocolBtn.style.borderBottomWidth = 1f;
-            protocolBtn.style.borderLeftWidth = 1f;
-            protocolBtn.style.borderRightWidth = 1f;
-            protocolBtn.style.borderTopColor = borderCyan;
-            protocolBtn.style.borderBottomColor = borderCyan;
-            protocolBtn.style.borderLeftColor = borderCyan;
-            protocolBtn.style.borderRightColor = borderCyan;
-            protocolBtn.style.paddingLeft = 10f;
-            protocolBtn.style.paddingRight = 10f;
-            protocolBtn.style.paddingTop = 5f;
-            protocolBtn.style.paddingBottom = 5f;
-            protocolBtn.style.fontSize = 11f;
-            bottomRow.Add(protocolBtn);
-
-            // Center Endgame Modal
-            VisualElement modal = new VisualElement { name = "endgame-modal" };
-            modal.style.position = Position.Absolute;
-            modal.style.left = 0f;
-            modal.style.right = 0f;
-            modal.style.top = 0f;
-            modal.style.bottom = 0f;
-            modal.style.backgroundColor = new Color(0.02f, 0.04f, 0.07f, 0.76f);
-            modal.style.alignItems = Align.Center;
-            modal.style.justifyContent = Justify.Center;
-            modal.style.display = DisplayStyle.None;
-            hudRoot.Add(modal);
-
-            VisualElement modalBox = CreateCard(new Color(0.05f, 0.08f, 0.13f, 0.96f), borderAmber, 440f);
-            modalBox.style.alignItems = Align.Center;
-            modalBox.style.paddingTop = 24f;
-            modalBox.style.paddingBottom = 24f;
-            modal.Add(modalBox);
-
-            Label endgameTitle = new Label("MISSION COMPLETE") { name = "endgame-title" };
-            endgameTitle.style.color = borderAmber;
-            endgameTitle.style.fontSize = 20f;
-            endgameTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
-            endgameTitle.style.marginBottom = 8f;
-            endgameTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
-            modalBox.Add(endgameTitle);
-
-            Label endgameSubtitle = new Label("Shipyard status updated.") { name = "endgame-subtitle" };
-            endgameSubtitle.style.color = Color.white;
-            endgameSubtitle.style.fontSize = 13f;
-            endgameSubtitle.style.marginBottom = 18f;
-            endgameSubtitle.style.whiteSpace = WhiteSpace.Normal;
-            endgameSubtitle.style.unityTextAlign = TextAnchor.MiddleCenter;
-            modalBox.Add(endgameSubtitle);
-
-            Button restartBtn = new Button { name = "restart-button", text = "RESTART SHIFT" };
-            restartBtn.style.backgroundColor = borderAmber;
-            restartBtn.style.color = new Color(0.05f, 0.08f, 0.12f, 1f);
-            restartBtn.style.unityFontStyleAndWeight = FontStyle.Bold;
-            restartBtn.style.paddingLeft = 20f;
-            restartBtn.style.paddingRight = 20f;
-            restartBtn.style.paddingTop = 8f;
-            restartBtn.style.paddingBottom = 8f;
-            modalBox.Add(restartBtn);
+            Time.timeScale = 1f;
+            Scene activeScene = SceneManager.GetActiveScene();
+            SceneManager.LoadScene(activeScene.buildIndex);
         }
 
-        private static VisualElement CreateCard(Color bg, Color border, float width)
+        private static void SetElementDisplay(VisualElement element, DisplayStyle display)
         {
-            VisualElement card = new VisualElement();
-            card.style.width = width;
-            card.style.backgroundColor = bg;
-            card.style.paddingLeft = 12f;
-            card.style.paddingRight = 12f;
-            card.style.paddingTop = 10f;
-            card.style.paddingBottom = 10f;
-            card.style.borderTopWidth = 1f;
-            card.style.borderBottomWidth = 1f;
-            card.style.borderLeftWidth = 1f;
-            card.style.borderRightWidth = 1f;
-            card.style.borderTopColor = border;
-            card.style.borderBottomColor = border;
-            card.style.borderLeftColor = border;
-            card.style.borderRightColor = border;
-            card.style.borderTopLeftRadius = 6f;
-            card.style.borderTopRightRadius = 6f;
-            card.style.borderBottomLeftRadius = 6f;
-            card.style.borderBottomRightRadius = 6f;
-            return card;
-        }
-
-        private static void CreateBarRow(
-            VisualElement parent,
-            string title,
-            string fillName,
-            string labelName,
-            Color trackColor,
-            Color fillColor,
-            string defaultText)
-        {
-            VisualElement header = new VisualElement();
-            header.style.flexDirection = FlexDirection.Row;
-            header.style.justifyContent = Justify.SpaceBetween;
-            header.style.marginBottom = 2f;
-            parent.Add(header);
-
-            Label nameLabel = new Label(title);
-            nameLabel.style.color = new Color(0.82f, 0.88f, 0.94f, 1f);
-            nameLabel.style.fontSize = 11f;
-            header.Add(nameLabel);
-
-            Label valueLabel = new Label(defaultText) { name = labelName };
-            valueLabel.style.color = Color.white;
-            valueLabel.style.fontSize = 11f;
-            header.Add(valueLabel);
-
-            VisualElement track = new VisualElement();
-            track.style.height = 10f;
-            track.style.backgroundColor = trackColor;
-            track.style.marginBottom = 6f;
-            track.style.borderTopLeftRadius = 3f;
-            track.style.borderTopRightRadius = 3f;
-            track.style.borderBottomLeftRadius = 3f;
-            track.style.borderBottomRightRadius = 3f;
-            track.style.overflow = Overflow.Hidden;
-            parent.Add(track);
-
-            VisualElement fill = new VisualElement { name = fillName };
-            fill.style.height = new Length(100f, LengthUnit.Percent);
-            fill.style.width = new Length(100f, LengthUnit.Percent);
-            fill.style.backgroundColor = fillColor;
-            track.Add(fill);
-        }
-
-        private static Label CreateTelemetryLabel(string name, string text, Color color, float fontSize, FontStyle fontStyle)
-        {
-            Label label = new Label(text) { name = name };
-            label.style.color = color;
-            label.style.fontSize = fontSize;
-            label.style.unityFontStyleAndWeight = fontStyle;
-            label.style.marginBottom = 3f;
-            return label;
+            if (element != null)
+            {
+                element.style.display = display;
+            }
         }
     }
 }
