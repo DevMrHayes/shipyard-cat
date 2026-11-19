@@ -68,6 +68,7 @@ namespace ShipyardCat.Tests
             try
             {
                 var vitals = goV.AddComponent<CatVitals>();
+                vitals.ResetVitals();
                 vitals.TakeDamage(40f);
                 float damaged = vitals.Health;
 

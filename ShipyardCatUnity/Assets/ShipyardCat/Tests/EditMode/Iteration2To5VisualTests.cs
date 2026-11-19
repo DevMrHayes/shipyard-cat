@@ -8,6 +8,15 @@ namespace ShipyardCat.Tests
 {
     public class Iteration2To5VisualTests
     {
+        private static Transform FindDescendant(Transform root, string childName)
+        {
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name == childName) return t;
+            }
+            return null;
+        }
+
         [Test]
         public void Alba_HasTuxedoVisualRigCollarTagAndDosimeter()
         {
@@ -16,9 +25,9 @@ namespace ShipyardCat.Tests
             Assert.IsNotNull(alba, "AlbaController missing.");
             var rig = alba.GetComponent<AlbaVisualRig>();
             Assert.IsNotNull(rig, "AlbaVisualRig missing on Alba_Player.");
-            Assert.IsNotNull(alba.transform.Find("Alba_SafetyCollar"), "Orange safety collar missing.");
-            Assert.IsNotNull(alba.transform.Find("Alba_BrassNnsTag"), "Brass NNS Sanctuary tag missing.");
-            Assert.IsNotNull(alba.transform.Find("Alba_LcdDosimeter"), "LCD Dosimeter missing.");
+            Assert.IsNotNull(FindDescendant(alba.transform, "Alba_SafetyCollar"), "Orange safety collar missing.");
+            Assert.IsNotNull(FindDescendant(alba.transform, "Alba_BrassNnsTag"), "Brass NNS Sanctuary tag missing.");
+            Assert.IsNotNull(FindDescendant(alba.transform, "Alba_LcdDosimeter"), "LCD Dosimeter missing.");
         }
 
         [Test]

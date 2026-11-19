@@ -26,31 +26,31 @@ namespace ShipyardCat.World
 
         private static readonly PuddleSpec[] PuddleSpecs =
         {
-            // Around Alba's spawn (-10, -20) - 5 puddles
-            new PuddleSpec(-10.8f, -18.6f, 4.2f, 2.9f, 18f),
-            new PuddleSpec(-7.4f, -21.8f, 5.1f, 3.6f, 64f),
-            new PuddleSpec(-13.2f, -22.5f, 3.4f, 2.4f, 112f),
-            new PuddleSpec(-8.9f, -16.9f, 2.8f, 2.1f, 145f),
-            new PuddleSpec(-12.1f, -19.7f, 3.7f, 2.6f, 37f),
+            // Around Alba's spawn (-10, -20) - spaced non-overlapping puddles
+            new PuddleSpec(-10.8f, -15.5f, 3.4f, 2.2f, 18f),
+            new PuddleSpec(-5.5f, -21.8f, 3.8f, 2.5f, 64f),
+            new PuddleSpec(-15.5f, -23.0f, 3.0f, 2.0f, 112f),
+            new PuddleSpec(-6.0f, -11.0f, 2.8f, 2.0f, 145f),
+            new PuddleSpec(-14.5f, -18.0f, 3.1f, 2.1f, 37f),
 
-            // Around rail yard (-25, 10) - 5 puddles
-            new PuddleSpec(-25.4f, 9.5f, 6.2f, 3.8f, 12f),
-            new PuddleSpec(-22.1f, 12.6f, 4.5f, 3.1f, 78f),
-            new PuddleSpec(-28.3f, 8.2f, 5.4f, 3.4f, 134f),
-            new PuddleSpec(-24.0f, 6.8f, 3.6f, 2.5f, 49f),
-            new PuddleSpec(-27.2f, 13.4f, 4.1f, 2.7f, 162f),
+            // Around rail yard (-25, 10) - spaced non-overlapping puddles
+            new PuddleSpec(-25.4f, 9.5f, 4.4f, 2.8f, 12f),
+            new PuddleSpec(-19.5f, 15.0f, 3.6f, 2.4f, 78f),
+            new PuddleSpec(-29.5f, 3.5f, 4.0f, 2.6f, 134f),
+            new PuddleSpec(-22.0f, -1.5f, 3.2f, 2.2f, 49f),
+            new PuddleSpec(-26.5f, 19.0f, 3.5f, 2.4f, 162f),
 
-            // Around Dry Dock 1 east apron (-22, 20) - 4 puddles
-            new PuddleSpec(-21.5f, 19.6f, 5.8f, 4.0f, 26f),
-            new PuddleSpec(-19.2f, 22.3f, 4.4f, 3.0f, 95f),
-            new PuddleSpec(-24.3f, 21.8f, 4.9f, 3.2f, 148f),
-            new PuddleSpec(-20.8f, 17.5f, 3.5f, 2.3f, 57f),
+            // Around Dry Dock 1 east apron (-18, 25..40) - spaced non-overlapping puddles
+            new PuddleSpec(-14.5f, 24.0f, 4.0f, 2.7f, 26f),
+            new PuddleSpec(-21.5f, 32.0f, 3.6f, 2.5f, 95f),
+            new PuddleSpec(-14.0f, 40.0f, 3.8f, 2.6f, 148f),
+            new PuddleSpec(-21.0f, 46.5f, 3.2f, 2.1f, 57f),
 
-            // Around Gate 4 (6, -44) - 4 puddles
-            new PuddleSpec(5.6f, -43.4f, 5.6f, 3.7f, 31f),
-            new PuddleSpec(8.7f, -45.2f, 4.3f, 2.9f, 84f),
-            new PuddleSpec(3.4f, -45.8f, 3.9f, 2.6f, 129f),
-            new PuddleSpec(7.1f, -41.6f, 4.8f, 3.1f, 168f)
+            // Around Gate 4 (6, -44) - spaced non-overlapping puddles
+            new PuddleSpec(2.5f, -40.0f, 3.8f, 2.5f, 31f),
+            new PuddleSpec(11.0f, -44.5f, 3.5f, 2.3f, 84f),
+            new PuddleSpec(1.0f, -47.5f, 3.2f, 2.2f, 129f),
+            new PuddleSpec(9.5f, -37.5f, 3.4f, 2.3f, 168f)
         };
 
         private static readonly Vector2[] PolePositions =
@@ -90,7 +90,7 @@ namespace ShipyardCat.World
                 GameObject puddle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 puddle.name = $"WetPuddle_{i + 1:00}";
                 puddle.transform.SetParent(puddlesRoot.transform, false);
-                puddle.transform.localPosition = new Vector3(spec.X, 0.018f, spec.Z);
+                puddle.transform.localPosition = new Vector3(spec.X, 0.034f, spec.Z);
                 puddle.transform.localRotation = Quaternion.Euler(0f, spec.RotationY, 0f);
                 puddle.transform.localScale = new Vector3(spec.ScaleX, 0.004f, spec.ScaleZ);
 
