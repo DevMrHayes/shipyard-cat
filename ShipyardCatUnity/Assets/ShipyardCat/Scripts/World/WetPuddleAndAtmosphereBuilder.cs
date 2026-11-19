@@ -56,7 +56,7 @@ namespace ShipyardCat.World
         private static readonly Vector2[] PolePositions =
         {
             new Vector2(-26f, -25f),
-            new Vector2(-26f, 15f),
+            new Vector2(-27.2f, -6.5f),
             new Vector2(8f, -25f),
             new Vector2(8f, 25f),
             new Vector2(-65f, 45f),

@@ -10,11 +10,36 @@ namespace ShipyardCat.Player
     public class AlbaVisualRig : MonoBehaviour
     {
         private const string ScaleWrapperName = "Alba_ScaleWrapper";
+        private const string CollarMountName = "Alba_Collar_Mount";
         private const string SafetyCollarName = "Alba_SafetyCollar";
         private const string BrassTagName = "Alba_BrassNnsTag";
         private const string DosimeterName = "Alba_LcdDosimeter";
         private const string DosimeterScreenName = "Alba_DosimeterScreen";
         private const string UrpLitShaderName = "Universal Render Pipeline/Lit";
+
+        private Transform _collarMount;
+        private Transform _neckLowerBone;
+        private Transform _neckUpperBone;
+        private Transform _headBone;
+        private bool _bonesResolved;
+
+        public Transform ResolvedNeckBone
+        {
+            get
+            {
+                ResolveNeckAndHeadBones();
+                return _neckLowerBone;
+            }
+        }
+
+        public void SetCachedTuxedoMaterial(Material tuxedoMaterial)
+        {
+            if (tuxedoMaterial != null)
+            {
+                cachedTuxedoMaterial = tuxedoMaterial;
+                BuildOrRefreshVisuals();
+            }
+        }
 
         private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
         private static readonly int MainTexId = Shader.PropertyToID("_MainTex");
@@ -123,6 +148,11 @@ namespace ShipyardCat.Player
             activeScreenMat.SetColor(EmissionColorId, _currentEmissionColor);
         }
 
+        private void LateUpdate()
+        {
+            SyncCollarMountToNeck();
+        }
+
         private void OnDestroy()
         {
             DestroyProceduralObject(_generatedTuxedoTexture);
@@ -156,6 +186,7 @@ namespace ShipyardCat.Player
             EnsureMaterials();
             EnsureMeshes();
 
+            _bonesResolved = false;
             Transform scaleWrapper = FindChildByName(transform, ScaleWrapperName);
             Transform visualRoot = scaleWrapper != null ? scaleWrapper : transform;
 
@@ -191,8 +222,8 @@ namespace ShipyardCat.Player
                 _collarMaterial = CreateMaterial(urpLit, "Alba_SafetyCollar_Mat");
                 _collarMaterial.SetColor(BaseColorId, CollarOrange);
                 _collarMaterial.SetFloat(MetallicId, 0.05f);
-                _collarMaterial.SetFloat(SmoothnessId, 0.58f);
-                EnableEmission(_collarMaterial, CollarOrange * 1.35f);
+                _collarMaterial.SetFloat(SmoothnessId, 0.52f);
+                EnableEmission(_collarMaterial, CollarOrange * 0.48f);
             }
 
             if (_brassMaterial == null)
@@ -235,22 +266,22 @@ namespace ShipyardCat.Player
         {
             if (_collarMesh == null)
             {
-                _collarMesh = BuildTorusMesh(0.068f, 0.016f, 0.65f, 28, 14);
+                _collarMesh = BuildTorusMesh(0.046f, 0.0085f, 0.85f, 28, 14);
             }
 
             if (_tagMesh == null)
             {
-                _tagMesh = BuildDiscMesh(0.022f, 0.005f, 24);
+                _tagMesh = BuildDiscMesh(0.015f, 0.004f, 24);
             }
 
             if (_dosimeterBoxMesh == null)
             {
-                _dosimeterBoxMesh = BuildBoxMesh(new Vector3(0.036f, 0.052f, 0.020f));
+                _dosimeterBoxMesh = BuildBoxMesh(new Vector3(0.022f, 0.032f, 0.014f));
             }
 
             if (_dosimeterScreenMesh == null)
             {
-                _dosimeterScreenMesh = BuildQuadMesh(0.026f, 0.028f);
+                _dosimeterScreenMesh = BuildQuadMesh(0.016f, 0.018f);
             }
         }
 
@@ -317,27 +348,31 @@ namespace ShipyardCat.Player
 
         private void BuildHardwareAttachments(Transform visualRoot)
         {
-            // Parent directly to Alba_Player root (1:1 world meters) aligned cleanly to 1.45x cat.glb neck height
-            Transform collarTransform = GetOrCreateChild(SafetyCollarName, transform);
-            collarTransform.localPosition = new Vector3(0f, 0.27f, 0.16f);
-            collarTransform.localRotation = Quaternion.Euler(28f, 0f, 0f);
+            ResolveNeckAndHeadBones();
+
+            _collarMount = GetOrCreateChild(CollarMountName, transform);
+            _collarMount.localScale = Vector3.one;
+
+            Transform collarTransform = GetOrCreateChild(SafetyCollarName, _collarMount);
+            collarTransform.localPosition = Vector3.zero;
+            collarTransform.localRotation = Quaternion.identity;
             collarTransform.localScale = Vector3.one;
             AssignMeshAndMaterial(collarTransform, _collarMesh, _collarMaterial);
 
-            Transform tagTransform = GetOrCreateChild(BrassTagName, transform);
-            tagTransform.localPosition = new Vector3(0f, 0.21f, 0.21f);
-            tagTransform.localRotation = Quaternion.Euler(14f, 0f, 0f);
+            Transform tagTransform = GetOrCreateChild(BrassTagName, _collarMount);
+            tagTransform.localPosition = new Vector3(0f, -0.008f, 0.054f);
+            tagTransform.localRotation = Quaternion.Euler(78f, 0f, 0f);
             tagTransform.localScale = Vector3.one;
             AssignMeshAndMaterial(tagTransform, _tagMesh, _brassMaterial);
 
-            Transform dosimeterTransform = GetOrCreateChild(DosimeterName, transform);
-            dosimeterTransform.localPosition = new Vector3(-0.072f, 0.27f, 0.16f);
-            dosimeterTransform.localRotation = Quaternion.Euler(0f, -45f, 0f);
+            Transform dosimeterTransform = GetOrCreateChild(DosimeterName, _collarMount);
+            dosimeterTransform.localPosition = new Vector3(0.052f, 0.002f, 0.008f);
+            dosimeterTransform.localRotation = Quaternion.Euler(0f, 90f, 0f);
             dosimeterTransform.localScale = Vector3.one;
             AssignMeshAndMaterial(dosimeterTransform, _dosimeterBoxMesh, _dosimeterBodyMaterial);
 
             Transform screenTransform = GetOrCreateChild(DosimeterScreenName, dosimeterTransform);
-            screenTransform.localPosition = new Vector3(0f, 0.004f, 0.011f);
+            screenTransform.localPosition = new Vector3(0f, 0.002f, 0.008f);
             screenTransform.localRotation = Quaternion.identity;
             screenTransform.localScale = Vector3.one;
 
@@ -345,6 +380,60 @@ namespace ShipyardCat.Player
                 ? _dosimeterScreenRuntimeMaterial
                 : _dosimeterScreenSharedMaterial;
             _dosimeterScreenRenderer = AssignMeshAndMaterial(screenTransform, _dosimeterScreenMesh, screenMat);
+
+            SyncCollarMountToNeck();
+        }
+
+        private void ResolveNeckAndHeadBones()
+        {
+            if (_bonesResolved && _neckLowerBone != null && _headBone != null)
+            {
+                return;
+            }
+
+            _neckLowerBone = FindTransformContaining(transform, "RigNeck2") ?? FindTransformContaining(transform, "RigNeck1") ?? FindNeckBone(transform);
+            _neckUpperBone = FindTransformContaining(transform, "RigNeck3") ?? _neckLowerBone;
+            _headBone = FindTransformContaining(transform, "RigHead") ?? FindTransformContaining(transform, "head");
+            _bonesResolved = _neckLowerBone != null && _headBone != null;
+        }
+
+        private void SyncCollarMountToNeck()
+        {
+            if (_collarMount == null)
+            {
+                _collarMount = FindChildByName(transform, CollarMountName);
+                if (_collarMount == null) return;
+            }
+
+            ResolveNeckAndHeadBones();
+            _collarMount.localScale = Vector3.one;
+
+            if (_neckLowerBone != null && _headBone != null)
+            {
+                Transform midRef = _neckUpperBone != null ? _neckUpperBone : _neckLowerBone;
+                Vector3 neckCenter = Vector3.Lerp(_neckLowerBone.position, midRef.position, 0.30f);
+                Vector3 neckAxis = (_headBone.position - _neckLowerBone.position);
+                if (neckAxis.sqrMagnitude < 1e-5f)
+                {
+                    neckAxis = transform.forward + transform.up * 0.6f;
+                }
+                neckAxis.Normalize();
+
+                Vector3 ventralDir = Vector3.ProjectOnPlane(Vector3.down, neckAxis);
+                if (ventralDir.sqrMagnitude < 1e-4f)
+                {
+                    ventralDir = Vector3.ProjectOnPlane(transform.forward, neckAxis);
+                }
+                ventralDir.Normalize();
+
+                _collarMount.position = neckCenter;
+                _collarMount.rotation = Quaternion.LookRotation(ventralDir, neckAxis);
+            }
+            else
+            {
+                _collarMount.localPosition = new Vector3(0f, 0.30f, 0.20f);
+                _collarMount.localRotation = Quaternion.Euler(52f, 0f, 0f);
+            }
         }
 
         private static MeshRenderer AssignMeshAndMaterial(Transform target, Mesh mesh, Material sharedMat)
@@ -456,7 +545,8 @@ namespace ShipyardCat.Player
             while (cur != null && cur != stopRoot)
             {
                 string n = cur.name;
-                if (string.Equals(n, SafetyCollarName, StringComparison.Ordinal) ||
+                if (string.Equals(n, CollarMountName, StringComparison.Ordinal) ||
+                    string.Equals(n, SafetyCollarName, StringComparison.Ordinal) ||
                     string.Equals(n, BrassTagName, StringComparison.Ordinal) ||
                     string.Equals(n, DosimeterName, StringComparison.Ordinal) ||
                     string.Equals(n, DosimeterScreenName, StringComparison.Ordinal))
@@ -624,21 +714,6 @@ namespace ShipyardCat.Player
                         float muzzleT = (v - 0.62f) / 0.16f;
                         float muzzleHalfWidth = Mathf.Lerp(0.11f, 0.035f, muzzleT * muzzleT);
                         if (distFromCenterU < muzzleHalfWidth)
-                        {
-                            isWhite = true;
-                        }
-                    }
-
-                    // White whiskers fanning outward from muzzle cheeks
-                    if (distFromCenterU > 0.05f && distFromCenterU < 0.26f)
-                    {
-                        float whiskerDist = distFromCenterU - 0.05f;
-                        float w1 = 0.695f + whiskerDist * 0.10f;
-                        float w2 = 0.672f - whiskerDist * 0.02f;
-                        float w3 = 0.650f - whiskerDist * 0.14f;
-                        if (Mathf.Abs(v - w1) < 0.0075f ||
-                            Mathf.Abs(v - w2) < 0.0075f ||
-                            Mathf.Abs(v - w3) < 0.0075f)
                         {
                             isWhite = true;
                         }

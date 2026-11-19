@@ -66,51 +66,66 @@ namespace ShipyardCat.Editor
 
         private static void BuildBigBlueSigns(Transform parent)
         {
-            const string signText = "NEWPORT NEWS SHIPBUILDING";
+            var (bigBlueTex, _) = SignTextureBaker.BakeAllSignTextures();
+            Material signMat = CreateCutoutSignMaterial(
+                "Mat_BigBlue_Sign_Cutout",
+                bigBlueTex,
+                new Color(0.70f, 0.82f, 0.94f) * 0.42f);
+
             const float craneCenterX = -115f;
             const float girderY = 76f;
             const float craneCenterZ = 210f;
-            const float zOffset = 6.2f;
+            // Twin girders at Z=210 +- 4.5, width 3.2 -> South exterior face at 203.9, North exterior face at 216.1
+            const float girderExteriorOffset = 6.28f;
+            var signScale = new Vector3(56f, 5.4f, 1f);
 
+            // Quad front (-Z) faces South toward yard
             CreateWorldTextSign(
                 parent,
                 "BigBlue_Sign_South",
-                signText,
-                new Vector3(craneCenterX, girderY, craneCenterZ - zOffset),
-                Quaternion.Euler(0f, 180f, 0f),
-                0.65f,
-                64,
-                Color.white);
+                new Vector3(craneCenterX, girderY, craneCenterZ - girderExteriorOffset),
+                Quaternion.identity,
+                signScale,
+                signMat);
 
+            // Rotated 180 deg so front faces North (+Z) toward river, occluded by steel girders from South view
             CreateWorldTextSign(
                 parent,
                 "BigBlue_Sign_North",
-                signText,
-                new Vector3(craneCenterX, girderY, craneCenterZ + zOffset),
-                Quaternion.identity,
-                0.65f,
-                64,
-                Color.white);
+                new Vector3(craneCenterX, girderY, craneCenterZ + girderExteriorOffset),
+                Quaternion.Euler(0f, 180f, 0f),
+                signScale,
+                signMat);
         }
 
         private static void BuildCarrierIslandHullNumberAndBeacons(Transform parent, Material emissiveBeaconMat)
         {
+            var (_, hull80Tex) = SignTextureBaker.BakeAllSignTextures();
+            Material hullMat = CreateCutoutSignMaterial(
+                "Mat_CVN80_Hull80_Cutout",
+                hull80Tex,
+                new Color(0.85f, 0.90f, 0.95f) * 0.35f);
+
             GameObject carrierDetails = new GameObject("CVN80_HeroDetails");
             carrierDetails.transform.SetParent(parent, false);
 
-            // Island tower world-aligned position: (-115 + 17.5, 17, 220 - 42) facing South/West
-            Vector3 islandHullPos = new Vector3(-115f + 17.5f, 17f, 220f - 42f);
-            Quaternion southWestFacing = Quaternion.Euler(0f, 45f, 0f);
-
+            // Island_Base world span: X:[-101.75,-93.25], Y:[6.9,14.9], Z:[168.0,188.0]
+            // Mount strictly proud (+0.18m) of exterior Island_Base walls so ZWrite/ZTest occludes properly behind foreground buildings & catwalk
             CreateWorldTextSign(
                 carrierDetails.transform,
                 "CVN80_Island_HullNumber_80",
-                "80",
-                islandHullPos,
-                southWestFacing,
-                0.95f,
-                84,
-                Color.white);
+                new Vector3(-97.5f, 11.4f, 167.80f),
+                Quaternion.identity,
+                new Vector3(6.6f, 6.6f, 1f),
+                hullMat);
+
+            CreateWorldTextSign(
+                carrierDetails.transform,
+                "CVN80_Island_HullNumber_80_East",
+                new Vector3(-92.95f, 11.4f, 178.0f),
+                Quaternion.Euler(0f, -90f, 0f),
+                new Vector3(7.0f, 7.0f, 1f),
+                hullMat);
 
             // Flight-deck edge beacon lights along CVN-80 port & starboard edges
             GameObject beaconsGroup = new GameObject("CVN80_FlightDeck_Beacons");
@@ -393,45 +408,68 @@ namespace ShipyardCat.Editor
         private static void CreateWorldTextSign(
             Transform parent,
             string objectName,
-            string text,
             Vector3 position,
             Quaternion rotation,
-            float characterSize,
-            int fontSize,
-            Color color)
+            Vector3 scale,
+            Material material)
         {
-            GameObject signGo = new GameObject(objectName);
+            GameObject signGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            signGo.name = objectName;
             signGo.transform.SetParent(parent, false);
             signGo.transform.position = position;
             signGo.transform.rotation = rotation;
-
-            TextMesh textMesh = signGo.AddComponent<TextMesh>();
-            if (textMesh.font == null)
-            {
-                Font fallbackFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                if (fallbackFont != null)
-                {
-                    textMesh.font = fallbackFont;
-                }
-            }
-
-            textMesh.text = text;
-            textMesh.characterSize = characterSize;
-            textMesh.fontSize = fontSize;
-            textMesh.fontStyle = FontStyle.Bold;
-            textMesh.anchor = TextAnchor.MiddleCenter;
-            textMesh.alignment = TextAlignment.Center;
-            textMesh.color = color;
+            signGo.transform.localScale = scale;
 
             MeshRenderer meshRenderer = signGo.GetComponent<MeshRenderer>();
-            if (meshRenderer != null && textMesh.font != null && textMesh.font.material != null)
+            if (meshRenderer != null && material != null)
             {
-                meshRenderer.sharedMaterial = textMesh.font.material;
+                meshRenderer.sharedMaterial = material;
                 meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                meshRenderer.receiveShadows = false;
+                meshRenderer.receiveShadows = true;
             }
 
             RemoveAllColliders(signGo);
+        }
+
+        private static Material CreateCutoutSignMaterial(string matName, Texture2D signTex, Color emissionColor)
+        {
+            string matPath = $"Assets/ShipyardCat/Materials/{matName}.mat";
+            Material mat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+
+            if (mat == null)
+            {
+                mat = new Material(shader) { name = matName };
+                UnityEditor.AssetDatabase.CreateAsset(mat, matPath);
+            }
+
+            mat.shader = shader;
+            if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", signTex);
+            if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", signTex);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", Color.white);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", Color.white);
+            if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0.05f);
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.35f);
+
+            // Enforce depth-tested, depth-writing, backface-culled AlphaTest cutout so distant signs never bleed backwards through hulls/girders
+            if (mat.HasProperty("_Surface")) mat.SetFloat("_Surface", 0.0f);
+            if (mat.HasProperty("_AlphaClip")) mat.SetFloat("_AlphaClip", 1.0f);
+            if (mat.HasProperty("_Cutoff")) mat.SetFloat("_Cutoff", 0.45f);
+            if (mat.HasProperty("_Cull")) mat.SetFloat("_Cull", 2.0f);
+            if (mat.HasProperty("_ZWrite")) mat.SetFloat("_ZWrite", 1.0f);
+            mat.EnableKeyword("_ALPHATEST_ON");
+            mat.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
+
+            if (mat.HasProperty("_EmissionColor"))
+            {
+                mat.EnableKeyword("_EMISSION");
+                mat.SetColor("_EmissionColor", emissionColor);
+                if (mat.HasProperty("_EmissionMap")) mat.SetTexture("_EmissionMap", signTex);
+            }
+
+            UnityEditor.EditorUtility.SetDirty(mat);
+            return mat;
         }
 
         private static void CreateDeckBeacon(

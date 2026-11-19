@@ -248,9 +248,10 @@ namespace ShipyardCat.Editor
                 BuildStylizedAlbaVisual(albaGo.transform, urpLit);
             }
 
-            // Apply Alba Tuxedo Coat + Fluorescent Orange Collar + Brass NNS Tag + Live Dosimeter
+            // Apply Alba Baked 3D-Space Tuxedo Coat + Neck-Tracked Orange Collar + Brass NNS Tag + Live Dosimeter
             var albaVisualRig = albaGo.AddComponent<AlbaVisualRig>();
-            albaVisualRig.BuildOrRefreshVisuals();
+            var bakedTuxedoMat = AlbaTuxedoBaker.BakeAndPersistTuxedoMaterial(albaGo);
+            albaVisualRig.SetCachedTuxedoMaterial(bakedTuxedoMat);
 
             // Wire AlbaCameraRig on Main Camera
             var mainCam = Camera.main;
@@ -265,7 +266,7 @@ namespace ShipyardCat.Editor
 
             var ratPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ShipyardCat/Imported/Models/rat.glb");
 
-            // 12. Dockyard Kingpin Boss in Dry Dock 1 Basin (-45, -3.5, 25) - Scarred Giant Norway Rat GLB + Arena Rig
+            // 12. Dockyard Kingpin Boss in Dry Dock 1 Basin (-45, -3.5, 25) - Scarred Giant Norway Rat GLB + Head-Tracked Eyes + Arena Rig
             var kingpinGo = new GameObject("DockyardKingpin_Boss");
             kingpinGo.transform.SetParent(enemiesRoot.transform, false);
             kingpinGo.transform.position = new Vector3(-45f, -3.5f, 25f);
@@ -273,6 +274,7 @@ namespace ShipyardCat.Editor
             kpCol.center = new Vector3(0f, 0.7f, 0f);
             kpCol.radius = 0.85f;
             kpCol.height = 1.9f;
+            Texture preservedRatTex = null;
             if (ratPrefab != null)
             {
                 var kpWrapper = new GameObject("Kingpin_ScaleWrapper");
@@ -285,30 +287,44 @@ namespace ShipyardCat.Editor
                 kpMesh.transform.localPosition = Vector3.zero;
                 if (kpMesh.GetComponent<Animator>() == null) kpMesh.AddComponent<Animator>();
 
-                var kpScarMat = CreateSimpleMaterial("KingpinScarredFurMat", urpLit, new Color(0.24f, 0.19f, 0.18f), 0.1f, 0.25f);
-                foreach (var rend in kpMesh.GetComponentsInChildren<Renderer>(true))
+                var firstSmr = kpMesh.GetComponentInChildren<SkinnedMeshRenderer>(true);
+                if (firstSmr != null && firstSmr.sharedMaterial != null)
                 {
-                    rend.sharedMaterial = kpScarMat;
+                    if (firstSmr.sharedMaterial.HasProperty("_BaseMap"))
+                        preservedRatTex = firstSmr.sharedMaterial.GetTexture("_BaseMap");
+                    if (preservedRatTex == null && firstSmr.sharedMaterial.HasProperty("_MainTex"))
+                        preservedRatTex = firstSmr.sharedMaterial.GetTexture("_MainTex");
+                    if (preservedRatTex == null)
+                        preservedRatTex = firstSmr.sharedMaterial.mainTexture;
                 }
+
                 var kpAnim = kingpinGo.AddComponent<RatAnimationDriver>();
                 kpAnim.SetClips(
                     LoadClip("Assets/ShipyardCat/Imported/Models/rat.glb", "Armature|Idle"),
                     LoadClip("Assets/ShipyardCat/Imported/Models/rat.glb", "Armature|Run")
                 );
             }
-            var kpEyeMat = CreateSimpleMaterial("KingpinRedEyeMat", urpLit, Color.red, 0f, 0.9f);
-            kpEyeMat.EnableKeyword("_EMISSION");
-            kpEyeMat.SetColor("_EmissionColor", Color.red * 3.5f);
-            for (int side = -1; side <= 1; side += 2)
+
+            var kpFurMat = CreateSimpleMaterial("KingpinScarredWetFurMat", urpLit,
+                preservedRatTex != null ? new Color(0.68f, 0.56f, 0.52f) : new Color(0.28f, 0.23f, 0.21f), 0.04f, 0.34f);
+            if (preservedRatTex != null)
             {
-                var eye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                eye.name = side < 0 ? "KingpinEye_L" : "KingpinEye_R";
-                eye.transform.SetParent(kingpinGo.transform, false);
-                eye.transform.localPosition = new Vector3(side * 0.14f, 0.95f, 1.05f);
-                eye.transform.localScale = Vector3.one * 0.08f;
-                eye.GetComponent<Renderer>().sharedMaterial = kpEyeMat;
-                Object.DestroyImmediate(eye.GetComponent<Collider>());
+                if (kpFurMat.HasProperty("_BaseMap")) kpFurMat.SetTexture("_BaseMap", preservedRatTex);
+                if (kpFurMat.HasProperty("_MainTex")) kpFurMat.SetTexture("_MainTex", preservedRatTex);
+                EditorUtility.SetDirty(kpFurMat);
             }
+
+            var urpUnlitShader = Shader.Find("Universal Render Pipeline/Unlit") ?? urpLit;
+            var kpEyeMat = CreateSimpleMaterial("KingpinRedEyeMat", urpUnlitShader, new Color(1f, 0.14f, 0.05f), 0f, 0.9f);
+            if (kpEyeMat.HasProperty("_EmissionColor"))
+            {
+                kpEyeMat.EnableKeyword("_EMISSION");
+                kpEyeMat.SetColor("_EmissionColor", new Color(1f, 0.22f, 0.04f) * 3.8f);
+                EditorUtility.SetDirty(kpEyeMat);
+            }
+
+            var kingpinVisual = kingpinGo.AddComponent<RatKingVisualController>();
+            kingpinVisual.ConfigurePersistedMaterials(kpFurMat, kpEyeMat);
             kingpinGo.AddComponent<UnityEngine.AI.NavMeshAgent>();
             kingpinGo.AddComponent<KingpinBossAI>();
             kingpinGo.AddComponent<KingpinArenaRig>();

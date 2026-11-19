@@ -303,20 +303,20 @@ namespace ShipyardCat.Editor
         {
             GameObject containersGroup = CreateGroup("Shipping_Containers", parent, Vector3.zero);
 
-            // Primary stack near (-25f, 0f, 38f)
-            GameObject stackA = CreateGroup("Container_Stack_Alpha", containersGroup.transform, new Vector3(-25f, 0f, 38f));
+            // Relocated cleanly east of Yard_Railway (X=-18) and well clear of DD1_ElevatedCatwalk (X:[-25.3,-22.7], Z:[-4,46])
+            GameObject stackA = CreateGroup("Container_Stack_Alpha", containersGroup.transform, new Vector3(-11.5f, 0f, 52.0f));
             BuildCorrugatedContainer(stackA.transform, "Container_Navy_Base", Vector3.zero, 0f, 6.2f, navyMat, steelMat);
             BuildCorrugatedContainer(stackA.transform, "Container_Rust_Top", new Vector3(0.08f, 2.62f, -0.1f), 4f, 6.2f, rustMat, steelMat);
 
-            // Second stack slightly offset behind/west
-            GameObject stackB = CreateGroup("Container_Stack_Beta", containersGroup.transform, new Vector3(-28.4f, 0f, 37.4f));
-            stackB.transform.localRotation = Quaternion.Euler(0f, -6f, 0f);
+            // Second stack east of Alpha
+            GameObject stackB = CreateGroup("Container_Stack_Beta", containersGroup.transform, new Vector3(-8.0f, 0f, 51.5f));
+            stackB.transform.localRotation = Quaternion.Euler(0f, -5f, 0f);
             BuildCorrugatedContainer(stackB.transform, "Container_DarkRust_Base", Vector3.zero, 0f, 6.2f, darkRustMat, steelMat);
             BuildCorrugatedContainer(stackB.transform, "Container_Navy_Top", new Vector3(-0.05f, 2.62f, 0.12f), -3f, 6.2f, navyMat, steelMat);
 
-            // North yard stack
-            GameObject stackC = CreateGroup("Container_Stack_Gamma", containersGroup.transform, new Vector3(-26.2f, 0f, 46.5f));
-            stackC.transform.localRotation = Quaternion.Euler(0f, 12f, 0f);
+            // North yard stack clear of catwalk & railway
+            GameObject stackC = CreateGroup("Container_Stack_Gamma", containersGroup.transform, new Vector3(-10.0f, 0f, 61.5f));
+            stackC.transform.localRotation = Quaternion.Euler(0f, 8f, 0f);
             BuildCorrugatedContainer(stackC.transform, "Container_Rust_Long", Vector3.zero, 0f, 9.2f, rustMat, steelMat);
         }
 
@@ -540,14 +540,14 @@ namespace ShipyardCat.Editor
                 BuildHazardBarrel(barrelsGroup.transform, $"Barrel_{barrelIndex++:00}", rackCluster[i], rackMats[i], steelMat, tipped: i == 3);
             }
 
-            // Cluster 2: Near shipping containers
+            // Cluster 2: Near relocated shipping containers (east of railway & clear of DD1 catwalk)
             Vector3[] containerCluster =
             {
-                new Vector3(-21.6f, 0f, 34.4f),
-                new Vector3(-22.3f, 0f, 34.8f),
-                new Vector3(-21.7f, 0f, 35.2f),
-                new Vector3(-22.5f, 0f, 33.9f),
-                new Vector3(-21.1f, 0f, 35.6f)
+                new Vector3(-14.2f, 0f, 49.4f),
+                new Vector3(-13.5f, 0f, 49.9f),
+                new Vector3(-14.1f, 0f, 50.5f),
+                new Vector3(-13.2f, 0f, 51.0f),
+                new Vector3(-14.3f, 0f, 51.6f)
             };
             Material[] containerMats = { safetyAmberMat, rustMat, safetyAmberMat, drumDarkMat, rustMat };
             for (int i = 0; i < containerCluster.Length; i++)
