@@ -339,6 +339,17 @@
     bottom: 0;
 }
 
+.radar-sweep-line {
+    position: absolute;
+    left: 50%;
+    top: 4px;
+    width: 2px;
+    height: 69px;
+    margin-left: -1px;
+    background-color: rgba(92, 232, 255, 0.48);
+    transform-origin: center bottom;
+}
+
 .radar-player-arrow {
     position: absolute;
     width: 8px;

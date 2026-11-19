@@ -93,6 +93,7 @@
                     <ui:VisualElement name="radar-ring-inner" class="radar-ring radar-ring-inner" picking-mode="Ignore" />
                     <ui:VisualElement class="radar-axis-h" picking-mode="Ignore" />
                     <ui:VisualElement class="radar-axis-v" picking-mode="Ignore" />
+                    <ui:VisualElement name="radar-sweep-line" class="radar-sweep-line" picking-mode="Ignore" />
                     <ui:VisualElement name="radar-blips-layer" class="radar-blips-layer" picking-mode="Ignore" />
                     <ui:VisualElement name="radar-player-arrow" class="radar-player-arrow" picking-mode="Ignore" />
                 </ui:VisualElement>

@@ -109,9 +109,11 @@ namespace ShipyardCat.Editor
             CreateVFXNode("FabShop_Welder_1", worldRoot.transform, new Vector3(-160f, 1.8f, -15f), WeldingAndSteamVFX.Mode.WeldingSparks);
             CreateVFXNode("FabShop_Welder_2", worldRoot.transform, new Vector3(-175f, 1.8f, -35f), WeldingAndSteamVFX.Mode.WeldingSparks);
             CreateVFXNode("DD1_Rim_Welder", worldRoot.transform, new Vector3(-30f, 2.2f, 15f), WeldingAndSteamVFX.Mode.WeldingSparks);
+            CreateVFXNode("CVN80_Bow_Scaffold_Welder", worldRoot.transform, new Vector3(-92f, 14f, 152f), WeldingAndSteamVFX.Mode.WeldingSparks);
             CreateVFXNode("DD1_Rim_Steam", worldRoot.transform, new Vector3(-32f, 0.5f, 40f), WeldingAndSteamVFX.Mode.SteamVent);
             CreateVFXNode("DD2_SteamVent_1", worldRoot.transform, new Vector3(-180f, 1.2f, 95f), WeldingAndSteamVFX.Mode.SteamVent);
             CreateVFXNode("DD2_SteamVent_2", worldRoot.transform, new Vector3(-180f, 1.2f, 165f), WeldingAndSteamVFX.Mode.SteamVent);
+            CreateVFXNode("PumpHouse_Exhaust_Stack", worldRoot.transform, new Vector3(-66f, 8.5f, 18f), WeldingAndSteamVFX.Mode.SteamVent);
 
             // 7. Cat Haven Sanctuary (-15, 0, -45) & Radiation Vault (42, 0, -60)
             var haven = CreateBox("CatHaven_SanctuaryPad", walkableRoot.transform, new Vector3(-15f, 0.06f, -45f), new Vector3(10f, 0.12f, 10f), sanctuaryMat);
@@ -147,7 +149,12 @@ namespace ShipyardCat.Editor
             floodlights.Add(CreateFloodlight("Floodlight_DryDock1", worldRoot.transform, new Vector3(-45f, 26f, 20f)));
             floodlights.Add(CreateFloodlight("Floodlight_DryDock2", worldRoot.transform, new Vector3(-175f, 28f, 110f)));
             floodlights.Add(CreateFloodlight("Floodlight_FabShop", worldRoot.transform, new Vector3(-165f, 26f, -25f)));
-            WetPuddleAndAtmosphereBuilder.BuildAtmosphereAndPuddles(worldRoot.transform, floodlights);
+            var envBaked = EnvironmentTextureBaker.BakeAllMaterials();
+            WetPuddleAndAtmosphereBuilder.BuildAtmosphereAndPuddles(
+                worldRoot.transform,
+                floodlights,
+                envBaked.WetPuddleMat,
+                envBaked.LamppostHaloMat);
 
             // 9. Bake & Persist NavMesh on Walkable Geometry so WebGL retains baked NavMeshData
             var navSurface = walkableRoot.AddComponent<NavMeshSurface>();
@@ -674,6 +681,8 @@ namespace ShipyardCat.Editor
             var so = new SerializedObject(vfx);
             so.FindProperty("effectMode").enumValueIndex = (int)mode;
             so.ApplyModifiedPropertiesWithoutUndo();
+            vfx.Configure();
+            vfx.Stop();
         }
 
         private static Light CreateFloodlight(string name, Transform parent, Vector3 pos)

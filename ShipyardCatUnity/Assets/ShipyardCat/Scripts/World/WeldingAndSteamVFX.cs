@@ -217,18 +217,14 @@ namespace ShipyardCat.World
 
         private void ConfigureWeldingSparks()
         {
-            Color coreColor = ResolvePaletteColor(
-                new Color(0.78f, 0.94f, 1.0f, 1f),
-                "WeldingArc", "ElectricCyan", "SonarCyan", "Cyan", "AccentCyan");
-            Color hotAmber = ResolvePaletteColor(
-                new Color(1.0f, 0.68f, 0.18f, 1f),
-                "SafetyAmber", "Amber", "HazardAmber", "SparkOrange", "AccentAmber");
-            Color emberRed = ResolvePaletteColor(
-                new Color(0.95f, 0.28f, 0.06f, 0f),
-                "EmberRed", "DangerCrimson", "Crimson", "WarningRed");
-            emberRed.a = 0f;
+            Color coreColor = Color.white;
+            Color electricBlue = new Color(0.294f, 0.659f, 1.0f, 1.0f); // #4BA8FF
+            Color hotAmber = new Color(1.0f, 0.424f, 0.063f, 0.85f);   // #FF6C10
+            Color emberFade = new Color(0.95f, 0.28f, 0.06f, 0f);
 
-            _sparkLightColor = Color.Lerp(coreColor, hotAmber, 0.45f);
+            _sparkLightColor = new Color(0.58f, 0.824f, 1.0f, 1f); // 10000K #94D2FF
+            lightBaseIntensity = Mathf.Max(lightBaseIntensity, 9.0f);
+            lightRange = Mathf.Max(lightRange, 14f);
             EnsureArcLight();
 
             _particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -239,25 +235,25 @@ namespace ShipyardCat.World
             main.playOnAwake = false;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.scalingMode = ParticleSystemScalingMode.Local;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(0.32f, 0.92f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(3.8f, 9.2f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.32f, 0.82f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(5.5f, 12.5f);
             main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.085f);
             main.startColor = Color.white;
-            main.gravityModifier = new ParticleSystem.MinMaxCurve(1.65f);
-            main.maxParticles = 320;
+            main.gravityModifier = new ParticleSystem.MinMaxCurve(1.35f);
+            main.maxParticles = 55;
 
             ParticleSystem.EmissionModule emission = _particleSystem.emission;
             emission.enabled = true;
-            emission.rateOverTime = new ParticleSystem.MinMaxCurve(72f * emissionScale);
+            emission.rateOverTime = new ParticleSystem.MinMaxCurve(34f * emissionScale);
             emission.SetBursts(new[]
             {
-                new ParticleSystem.Burst(0.0f, (short)Mathf.Clamp(Mathf.RoundToInt(14 * emissionScale), 4, 48), 1, 0.65f)
+                new ParticleSystem.Burst(0.0f, (short)Mathf.Clamp(Mathf.RoundToInt(10 * emissionScale), 4, 24), 1, 0.75f)
             });
 
             ParticleSystem.ShapeModule shape = _particleSystem.shape;
             shape.enabled = true;
             shape.shapeType = ParticleSystemShapeType.Cone;
-            shape.angle = 34f;
+            shape.angle = 36f;
             shape.radius = 0.05f;
             shape.radiusThickness = 1f;
 
@@ -280,7 +276,7 @@ namespace ShipyardCat.World
             collision.bounce = 0.58f;
             collision.lifetimeLoss = 0.14f;
             collision.minKillSpeed = 0.4f;
-            collision.quality = ParticleSystemCollisionQuality.Medium;
+            collision.quality = ParticleSystemCollisionQuality.Low;
             collision.collidesWith = Physics.DefaultRaycastLayers;
 
             Gradient sparkGradient = new Gradient();
@@ -288,13 +284,14 @@ namespace ShipyardCat.World
                 new[]
                 {
                     new GradientColorKey(coreColor, 0.0f),
-                    new GradientColorKey(hotAmber, 0.28f),
-                    new GradientColorKey(emberRed, 1.0f)
+                    new GradientColorKey(electricBlue, 0.22f),
+                    new GradientColorKey(hotAmber, 0.68f),
+                    new GradientColorKey(emberFade, 1.0f)
                 },
                 new[]
                 {
                     new GradientAlphaKey(1.0f, 0.0f),
-                    new GradientAlphaKey(0.95f, 0.55f),
+                    new GradientAlphaKey(0.95f, 0.50f),
                     new GradientAlphaKey(0.0f, 1.0f)
                 });
 
@@ -349,11 +346,11 @@ namespace ShipyardCat.World
             main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
             main.startColor = Color.white;
             main.gravityModifier = new ParticleSystem.MinMaxCurve(-0.18f);
-            main.maxParticles = 160;
+            main.maxParticles = 40;
 
             ParticleSystem.EmissionModule emission = _particleSystem.emission;
             emission.enabled = true;
-            emission.rateOverTime = new ParticleSystem.MinMaxCurve(18f * emissionScale);
+            emission.rateOverTime = new ParticleSystem.MinMaxCurve(9f * emissionScale);
             emission.SetBursts(Array.Empty<ParticleSystem.Burst>());
 
             ParticleSystem.ShapeModule shape = _particleSystem.shape;

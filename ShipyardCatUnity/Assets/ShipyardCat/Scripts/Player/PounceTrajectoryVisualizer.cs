@@ -7,12 +7,12 @@ namespace ShipyardCat.Player
     [DisallowMultipleComponent]
     public class PounceTrajectoryVisualizer : MonoBehaviour
     {
-        private const int ArcSegmentCount = 24;
+        private const int ArcSegmentCount = 32;
         private const int ArcPointCount = ArcSegmentCount + 1;
         private const int RingSegmentCount = 32;
         private const int RaycastBufferSize = 16;
 
-        private static readonly Color LuminousCyan = new Color(0.26666668f, 0.9490196f, 1f, 1f); // #44F2FF
+        private static readonly Color LuminousCyan = new Color(0.306f, 0.949f, 0.824f, 1f); // #4EF2D2
 
         public static event Action<string> OnPouncePromptChanged;
 
@@ -43,10 +43,12 @@ namespace ShipyardCat.Player
         public LineRenderer LandingRingRenderer { get; private set; }
         public bool IsAiming { get; private set; }
         public Vector3 PredictedLandingPoint { get; private set; }
+        public int ConfiguredArcSegmentCount => ArcSegmentCount;
 
         private readonly Vector3[] _arcPoints = new Vector3[ArcPointCount];
         private readonly Vector3[] _ringPoints = new Vector3[RingSegmentCount];
         private readonly RaycastHit[] _raycastHits = new RaycastHit[RaycastBufferSize];
+        private readonly Collider[] _perchSnapBuffer = new Collider[24];
 
         private Collider[] _ownColliders;
         private Material _arcMaterial;
@@ -207,9 +209,22 @@ namespace ShipyardCat.Player
 
             if (hitSurface)
             {
-                PredictedLandingPoint = closestHit.point;
-                UpdateLandingRing(closestHit.point, closestHit.normal);
-                UpdatePromptForHit(closestHit.collider);
+                Vector3 targetPoint = closestHit.point;
+                Vector3 targetNormal = closestHit.normal;
+                Collider targetCollider = closestHit.collider;
+
+                if (TryFindElevatedPerchSnap(targetPoint, out Collider snappedCol, out Vector3 snappedPoint))
+                {
+                    targetPoint = snappedPoint;
+                    targetNormal = Vector3.up;
+                    targetCollider = snappedCol;
+                    _arcPoints[pointCount - 1] = targetPoint;
+                    ArcRenderer.SetPositions(_arcPoints);
+                }
+
+                PredictedLandingPoint = targetPoint;
+                UpdateLandingRing(targetPoint, targetNormal);
+                UpdatePromptForHit(targetCollider);
             }
             else
             {
@@ -218,6 +233,51 @@ namespace ShipyardCat.Player
                 UpdateLandingRing(endPoint, Vector3.up);
                 UpdatePromptForNoHit();
             }
+        }
+
+        private bool TryFindElevatedPerchSnap(Vector3 landingPoint, out Collider perchCollider, out Vector3 snappedTop)
+        {
+            perchCollider = null;
+            snappedTop = default;
+
+            int count = Physics.OverlapSphereNonAlloc(landingPoint, 1.35f, _perchSnapBuffer, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            float bestScore = float.MaxValue;
+            Vector3 forward = transform.forward;
+
+            for (int i = 0; i < count; i++)
+            {
+                Collider col = _perchSnapBuffer[i];
+                if (col == null || IsOwnCollider(col)) continue;
+
+                string n = col.gameObject.name;
+                bool isPerch = n.IndexOf("CatwalkDeck", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                               n.IndexOf("Keel", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                               n.IndexOf("Flatcar_Deck", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                               n.IndexOf("Container_Body", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!isPerch) continue;
+
+                float topY = col.bounds.max.y;
+                if (topY <= transform.position.y + 0.15f || topY > transform.position.y + 4.2f) continue;
+
+                Vector3 clamped = col.ClosestPoint(new Vector3(landingPoint.x, topY, landingPoint.z));
+                clamped.y = topY;
+                Vector3 toPerch = clamped - transform.position;
+                Vector2 flatToPerch = new Vector2(toPerch.x, toPerch.z);
+                if (flatToPerch.magnitude < 1.2f || flatToPerch.magnitude > 11.5f) continue;
+
+                float angle = Vector3.Angle(new Vector3(forward.x, 0f, forward.z), new Vector3(toPerch.x, 0f, toPerch.z));
+                if (angle > 22f) continue;
+
+                float d = Vector3.Distance(clamped, landingPoint);
+                if (d < bestScore)
+                {
+                    bestScore = d;
+                    perchCollider = col;
+                    snappedTop = clamped;
+                }
+            }
+
+            return perchCollider != null;
         }
 
         private Vector3 ComputeInitialVelocity()
@@ -379,7 +439,7 @@ namespace ShipyardCat.Player
             _hadValidHit = true;
             _lastHitCollider = hitCollider;
 
-            string targetName = CleanDisplayName(hitCollider.gameObject.name);
+            string targetName = FormatFriendlyTargetName(hitCollider.gameObject.name);
             bool isEnemy = IsEnemyTarget(hitCollider.gameObject);
             string prompt = isEnemy
                 ? $"[SPACE / F] Pounce on {targetName}"
@@ -412,6 +472,25 @@ namespace ShipyardCat.Player
                    name.IndexOf("Enemy", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        public static string FormatFriendlyTargetName(string rawName)
+        {
+            if (string.IsNullOrEmpty(rawName))
+            {
+                return "Surface";
+            }
+
+            if (rawName.IndexOf("Catwalk", StringComparison.OrdinalIgnoreCase) >= 0) return "DD1 Catwalk";
+            if (rawName.IndexOf("KeelCrib", StringComparison.OrdinalIgnoreCase) >= 0 || rawName.IndexOf("TopKeelCap", StringComparison.OrdinalIgnoreCase) >= 0) return "Keel Cribbing";
+            if (rawName.IndexOf("Flatcar", StringComparison.OrdinalIgnoreCase) >= 0) return "Rail Flatcar";
+            if (rawName.IndexOf("Container", StringComparison.OrdinalIgnoreCase) >= 0) return "Cargo Container";
+            if (rawName.IndexOf("YardAsphalt", StringComparison.OrdinalIgnoreCase) >= 0) return "Shipyard Apron";
+            if (rawName.IndexOf("DockyardKingpin", StringComparison.OrdinalIgnoreCase) >= 0) return "Dockyard Kingpin";
+            if (rawName.IndexOf("RatPrey", StringComparison.OrdinalIgnoreCase) >= 0) return "Sewer Rat";
+            if (rawName.IndexOf("DD1_", StringComparison.OrdinalIgnoreCase) >= 0) return "Dry Dock 1";
+
+            return CleanDisplayName(rawName);
+        }
+
         private static string CleanDisplayName(string rawName)
         {
             if (string.IsNullOrEmpty(rawName))
@@ -421,7 +500,8 @@ namespace ShipyardCat.Player
 
             const string cloneSuffix = "(Clone)";
             int cloneIdx = rawName.IndexOf(cloneSuffix, StringComparison.Ordinal);
-            return cloneIdx >= 0 ? rawName.Substring(0, cloneIdx).Trim() : rawName.Trim();
+            string stripped = cloneIdx >= 0 ? rawName.Substring(0, cloneIdx).Trim() : rawName.Trim();
+            return stripped.Replace('_', ' ');
         }
 
         private void EmitPromptIfChanged(string prompt)

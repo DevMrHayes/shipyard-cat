@@ -53,16 +53,24 @@ namespace ShipyardCat.Editor
                 ? safetyAmberMat
                 : CreateUrpLitMaterial("Mat_DD1_SafetyAmberFallback", new Color(0.95f, 0.68f, 0.06f), 0.2f, 0.45f);
 
+            EnvironmentTextureBaker.BakedEnvironmentMaterials bakedMats = EnvironmentTextureBaker.BakeAllMaterials();
+
             Material hazardBlackMat = CreateUrpLitMaterial("Mat_DD1_HazardBlack", new Color(0.08f, 0.08f, 0.09f), 0.1f, 0.35f);
+            Material hazardStripeMat = bakedMats.HazardStripeMat != null ? bakedMats.HazardStripeMat : safeAmberMat;
+            Material diamondPlateMat = bakedMats.DiamondPlateMat != null ? bakedMats.DiamondPlateMat : safeSteelMat;
             Material keelTimberMat = CreateUrpLitMaterial("Mat_KeelTimber", new Color(0.32f, 0.20f, 0.11f), 0.0f, 0.18f);
-            Material sumpWaterMat = CreateToxicSumpMaterial("Mat_DD1_ToxicSump", "#2A6826");
+            Material sumpWaterMat = bakedMats.ToxicSumpMat != null
+                ? bakedMats.ToxicSumpMat
+                : CreateToxicSumpMaterial("Mat_DD1_ToxicSump", "#24381A");
             Material valveRedMat = CreateUrpLitMaterial("Mat_DD1_ValveRed", new Color(0.68f, 0.12f, 0.10f), 0.35f, 0.5f);
 
-            BuildCopingHazardStriping(heroRoot, hazardBlackMat, safeAmberMat);
+            BuildCopingHazardStriping(heroRoot, hazardBlackMat, hazardStripeMat);
             BuildKeelCribbing(heroRoot, keelTimberMat);
             BuildToxicDrainageSump(heroRoot, safeConcreteMat, sumpWaterMat);
+            BuildDrainageCulvert(heroRoot, safeConcreteMat, safeSteelMat);
+            BuildRecessedWallSconces(heroRoot, safeSteelMat);
             BuildWestRimPipeManifold(heroRoot, safeSteelMat, safeAmberMat, valveRedMat);
-            BuildElevatedCatwalk(heroRoot, safeSteelMat, safeAmberMat);
+            BuildElevatedCatwalk(heroRoot, safeSteelMat, safeAmberMat, diamondPlateMat, hazardStripeMat);
 
             EditorUtility.SetDirty(walkableRoot.gameObject);
         }
@@ -425,8 +433,13 @@ namespace ShipyardCat.Editor
             }
         }
 
-        // 5) Elevated walkable Yellow Steel Catwalk + Support Stanchions + Handrails + Access Ramp
-        private static void BuildElevatedCatwalk(Transform parent, Material steelMat, Material safetyAmberMat)
+        // 5) Elevated walkable Galvanized Diamond-Plate Catwalk + Hazard Kickplates + Support Stanchions + Access Ramp
+        private static void BuildElevatedCatwalk(
+            Transform parent,
+            Material steelMat,
+            Material safetyAmberMat,
+            Material diamondPlateMat,
+            Material hazardStripeMat)
         {
             GameObject catwalkGroup = CreateChildGroup("DD1_ElevatedCatwalk", parent);
 
@@ -443,7 +456,7 @@ namespace ShipyardCat.Editor
             float maxZ = catwalkZ + length * 0.5f;               // 46f
             float halfW = width * 0.5f;                          // 1.3f
 
-            // Main walkable steel deck
+            // Main walkable galvanized diamond-plate deck
             CreatePrimitive(
                 "DD1_CatwalkDeck",
                 PrimitiveType.Cube,
@@ -451,8 +464,29 @@ namespace ShipyardCat.Editor
                 new Vector3(catwalkX, catwalkY, catwalkZ),
                 Quaternion.identity,
                 new Vector3(width, deckThickness, length),
-                safetyAmberMat,
+                diamondPlateMat,
                 removeCollider: false);
+
+            // Weathered 45-degree hazard toe kickplates along port & starboard deck edges
+            CreatePrimitive(
+                "DD1_CatwalkKickplate_W",
+                PrimitiveType.Cube,
+                catwalkGroup.transform,
+                new Vector3(catwalkX - halfW + 0.04f, deckTopY + 0.07f, catwalkZ),
+                Quaternion.identity,
+                new Vector3(0.05f, 0.14f, length),
+                hazardStripeMat,
+                removeCollider: true);
+
+            CreatePrimitive(
+                "DD1_CatwalkKickplate_E",
+                PrimitiveType.Cube,
+                catwalkGroup.transform,
+                new Vector3(catwalkX + halfW - 0.04f, deckTopY + 0.07f, catwalkZ),
+                Quaternion.identity,
+                new Vector3(0.05f, 0.14f, length),
+                hazardStripeMat,
+                removeCollider: true);
 
             // Under-deck longitudinal steel stringers
             CreatePrimitive(
@@ -602,8 +636,101 @@ namespace ShipyardCat.Editor
                 }
             }
 
-            // Sloped steel access ramp (DD1_CatwalkRamp) connecting yard asphalt (Z = -4f) up to catwalk (Z = 4f)
-            BuildCatwalkAccessRamp(catwalkGroup.transform, catwalkX, deckTopY, width, steelMat, safetyAmberMat);
+            // Sloped diamond-plate access ramp (DD1_CatwalkRamp) connecting yard asphalt (Z = -4f) up to catwalk (Z = 4f)
+            BuildCatwalkAccessRamp(catwalkGroup.transform, catwalkX, deckTopY, width, steelMat, safetyAmberMat, diamondPlateMat);
+        }
+
+        private static void BuildDrainageCulvert(Transform parent, Material concreteMat, Material steelMat)
+        {
+            GameObject culvert = CreateChildGroup("DD1_DrainageCulvert", parent);
+            const float cx = -40f;
+            const float floorY = DD1FloorY;
+            const float mouthZ = 19.6f;
+
+            Material recessDarkMat = CreateUrpLitMaterial("Mat_CulvertInteriorDark", new Color(0.03f, 0.04f, 0.045f), 0f, 0.1f);
+            Material rustyIronMat = CreateUrpLitMaterial("Mat_CulvertRustyGrate", new Color(0.24f, 0.14f, 0.10f), 0.7f, 0.25f);
+
+            // Concrete portal cheeks & keystone lintel
+            CreatePrimitive("Culvert_Cheek_W", PrimitiveType.Cube, culvert.transform,
+                new Vector3(cx - 1.65f, floorY + 1.15f, mouthZ), Quaternion.identity,
+                new Vector3(0.95f, 2.3f, 1.4f), concreteMat, removeCollider: false);
+            CreatePrimitive("Culvert_Cheek_E", PrimitiveType.Cube, culvert.transform,
+                new Vector3(cx + 1.65f, floorY + 1.15f, mouthZ), Quaternion.identity,
+                new Vector3(0.95f, 2.3f, 1.4f), concreteMat, removeCollider: false);
+            CreatePrimitive("Culvert_ArchCap", PrimitiveType.Cube, culvert.transform,
+                new Vector3(cx, floorY + 2.35f, mouthZ), Quaternion.identity,
+                new Vector3(4.3f, 0.65f, 1.45f), concreteMat, removeCollider: false);
+
+            // Dark tunnel recess box behind arch
+            CreatePrimitive("Culvert_TunnelDarkBack", PrimitiveType.Cube, culvert.transform,
+                new Vector3(cx, floorY + 1.0f, mouthZ - 1.4f), Quaternion.identity,
+                new Vector3(2.35f, 2.0f, 2.6f), recessDarkMat, removeCollider: true);
+
+            // Rusty iron sluice grate bars across opening
+            for (int i = -2; i <= 2; i++)
+            {
+                CreatePrimitive($"Culvert_GrateBar_{i + 2}", PrimitiveType.Cylinder, culvert.transform,
+                    new Vector3(cx + i * 0.42f, floorY + 1.45f, mouthZ + 0.45f), Quaternion.identity,
+                    new Vector3(0.055f, 0.65f, 0.055f), rustyIronMat, removeCollider: true);
+            }
+
+            // Subtle cold interior drainage fixture light
+            GameObject lightGo = new GameObject("Culvert_DrainageLight");
+            lightGo.transform.SetParent(culvert.transform, false);
+            lightGo.transform.position = new Vector3(cx, floorY + 1.65f, mouthZ - 0.1f);
+            Light l = lightGo.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.color = new Color(0.32f, 0.58f, 0.36f, 1f);
+            l.range = 8.5f;
+            l.intensity = 3.0f;
+            l.shadows = LightShadows.None;
+        }
+
+        private static void BuildRecessedWallSconces(Transform parent, Material steelMat)
+        {
+            GameObject group = CreateChildGroup("DD1_WallSconces", parent);
+            Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Material amberLensMat = new Material(urpLit) { name = "Mat_DD1_SconceAmber2200K" };
+            Color amber2200K = new Color(1f, 0.635f, 0.24f, 1f); // #FFA23D
+            if (amberLensMat.HasProperty("_BaseColor")) amberLensMat.SetColor("_BaseColor", amber2200K);
+            amberLensMat.EnableKeyword("_EMISSION");
+            if (amberLensMat.HasProperty("_EmissionColor")) amberLensMat.SetColor("_EmissionColor", amber2200K * 4.2f);
+
+            float sconceY = DD1FloorY + 1.8f; // 1.8m above DD1 floor (-2.1f world)
+            for (float z = 0f; z <= 48.01f; z += 12.0f)
+            {
+                CreateSingleWallSconce(group.transform, $"Sconce_W_{(int)z:D2}", new Vector3(DD1MinX + 0.25f, sconceY, z), 1f, steelMat, amberLensMat, amber2200K);
+                CreateSingleWallSconce(group.transform, $"Sconce_E_{(int)z:D2}", new Vector3(DD1MaxX - 0.25f, sconceY, z), -1f, steelMat, amberLensMat, amber2200K);
+            }
+        }
+
+        private static void CreateSingleWallSconce(
+            Transform parent,
+            string name,
+            Vector3 worldPos,
+            float inwardXSign,
+            Material housingMat,
+            Material lensMat,
+            Color lightColor)
+        {
+            GameObject go = CreateChildGroup(name, parent);
+            go.transform.position = worldPos;
+
+            CreatePrimitive($"{name}_Housing", PrimitiveType.Cube, go.transform,
+                worldPos, Quaternion.identity, new Vector3(0.26f, 0.32f, 0.44f), housingMat, removeCollider: true);
+
+            CreatePrimitive($"{name}_Lens", PrimitiveType.Cube, go.transform,
+                worldPos + new Vector3(inwardXSign * 0.14f, -0.04f, 0f), Quaternion.identity, new Vector3(0.06f, 0.18f, 0.32f), lensMat, removeCollider: true);
+
+            GameObject lGo = new GameObject($"{name}_Light");
+            lGo.transform.SetParent(go.transform, false);
+            lGo.transform.position = worldPos + new Vector3(inwardXSign * 0.45f, -0.05f, 0f);
+            Light light = lGo.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = lightColor;
+            light.range = 11.5f;
+            light.intensity = 3.2f;
+            light.shadows = LightShadows.None;
         }
 
         private static void BuildCatwalkAccessRamp(
@@ -612,7 +739,8 @@ namespace ShipyardCat.Editor
             float catwalkTopY,
             float width,
             Material steelMat,
-            Material safetyAmberMat)
+            Material safetyAmberMat,
+            Material diamondPlateMat)
         {
             GameObject rampGroup = CreateChildGroup("DD1_CatwalkRamp", parent);
 
@@ -640,7 +768,7 @@ namespace ShipyardCat.Editor
                 rampCenter,
                 rampRot,
                 new Vector3(width, rampThickness, rampSlopeLength),
-                steelMat,
+                diamondPlateMat,
                 removeCollider: false);
 
             // Ramp side safety handrails

@@ -14,9 +14,9 @@ namespace ShipyardCat.Player
         private const float HighlightRadius = 28f;
         private const float HighlightRadiusSqr = HighlightRadius * HighlightRadius;
 
-        private static readonly Color ElectricCyan = new Color(0f, 240f / 255f, 1f, 1f);
-        private static readonly Color PhosphorGreenBoost = new Color(0.15f, 1f, 0.42f, 1f) * 2.2f;
-        private static readonly Color ThermalAmberBoost = new Color(1f, 0.52f, 0.05f, 1f) * 2.5f;
+        private static readonly Color ElectricCyan = new Color(0.176f, 0.886f, 0.902f, 1f); // #2DE2E6
+        private static readonly Color PhosphorGreenBoost = new Color(0.322f, 1f, 0.529f, 1f) * 2.6f; // #52FF87
+        private static readonly Color ThermalAmberBoost = new Color(1f, 0.643f, 0.224f, 1f) * 2.8f;   // #FFA439
         private static readonly float[] RingPhaseOffsets = { 0f, 0.25f, 0.5f, 0.75f };
 
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
@@ -24,7 +24,7 @@ namespace ShipyardCat.Player
 
         [Header("Sonar Pulse Visuals")]
         [SerializeField] private float pulseDuration = 2.4f;
-        [SerializeField] private float ringWidth = 0.12f;
+        [SerializeField] private float ringWidth = 0.08f;
         [SerializeField] private float groundYOffset = 0.06f;
 
         [Header("Sonar Ground Light")]
@@ -250,38 +250,7 @@ namespace ShipyardCat.Player
                 _visualRoot.SetParent(transform, false);
             }
 
-            for (int i = 0; i < RingCount; i++)
-            {
-                if (_rings[i] != null)
-                {
-                    continue;
-                }
-
-                var ringGo = new GameObject($"SonarRing_{i}");
-                ringGo.hideFlags = HideFlags.DontSave;
-                ringGo.transform.SetParent(_visualRoot, false);
-
-                var lr = ringGo.AddComponent<LineRenderer>();
-                lr.useWorldSpace = true;
-                lr.loop = true;
-                lr.positionCount = RingSegments;
-                lr.startWidth = ringWidth;
-                lr.endWidth = ringWidth;
-                lr.alignment = LineAlignment.View;
-                lr.textureMode = LineTextureMode.Stretch;
-                lr.shadowCastingMode = ShadowCastingMode.Off;
-                lr.receiveShadows = false;
-                lr.allowOcclusionWhenDynamic = false;
-                lr.startColor = ElectricCyan;
-                lr.endColor = ElectricCyan;
-
-                if (_ringMaterial != null)
-                {
-                    lr.sharedMaterial = _ringMaterial;
-                }
-
-                _rings[i] = lr;
-            }
+            CreateRingPool();
 
             if (sonarPointLight == null)
             {
@@ -302,6 +271,45 @@ namespace ShipyardCat.Player
             _visualsInitialized = true;
         }
 
+        private void CreateRingPool()
+        {
+            ringWidth = 0.08f;
+
+            for (int i = 0; i < RingCount; i++)
+            {
+                if (_rings[i] != null)
+                {
+                    continue;
+                }
+
+                var ringGo = new GameObject($"SonarRing_{i}");
+                ringGo.hideFlags = HideFlags.DontSave;
+                ringGo.transform.SetParent(_visualRoot, false);
+                ringGo.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+
+                var lr = ringGo.AddComponent<LineRenderer>();
+                lr.useWorldSpace = true;
+                lr.loop = true;
+                lr.positionCount = RingSegments;
+                lr.startWidth = ringWidth;
+                lr.endWidth = ringWidth;
+                lr.alignment = LineAlignment.TransformZ;
+                lr.textureMode = LineTextureMode.Stretch;
+                lr.shadowCastingMode = ShadowCastingMode.Off;
+                lr.receiveShadows = false;
+                lr.allowOcclusionWhenDynamic = false;
+                lr.startColor = ElectricCyan;
+                lr.endColor = ElectricCyan;
+
+                if (_ringMaterial != null)
+                {
+                    lr.sharedMaterial = _ringMaterial;
+                }
+
+                _rings[i] = lr;
+            }
+        }
+
         private void SetVisualsEnabled(bool enabled)
         {
             for (int i = 0; i < RingCount; i++)
@@ -320,13 +328,18 @@ namespace ShipyardCat.Player
 
         private void UpdateRings(float elapsed)
         {
+            float duration = Mathf.Max(0.1f, pulseDuration);
+            float normalizedTime = elapsed / duration;
+            UpdateRings(transform.position, normalizedTime);
+        }
+
+        public void UpdateRings(Vector3 center, float normalizedTime)
+        {
             if (!_visualsInitialized)
             {
                 return;
             }
 
-            float duration = Mathf.Max(0.1f, pulseDuration);
-            Vector3 center = transform.position;
             float groundY = center.y + groundYOffset;
 
             for (int r = 0; r < RingCount; r++)
@@ -337,7 +350,9 @@ namespace ShipyardCat.Player
                     continue;
                 }
 
-                float phase = Mathf.Repeat(elapsed / duration + RingPhaseOffsets[r], 1f);
+                lr.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+
+                float phase = Mathf.Repeat(normalizedTime + RingPhaseOffsets[r], 1f);
                 float radius = Mathf.Lerp(MinRingRadius, MaxRingRadius, phase);
 
                 float fadeIn = Mathf.Clamp01(phase / 0.06f);
@@ -474,9 +489,8 @@ namespace ShipyardCat.Player
             }
         }
 
-        private static bool TryGetHighlightColor(MonoBehaviour behaviour, out Color boostColor)
+        public static bool TryGetHighlightColorForType(string typeName, out Color boostColor)
         {
-            string typeName = behaviour.GetType().Name;
             switch (typeName)
             {
                 case "RatPreyAI":
@@ -491,6 +505,11 @@ namespace ShipyardCat.Player
                     boostColor = default;
                     return false;
             }
+        }
+
+        private static bool TryGetHighlightColor(MonoBehaviour behaviour, out Color boostColor)
+        {
+            return TryGetHighlightColorForType(behaviour.GetType().Name, out boostColor);
         }
 
         private void TryApplyHighlight(MonoBehaviour target, Color boostColor)

@@ -65,18 +65,28 @@ namespace ShipyardCat.World
 
         public static void BuildAtmosphereAndPuddles(Transform worldRoot, List<Light> floodlights)
         {
+            BuildAtmosphereAndPuddles(worldRoot, floodlights, null, null);
+        }
+
+        public static void BuildAtmosphereAndPuddles(
+            Transform worldRoot,
+            List<Light> floodlights,
+            Material organicPuddleMat,
+            Material haloMat)
+        {
             GameObject container = new GameObject("WetPuddlesAndSodiumAtmosphere");
             if (worldRoot != null)
             {
                 container.transform.SetParent(worldRoot, false);
             }
 
-            Material puddleMaterial = CreateWetPuddleMaterial();
+            Material puddleMaterial = organicPuddleMat != null ? organicPuddleMat : CreateWetPuddleMaterial();
             Material darkSteelMaterial = CreateDarkSteelMaterial();
             Material sodiumEmissiveMaterial = CreateSodiumEmissiveMaterial();
 
             BuildPuddles(container.transform, puddleMaterial);
-            BuildSodiumVaporLightPoles(container.transform, darkSteelMaterial, sodiumEmissiveMaterial, floodlights);
+            BuildSodiumVaporLightPoles(container.transform, darkSteelMaterial, sodiumEmissiveMaterial, haloMat, floodlights);
+            BuildYardReflectionProbe(container.transform);
         }
 
         private static void BuildPuddles(Transform parent, Material puddleMaterial)
@@ -87,12 +97,13 @@ namespace ShipyardCat.World
             for (int i = 0; i < PuddleSpecs.Length; i++)
             {
                 PuddleSpec spec = PuddleSpecs[i];
-                GameObject puddle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                GameObject puddle = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 puddle.name = $"WetPuddle_{i + 1:00}";
                 puddle.transform.SetParent(puddlesRoot.transform, false);
                 puddle.transform.localPosition = new Vector3(spec.X, 0.034f, spec.Z);
-                puddle.transform.localRotation = Quaternion.Euler(0f, spec.RotationY, 0f);
-                puddle.transform.localScale = new Vector3(spec.ScaleX, 0.004f, spec.ScaleZ);
+                // Quad front (-Z) rotated +90 deg around X points strictly upward (+Y) to reflect twilight sky
+                puddle.transform.localRotation = Quaternion.Euler(90f, spec.RotationY, 0f);
+                puddle.transform.localScale = new Vector3(spec.ScaleX * 1.25f, spec.ScaleZ * 1.25f, 1f);
 
                 DestroyColliderImmediateOrRuntime(puddle);
 
@@ -106,10 +117,28 @@ namespace ShipyardCat.World
             }
         }
 
+        private static void BuildYardReflectionProbe(Transform parent)
+        {
+            GameObject probeGo = new GameObject("Yard_ReflectionProbe");
+            probeGo.transform.SetParent(parent, false);
+            probeGo.transform.localPosition = new Vector3(-45f, 6f, 25f);
+
+            ReflectionProbe probe = probeGo.AddComponent<ReflectionProbe>();
+            probe.mode = ReflectionProbeMode.Baked;
+            probe.refreshMode = ReflectionProbeRefreshMode.OnAwake;
+            probe.timeSlicingMode = ReflectionProbeTimeSlicingMode.AllFacesAtOnce;
+            probe.resolution = 128;
+            probe.size = new Vector3(180f, 45f, 240f);
+            probe.clearFlags = ReflectionProbeClearFlags.Skybox;
+            // Disabled at runtime so WebGL headless/browser renders use the bright evening_sky_1k.hdr skybox IBL instead of an unbaked black cubemap
+            probe.enabled = false;
+        }
+
         private static void BuildSodiumVaporLightPoles(
             Transform parent,
             Material darkSteelMaterial,
             Material sodiumEmissiveMaterial,
+            Material haloMat,
             List<Light> floodlights)
         {
             GameObject polesRoot = new GameObject("SodiumVaporLightPoles");
@@ -174,6 +203,18 @@ namespace ShipyardCat.World
                 emitter.transform.localScale = new Vector3(0.42f, 0.06f, 0.72f);
                 DestroyColliderImmediateOrRuntime(emitter);
                 ApplyMaterial(emitter, sodiumEmissiveMaterial, ShadowCastingMode.Off);
+
+                if (haloMat != null)
+                {
+                    GameObject haloQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    haloQuad.name = "SodiumHaloBillboard";
+                    haloQuad.transform.SetParent(poleRoot.transform, false);
+                    haloQuad.transform.localPosition = new Vector3(0f, 10.76f, 1.45f);
+                    haloQuad.transform.localScale = Vector3.one * 2.4f;
+                    DestroyColliderImmediateOrRuntime(haloQuad);
+                    ApplyMaterial(haloQuad, haloMat, ShadowCastingMode.Off);
+                    haloQuad.AddComponent<LamppostBillboardHalo>();
+                }
 
                 // Downward warm #FF9B38 Spot Light (WebGL-safe: LightShadows.None)
                 GameObject lightObj = new GameObject("SodiumVaporLight");

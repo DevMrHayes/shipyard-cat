@@ -222,8 +222,11 @@ namespace ShipyardCat.Core
             if (uiDocument != null && uiDocument.rootVisualElement != null)
             {
                 bool showHud = CurrentState != GameState.TitleLogin;
-                var topBar = uiDocument.rootVisualElement.Q<VisualElement>("top-bar");
-                if (topBar != null) topBar.style.display = showHud ? DisplayStyle.Flex : DisplayStyle.None;
+                if (!showHud)
+                {
+                    var topBar = uiDocument.rootVisualElement.Q<VisualElement>("top-bar");
+                    if (topBar != null) topBar.style.display = DisplayStyle.None;
+                }
                 var missionCard = uiDocument.rootVisualElement.Q<VisualElement>("mission-card");
                 if (missionCard != null) missionCard.style.display = showHud ? DisplayStyle.Flex : DisplayStyle.None;
             }

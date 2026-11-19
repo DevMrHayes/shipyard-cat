@@ -38,6 +38,17 @@ namespace ShipyardCat.AI
         private Material _particleMaterial;
         private Texture2D _particleTexture;
 
+        private LineRenderer _lungeConeRenderer;
+        private LineRenderer _stompRingRenderer;
+        private Material _lungeConeMaterial;
+        private Material _stompRingMaterial;
+        private readonly Vector3[] _conePoints = new Vector3[11];
+        private readonly Vector3[] _stompRingPoints = new Vector3[36];
+        private float _telegraphCycleTime;
+
+        public bool HasLungeConeTelegraph => _lungeConeRenderer != null;
+        public bool HasToxicStompRing => _stompRingRenderer != null;
+
         private float _currentIntensity;
         private float _fastMoveSpeedSqr;
         private float _moveBurstTimer;
@@ -51,6 +62,7 @@ namespace ShipyardCat.AI
 
             CreateRimLights();
             CreateSplashParticleSystem();
+            CreateCombatTelegraphs();
 
             if (_bossTransform != null)
             {
@@ -89,6 +101,18 @@ namespace ShipyardCat.AI
                 Destroy(_particleTexture);
                 _particleTexture = null;
             }
+
+            if (_lungeConeMaterial != null)
+            {
+                Destroy(_lungeConeMaterial);
+                _lungeConeMaterial = null;
+            }
+
+            if (_stompRingMaterial != null)
+            {
+                Destroy(_stompRingMaterial);
+                _stompRingMaterial = null;
+            }
         }
 
         private void Update()
@@ -102,6 +126,95 @@ namespace ShipyardCat.AI
 
             UpdateRimLights(dt);
             UpdateFastMovementBursts(dt);
+            UpdateCombatTelegraphs(dt);
+        }
+
+        private void CreateCombatTelegraphs()
+        {
+            Shader unlit = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            _lungeConeMaterial = new Material(unlit) { name = "KingpinLungeTelegraphMat", hideFlags = HideFlags.DontSave };
+            _lungeConeMaterial.color = new Color(1f, 0.353f, 0.125f, 0.85f); // #FF5A20
+
+            _stompRingMaterial = new Material(unlit) { name = "KingpinStompTelegraphMat", hideFlags = HideFlags.DontSave };
+            _stompRingMaterial.color = new Color(0.525f, 1f, 0.2f, 0.85f); // #86FF33
+
+            var coneGo = new GameObject("KingpinLungeTelegraph");
+            coneGo.transform.SetParent(transform, false);
+            _lungeConeRenderer = coneGo.AddComponent<LineRenderer>();
+            _lungeConeRenderer.useWorldSpace = true;
+            _lungeConeRenderer.loop = true;
+            _lungeConeRenderer.positionCount = _conePoints.Length;
+            _lungeConeRenderer.startWidth = 0.08f;
+            _lungeConeRenderer.endWidth = 0.08f;
+            _lungeConeRenderer.sharedMaterial = _lungeConeMaterial;
+            _lungeConeRenderer.enabled = false;
+
+            var ringGo = new GameObject("KingpinStompTelegraph");
+            ringGo.transform.SetParent(transform, false);
+            _stompRingRenderer = ringGo.AddComponent<LineRenderer>();
+            _stompRingRenderer.useWorldSpace = true;
+            _stompRingRenderer.loop = true;
+            _stompRingRenderer.positionCount = _stompRingPoints.Length;
+            _stompRingRenderer.startWidth = 0.10f;
+            _stompRingRenderer.endWidth = 0.10f;
+            _stompRingRenderer.sharedMaterial = _stompRingMaterial;
+            _stompRingRenderer.enabled = false;
+        }
+
+        private void UpdateCombatTelegraphs(float dt)
+        {
+            if (_lungeConeRenderer == null || _stompRingRenderer == null) return;
+
+            bool show = bossAI.IsAggro && bossAI.IsAlive;
+            if (!show)
+            {
+                if (_lungeConeRenderer.enabled) _lungeConeRenderer.enabled = false;
+                if (_stompRingRenderer.enabled) _stompRingRenderer.enabled = false;
+                return;
+            }
+
+            _telegraphCycleTime = Mathf.Repeat(_telegraphCycleTime + dt, 3.2f);
+            Vector3 basePos = _bossTransform.position + Vector3.up * 0.08f;
+
+            // 60-degree lunge hazard cone during attack buildup windows
+            bool lungeWindow = _telegraphCycleTime < 0.75f;
+            _lungeConeRenderer.enabled = lungeWindow;
+            if (lungeWindow)
+            {
+                Vector3 fwd = _bossTransform.forward;
+                fwd.y = 0f;
+                if (fwd.sqrMagnitude < 0.001f) fwd = Vector3.forward;
+                fwd.Normalize();
+
+                const float radius = 5.5f;
+                _conePoints[0] = basePos;
+                for (int i = 0; i <= 9; i++)
+                {
+                    float ang = Mathf.Lerp(-30f, 30f, i / 9f);
+                    _conePoints[i + 1] = basePos + Quaternion.Euler(0f, ang, 0f) * fwd * radius;
+                }
+                _lungeConeRenderer.SetPositions(_conePoints);
+            }
+
+            // Expanding radial bile-green toxic stomp shockwave ring
+            bool stompWindow = _telegraphCycleTime >= 1.6f && _telegraphCycleTime < 2.65f;
+            _stompRingRenderer.enabled = stompWindow;
+            if (stompWindow)
+            {
+                float progress = (_telegraphCycleTime - 1.6f) / 1.05f;
+                float r = Mathf.Lerp(1.0f, 9.0f, progress);
+                float alpha = 1f - progress;
+                Color c = new Color(0.525f, 1f, 0.2f, alpha);
+                _stompRingRenderer.startColor = c;
+                _stompRingRenderer.endColor = c;
+
+                for (int i = 0; i < _stompRingPoints.Length; i++)
+                {
+                    float a = (i / (float)_stompRingPoints.Length) * Mathf.PI * 2f;
+                    _stompRingPoints[i] = basePos + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+                }
+                _stompRingRenderer.SetPositions(_stompRingPoints);
+            }
         }
 
         private void ResolveBossReference()

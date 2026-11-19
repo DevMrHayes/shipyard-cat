@@ -63,6 +63,8 @@ namespace ShipyardCat.UI
         // Radar
         private VisualElement _radarCircle;
         private VisualElement _radarBlipsLayer;
+        private VisualElement _radarSweepLine;
+        private float _radarSweepAngle;
         private readonly List<RadarBlip> _radarBlipBuffer = new List<RadarBlip>(MaxRadarBlips);
         private readonly List<VisualElement> _radarBlipPool = new List<VisualElement>(MaxRadarBlips);
         private int _activeBlipCount;
@@ -125,6 +127,18 @@ namespace ShipyardCat.UI
         private int _combatTier = 1;
         private int _radTier = 1;
         private bool _gameplayHudVisible = true;
+        private bool _debugToolbarVisible;
+
+        public bool IsDebugToolbarVisible => _debugToolbarVisible;
+
+        public void ToggleDebugToolbar()
+        {
+            _debugToolbarVisible = !_debugToolbarVisible;
+            if (_gameplayHudVisible)
+            {
+                SetElementDisplay(_topBar, _debugToolbarVisible ? DisplayStyle.Flex : DisplayStyle.None);
+            }
+        }
 
         private void Awake()
         {
@@ -157,6 +171,10 @@ namespace ShipyardCat.UI
             if (kb != null && kb.tabKey.wasPressedThisFrame)
             {
                 ToggleLogbookOverlay();
+            }
+            if (kb != null && kb.f12Key.wasPressedThisFrame)
+            {
+                ToggleDebugToolbar();
             }
 
             if (_toastTimer > 0f)
@@ -206,7 +224,7 @@ namespace ShipyardCat.UI
             SetElementDisplay(_vitalsCard, display);
             SetElementDisplay(_missionCard, display);
             SetElementDisplay(_radarCard, display);
-            SetElementDisplay(_topBar, display);
+            SetElementDisplay(_topBar, (visible && _debugToolbarVisible) ? DisplayStyle.Flex : DisplayStyle.None);
             SetElementDisplay(_bottomDock, display);
             SetElementDisplay(_toolbar, display);
 
@@ -356,6 +374,7 @@ namespace ShipyardCat.UI
 
             _radarCircle = _root.Q<VisualElement>("radar-circle");
             _radarBlipsLayer = _root.Q<VisualElement>("radar-blips-layer");
+            _radarSweepLine = _root.Q<VisualElement>("radar-sweep-line");
             InitializeRadarPool();
 
             _contextualPromptBar = _root.Q<VisualElement>("contextual-prompt-bar");
@@ -641,6 +660,12 @@ namespace ShipyardCat.UI
 
         private void UpdateRadar()
         {
+            if (_radarSweepLine != null)
+            {
+                _radarSweepAngle = (_radarSweepAngle + Time.unscaledDeltaTime * 95f) % 360f;
+                _radarSweepLine.style.rotate = new Rotate(_radarSweepAngle);
+            }
+
             if (_radarController == null || _radarBlipsLayer == null || _radarBlipPool.Count == 0)
             {
                 return;

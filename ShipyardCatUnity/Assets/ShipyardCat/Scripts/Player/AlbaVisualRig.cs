@@ -223,7 +223,11 @@ namespace ShipyardCat.Player
                 _collarMaterial.SetColor(BaseColorId, CollarOrange);
                 _collarMaterial.SetFloat(MetallicId, 0.05f);
                 _collarMaterial.SetFloat(SmoothnessId, 0.52f);
-                EnableEmission(_collarMaterial, CollarOrange * 0.48f);
+                EnableEmission(_collarMaterial, CollarOrange * 0.95f);
+            }
+            else
+            {
+                EnableEmission(_collarMaterial, CollarOrange * 0.95f);
             }
 
             if (_brassMaterial == null)
@@ -266,12 +270,12 @@ namespace ShipyardCat.Player
         {
             if (_collarMesh == null)
             {
-                _collarMesh = BuildTorusMesh(0.046f, 0.0085f, 0.85f, 28, 14);
+                _collarMesh = BuildTorusMesh(0.076f, 0.0115f, 0.86f, 28, 14);
             }
 
             if (_tagMesh == null)
             {
-                _tagMesh = BuildDiscMesh(0.015f, 0.004f, 24);
+                _tagMesh = BuildDiscMesh(0.018f, 0.005f, 20);
             }
 
             if (_dosimeterBoxMesh == null)
@@ -346,6 +350,11 @@ namespace ShipyardCat.Player
             _rendererBuffer.Clear();
         }
 
+        public void AttachSafetyCollarAndBell(Transform visualRoot)
+        {
+            BuildHardwareAttachments(visualRoot);
+        }
+
         private void BuildHardwareAttachments(Transform visualRoot)
         {
             ResolveNeckAndHeadBones();
@@ -357,18 +366,30 @@ namespace ShipyardCat.Player
             collarTransform.localPosition = Vector3.zero;
             collarTransform.localRotation = Quaternion.identity;
             collarTransform.localScale = Vector3.one;
+
+            if (_collarMesh != null)
+            {
+                DestroyProceduralObject(_collarMesh);
+            }
+            _collarMesh = BuildTorusMesh(0.076f, 0.0115f, 0.86f, 28, 14);
             AssignMeshAndMaterial(collarTransform, _collarMesh, _collarMaterial);
 
             Transform tagTransform = GetOrCreateChild(BrassTagName, _collarMount);
-            tagTransform.localPosition = new Vector3(0f, -0.008f, 0.054f);
-            tagTransform.localRotation = Quaternion.Euler(78f, 0f, 0f);
+            tagTransform.localPosition = new Vector3(0f, -0.010f, 0.088f);
+            tagTransform.localRotation = Quaternion.Euler(58f, 0f, 0f);
             tagTransform.localScale = Vector3.one;
+
+            if (_tagMesh != null)
+            {
+                DestroyProceduralObject(_tagMesh);
+            }
+            _tagMesh = BuildDiscMesh(0.018f, 0.005f, 20);
             AssignMeshAndMaterial(tagTransform, _tagMesh, _brassMaterial);
 
             Transform dosimeterTransform = GetOrCreateChild(DosimeterName, _collarMount);
-            dosimeterTransform.localPosition = new Vector3(0.052f, 0.002f, 0.008f);
+            dosimeterTransform.localPosition = new Vector3(0.082f, 0.003f, 0.012f);
             dosimeterTransform.localRotation = Quaternion.Euler(0f, 90f, 0f);
-            dosimeterTransform.localScale = Vector3.one;
+            dosimeterTransform.localScale = new Vector3(0.014f, 0.020f, 0.026f);
             AssignMeshAndMaterial(dosimeterTransform, _dosimeterBoxMesh, _dosimeterBodyMaterial);
 
             Transform screenTransform = GetOrCreateChild(DosimeterScreenName, dosimeterTransform);

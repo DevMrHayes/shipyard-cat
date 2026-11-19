@@ -309,6 +309,12 @@ namespace ShipyardCat.Player
                 {
                     _verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
                 }
+                else if (isGrounded && moveDir.sqrMagnitude > 0.01f &&
+                         TryDetectMantleLedge(transform.position, moveDir, out Vector3 mantleTop))
+                {
+                    float heightDelta = Mathf.Clamp(mantleTop.y - transform.position.y, 0.2f, 1.15f);
+                    _verticalVelocity = Mathf.Max(_verticalVelocity, Mathf.Sqrt((heightDelta + 0.28f) * -2f * gravity));
+                }
             }
 
             _verticalVelocity += gravity * dt;
@@ -316,6 +322,41 @@ namespace ShipyardCat.Player
             Vector3 velocity = _currentHorizontalVelocity;
             velocity.y = _verticalVelocity;
             _characterController.Move(velocity * dt);
+        }
+
+        public bool TryDetectMantleLedge(Vector3 origin, Vector3 forward, out Vector3 targetTop)
+        {
+            targetTop = default;
+            if (forward.sqrMagnitude < 0.001f) return false;
+            Vector3 flatForward = new Vector3(forward.x, 0f, forward.z).normalized;
+
+            // Lower spherecast detects obstacle face; upper spherecast verifies clearance over top
+            Vector3 chestOrigin = origin + Vector3.up * 0.26f;
+            if (!Physics.SphereCast(chestOrigin, 0.14f, flatForward, out RaycastHit obstacleHit, 0.72f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                return false;
+            }
+
+            if (obstacleHit.collider == null || obstacleHit.collider.transform.IsChildOf(transform))
+            {
+                return false;
+            }
+
+            float topY = obstacleHit.collider.bounds.max.y;
+            float rise = topY - origin.y;
+            if (rise < 0.18f || rise > 1.15f)
+            {
+                return false;
+            }
+
+            Vector3 headOrigin = new Vector3(origin.x, topY + 0.28f, origin.z);
+            if (Physics.SphereCast(headOrigin, 0.14f, flatForward, out _, 0.65f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                return false;
+            }
+
+            targetTop = new Vector3(obstacleHit.point.x, topY, obstacleHit.point.z);
+            return true;
         }
 
         private void ApplyIdleGravity(float dt)

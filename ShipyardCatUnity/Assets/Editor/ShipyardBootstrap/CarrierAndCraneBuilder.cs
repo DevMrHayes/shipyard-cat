@@ -70,7 +70,7 @@ namespace ShipyardCat.Editor
             Material signMat = CreateCutoutSignMaterial(
                 "Mat_BigBlue_Sign_Cutout",
                 bigBlueTex,
-                new Color(0.70f, 0.82f, 0.94f) * 0.42f);
+                new Color(0.84f, 0.93f, 1.0f) * 1.45f);
 
             const float craneCenterX = -115f;
             const float girderY = 76f;
@@ -104,7 +104,7 @@ namespace ShipyardCat.Editor
             Material hullMat = CreateCutoutSignMaterial(
                 "Mat_CVN80_Hull80_Cutout",
                 hull80Tex,
-                new Color(0.85f, 0.90f, 0.95f) * 0.35f);
+                new Color(0.88f, 0.94f, 1.0f) * 1.15f);
 
             GameObject carrierDetails = new GameObject("CVN80_HeroDetails");
             carrierDetails.transform.SetParent(parent, false);
