@@ -293,18 +293,21 @@ namespace ShipyardCat.UI
 
         private void EnsureBound()
         {
-            if (!_isBound)
+            if (!_isBound && !_isBinding)
             {
                 BindUI();
             }
         }
 
+        private bool _isBinding;
+
         private void BindUI()
         {
-            if (_isBound)
+            if (_isBound || _isBinding)
             {
                 return;
             }
+            _isBinding = true;
 
             if (_uiDocument == null)
             {
@@ -314,6 +317,7 @@ namespace ShipyardCat.UI
             _root = _uiDocument != null ? _uiDocument.rootVisualElement : null;
             if (_root == null)
             {
+                _isBinding = false;
                 return;
             }
 
@@ -395,8 +399,9 @@ namespace ShipyardCat.UI
                 _zoneLabel.text = "SHIPYARD";
             }
 
-            SetGameplayHudVisible(_gameplayHudVisible);
+            _isBinding = false;
             _isBound = true;
+            SetGameplayHudVisible(_gameplayHudVisible);
         }
 
         private void UnbindUI()

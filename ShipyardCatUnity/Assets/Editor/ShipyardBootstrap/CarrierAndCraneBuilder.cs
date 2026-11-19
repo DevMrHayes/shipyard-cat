@@ -77,7 +77,7 @@ namespace ShipyardCat.Editor
                 "BigBlue_Sign_South",
                 signText,
                 new Vector3(craneCenterX, girderY, craneCenterZ - zOffset),
-                Quaternion.identity,
+                Quaternion.Euler(0f, 180f, 0f),
                 0.65f,
                 64,
                 Color.white);
@@ -87,7 +87,7 @@ namespace ShipyardCat.Editor
                 "BigBlue_Sign_North",
                 signText,
                 new Vector3(craneCenterX, girderY, craneCenterZ + zOffset),
-                Quaternion.Euler(0f, 180f, 0f),
+                Quaternion.identity,
                 0.65f,
                 64,
                 Color.white);

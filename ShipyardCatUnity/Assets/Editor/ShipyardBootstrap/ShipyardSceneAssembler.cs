@@ -124,8 +124,8 @@ namespace ShipyardCat.Editor
             CreateBox("CatHaven_CanopyRoof", worldRoot.transform, new Vector3(-15f, 2.8f, -45f), new Vector3(7f, 0.25f, 7f), safetyAmberMat);
             CreateBox("CatHaven_PillarNW", worldRoot.transform, new Vector3(-18f, 1.4f, -48f), new Vector3(0.3f, 2.8f, 0.3f), steelMat);
             CreateBox("CatHaven_PillarNE", worldRoot.transform, new Vector3(-12f, 1.4f, -48f), new Vector3(0.3f, 2.8f, 0.3f), steelMat);
-            CreateBox("CargoContainer_Navy1", worldRoot.transform, new Vector3(-2f, 1.3f, -26f), new Vector3(2.5f, 2.6f, 6.1f), waterMat);
-            CreateBox("CargoContainer_Amber2", worldRoot.transform, new Vector3(-2f, 1.3f, -18f), new Vector3(2.5f, 2.6f, 6.1f), safetyAmberMat);
+            CreateBox("CargoContainer_Navy1", worldRoot.transform, new Vector3(12f, 1.3f, -26f), new Vector3(2.5f, 2.6f, 6.1f), waterMat);
+            CreateBox("CargoContainer_Amber2", worldRoot.transform, new Vector3(12f, 1.3f, -18f), new Vector3(2.5f, 2.6f, 6.1f), safetyAmberMat);
             CreateBox("CableSpool_Rack", worldRoot.transform, new Vector3(-18f, 0.8f, -15f), new Vector3(2.2f, 1.6f, 2.2f), steelMat);
 
             var vault = CreateBox("RadiationVault_Bunker", worldRoot.transform, new Vector3(42f, 3f, -60f), new Vector3(14f, 6f, 14f), safetyAmberMat);
@@ -149,10 +149,20 @@ namespace ShipyardCat.Editor
             floodlights.Add(CreateFloodlight("Floodlight_FabShop", worldRoot.transform, new Vector3(-165f, 26f, -25f)));
             WetPuddleAndAtmosphereBuilder.BuildAtmosphereAndPuddles(worldRoot.transform, floodlights);
 
-            // 9. Bake NavMesh on Walkable Geometry
+            // 9. Bake & Persist NavMesh on Walkable Geometry so WebGL retains baked NavMeshData
             var navSurface = walkableRoot.AddComponent<NavMeshSurface>();
             navSurface.collectObjects = CollectObjects.Children;
             navSurface.BuildNavMesh();
+            if (navSurface.navMeshData != null)
+            {
+                const string navPath = "Assets/ShipyardCat/Settings/ShipyardNavMesh.asset";
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.AI.NavMeshData>(navPath) != null)
+                {
+                    AssetDatabase.DeleteAsset(navPath);
+                }
+                AssetDatabase.CreateAsset(navSurface.navMeshData, navPath);
+                EditorUtility.SetDirty(navSurface);
+            }
 
             // 10. Managers & Systems
             var managersGo = new GameObject("ShipyardManagers");

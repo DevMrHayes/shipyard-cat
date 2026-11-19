@@ -235,12 +235,12 @@ namespace ShipyardCat.Player
         {
             if (_collarMesh == null)
             {
-                _collarMesh = BuildTorusMesh(0.072f, 0.015f, 0.62f, 28, 14);
+                _collarMesh = BuildTorusMesh(0.068f, 0.016f, 0.65f, 28, 14);
             }
 
             if (_tagMesh == null)
             {
-                _tagMesh = BuildDiscMesh(0.021f, 0.0045f, 24);
+                _tagMesh = BuildDiscMesh(0.022f, 0.005f, 24);
             }
 
             if (_dosimeterBoxMesh == null)
@@ -317,41 +317,27 @@ namespace ShipyardCat.Player
 
         private void BuildHardwareAttachments(Transform visualRoot)
         {
-            Transform neckBone = FindNeckBone(visualRoot);
-            bool hasNeckBone = neckBone != null;
-
-            Transform collarTransform = GetOrCreateChild(SafetyCollarName, hasNeckBone ? neckBone : visualRoot);
-            if (hasNeckBone)
-            {
-                collarTransform.localPosition = Vector3.zero;
-                collarTransform.localRotation = Quaternion.identity;
-            }
-            else
-            {
-                collarTransform.localPosition = new Vector3(0f, 0.44f, 0.23f);
-                collarTransform.localRotation = Quaternion.Euler(14f, 0f, 0f);
-            }
+            // Parent directly to Alba_Player root (1:1 world meters) aligned cleanly to 1.45x cat.glb neck height
+            Transform collarTransform = GetOrCreateChild(SafetyCollarName, transform);
+            collarTransform.localPosition = new Vector3(0f, 0.27f, 0.16f);
+            collarTransform.localRotation = Quaternion.Euler(28f, 0f, 0f);
             collarTransform.localScale = Vector3.one;
             AssignMeshAndMaterial(collarTransform, _collarMesh, _collarMaterial);
 
-            Transform tagTransform = GetOrCreateChild(BrassTagName, hasNeckBone ? neckBone : visualRoot);
-            tagTransform.localPosition = hasNeckBone
-                ? new Vector3(0f, -0.08f, 0.05f)
-                : new Vector3(0f, 0.36f, 0.28f);
-            tagTransform.localRotation = Quaternion.Euler(10f, 0f, 0f);
+            Transform tagTransform = GetOrCreateChild(BrassTagName, transform);
+            tagTransform.localPosition = new Vector3(0f, 0.21f, 0.21f);
+            tagTransform.localRotation = Quaternion.Euler(14f, 0f, 0f);
             tagTransform.localScale = Vector3.one;
             AssignMeshAndMaterial(tagTransform, _tagMesh, _brassMaterial);
 
-            Transform dosimeterTransform = GetOrCreateChild(DosimeterName, hasNeckBone ? neckBone : visualRoot);
-            dosimeterTransform.localPosition = hasNeckBone
-                ? new Vector3(-0.085f, -0.01f, 0.01f)
-                : new Vector3(-0.085f, 0.43f, 0.24f);
-            dosimeterTransform.localRotation = Quaternion.Euler(0f, -35f, 0f);
+            Transform dosimeterTransform = GetOrCreateChild(DosimeterName, transform);
+            dosimeterTransform.localPosition = new Vector3(-0.072f, 0.27f, 0.16f);
+            dosimeterTransform.localRotation = Quaternion.Euler(0f, -45f, 0f);
             dosimeterTransform.localScale = Vector3.one;
             AssignMeshAndMaterial(dosimeterTransform, _dosimeterBoxMesh, _dosimeterBodyMaterial);
 
             Transform screenTransform = GetOrCreateChild(DosimeterScreenName, dosimeterTransform);
-            screenTransform.localPosition = new Vector3(0f, 0.004f, 0.0105f);
+            screenTransform.localPosition = new Vector3(0f, 0.004f, 0.011f);
             screenTransform.localRotation = Quaternion.identity;
             screenTransform.localScale = Vector3.one;
 

@@ -206,11 +206,11 @@ namespace ShipyardCat.World
                 name = "Mat_WetAsphaltPuddle"
             };
 
-            Color baseColor = new Color(0.06f, 0.08f, 0.11f, 0.78f);
+            Color baseColor = new Color(0.008f, 0.010f, 0.014f, 0.72f);
             mat.SetColor("_BaseColor", baseColor);
             mat.SetColor("_Color", baseColor);
-            mat.SetFloat("_Metallic", 0.22f);
-            mat.SetFloat("_Smoothness", 0.94f);
+            mat.SetFloat("_Metallic", 0.0f);
+            mat.SetFloat("_Smoothness", 0.72f);
             mat.SetFloat("_Glossiness", 0.94f);
 
             // Configure URP Transparent surface for mirror-like wet puddle alpha blend

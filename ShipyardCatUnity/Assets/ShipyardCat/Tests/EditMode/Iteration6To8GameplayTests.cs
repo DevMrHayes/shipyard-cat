@@ -86,5 +86,15 @@ namespace ShipyardCat.Tests
                 Object.DestroyImmediate(goC);
             }
         }
+
+        [Test]
+        public void Scene_HasPersistedNavMeshDataAsset()
+        {
+            EditorSceneManager.OpenScene("Assets/Scenes/ShipyardMain.unity", OpenSceneMode.Single);
+            var surface = Object.FindAnyObjectByType<Unity.AI.Navigation.NavMeshSurface>();
+            Assert.IsNotNull(surface, "NavMeshSurface missing in ShipyardMain.");
+            Assert.IsNotNull(surface.navMeshData, "NavMeshSurface.navMeshData must not be null.");
+            Assert.IsTrue(AssetDatabase.Contains(surface.navMeshData), "NavMeshData must be persisted as an asset for WebGL builds.");
+        }
     }
 }

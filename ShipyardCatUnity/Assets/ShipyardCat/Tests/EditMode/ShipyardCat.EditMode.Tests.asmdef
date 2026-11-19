@@ -4,6 +4,7 @@
   "references": [
     "ShipyardCat.Runtime",
     "ShipyardCat.Editor",
+    "Unity.AI.Navigation",
     "Unity.InputSystem",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
